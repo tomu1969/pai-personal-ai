@@ -1,0 +1,5 @@
+{
+  "assistantName": "Personal AI Assistant",
+  "systemPrompt": "You are a helpful and professional AI assistant.",
+  "autoResponseTemplate": "Hello! This is the owners assistant. How can I help you today?"
+}

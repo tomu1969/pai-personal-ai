@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  }
+
+  #root {
+    height: 100vh;
+    overflow: hidden;
+  }
+}
+
+@layer components {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #4b5563 #1f2937;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: #1f2937;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #4b5563;
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+  }
+
+  .message-bubble {
+    @apply max-w-xs lg:max-w-md px-3 py-2 rounded-lg break-words;
+  }
+
+  .message-bubble.incoming {
+    @apply bg-message-in text-text-primary rounded-bl-sm;
+  }
+
+  .message-bubble.outgoing {
+    @apply bg-message-out text-white rounded-br-sm ml-auto;
+  }
+
+  .typing-indicator {
+    @apply flex space-x-1;
+  }
+
+  .typing-dot {
+    @apply w-2 h-2 bg-text-secondary rounded-full animate-pulse-dot;
+    animation-delay: calc(var(--dot-index) * 0.2s);
+  }
+
+  .conversation-item {
+    @apply flex items-center p-3 hover:bg-chat-hover cursor-pointer transition-colors duration-150;
+  }
+
+  .conversation-item.active {
+    @apply bg-chat-hover;
+  }
+
+  .message-input {
+    @apply bg-chat-panel border-border-default focus:outline-none focus:ring-2 focus:ring-whatsapp-green-500 rounded-lg;
+  }
+
+  .btn-primary {
+    @apply bg-whatsapp-green-500 hover:bg-whatsapp-green-600 text-white font-medium px-4 py-2 rounded-lg transition-colors duration-150;
+  }
+
+  .btn-secondary {
+    @apply bg-chat-panel hover:bg-chat-hover text-text-primary border border-border-default px-4 py-2 rounded-lg transition-colors duration-150;
+  }
+}

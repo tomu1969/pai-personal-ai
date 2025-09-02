@@ -1,0 +1,15 @@
+{
+  "event": "messages.upsert",
+  "data": [{
+    "key": {
+      "id": "test-123",
+      "fromMe": false,
+      "remoteJid": "1234567890@s.whatsapp.net"
+    },
+    "message": {
+      "conversation": "Hello! Can you help me?"
+    },
+    "messageTimestamp": 1640995200,
+    "pushName": "Test User"
+  }]
+}

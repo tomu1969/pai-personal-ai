@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database - Required by Evolution API v2+
+  postgres:
+    container_name: evolution-postgres
+    image: postgres:15
+    networks:
+      - evolution-net
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: mypassword123
+      POSTGRES_DB: evolution_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution -d evolution_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache - Required by Evolution API
+  redis:
+    container_name: evolution-redis
+    image: redis:latest
+    networks:
+      - evolution-net
+    restart: always
+    command: redis-server --port 6379 --appendonly yes
+    volumes:
+      - evolution_redis:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Evolution API - WhatsApp Integration
+  evolution-api:
+    container_name: evolution_api
+    image: atendai/evolution-api:v2.0.9
+    networks:
+      - evolution-net
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - evolution_instances:/evolution/instances
+    env_file:
+      - .env.evolution
+    environment:
+      # Override critical settings to ensure they work
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://evolution:mypassword123@postgres:5432/evolution_db?schema=public
+
+volumes:
+  postgres_data:
+  evolution_redis:
+  evolution_instances:
+
+networks:
+  evolution-net:
+    driver: bridge

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI PBX - WhatsApp QR Code</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        h1 { 
+            color: #25D366; 
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .status-container {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+        .status-item {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            flex: 1;
+            margin: 0 10px;
+        }
+        .status-ok { background: #d4edda; color: #155724; }
+        .status-waiting { background: #fff3cd; color: #856404; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        
+        .qr-container {
+            margin: 30px auto;
+            padding: 20px;
+            border: 3px dashed #25D366;
+            border-radius: 20px;
+            max-width: 400px;
+            min-height: 350px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f8f9fa;
+        }
+        .qr-content {
+            text-align: center;
+        }
+        #qrcode {
+            max-width: 300px;
+            max-height: 300px;
+        }
+        .instructions {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #1976d2;
+        }
+        .instructions ol {
+            text-align: left;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 10px 0;
+        }
+        .button-group {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        button {
+            background: #25D366;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #128C7E;
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #25D366;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error-msg {
+            color: #dc3545;
+            text-align: center;
+            padding: 10px;
+            background: #f8d7da;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .success-msg {
+            color: #155724;
+            text-align: center;
+            padding: 10px;
+            background: #d4edda;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI PBX WhatsApp Connection</h1>
+        <p class="subtitle">Connect your WhatsApp to the AI Assistant</p>
+        
+        <div class="status-container">
+            <div class="status-item status-ok" id="ai-pbx-status">
+                <strong>AI PBX</strong><br>
+                <span id="ai-pbx-text">Running</span>
+            </div>
+            <div class="status-item status-waiting" id="evolution-status">
+                <strong>Evolution API</strong><br>
+                <span id="evolution-text">Checking...</span>
+            </div>
+            <div class="status-item status-waiting" id="whatsapp-status">
+                <strong>WhatsApp</strong><br>
+                <span id="whatsapp-text">Not Connected</span>
+            </div>
+        </div>
+        
+        <div id="messages"></div>
+        
+        <div class="qr-container">
+            <div class="qr-content" id="qr-content">
+                <div class="loading"></div>
+                <p>Loading QR Code...</p>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h3>How to Connect:</h3>
+            <ol>
+                <li>Wait for the QR code to appear above</li>
+                <li>Open <strong>WhatsApp</strong> on your phone</li>
+                <li>Tap <strong>Menu</strong> (3 dots) → <strong>Linked Devices</strong></li>
+                <li>Tap <strong>"Link a Device"</strong></li>
+                <li>Scan the QR code above</li>
+                <li>Wait for "Connected" status</li>
+            </ol>
+        </div>
+        
+        <div class="button-group">
+            <button onclick="checkStatus()">Check Status</button>
+            <button onclick="createInstance()">Create Instance</button>
+            <button onclick="getQRCode()">Refresh QR</button>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = 'ai-pbx-key-2024';
+        const INSTANCE_NAME = 'aipbx';  // Changed to new instance name
+        const BASE_URL = 'http://localhost:8080';
+        let checkInterval;
+        
+        function showMessage(message, type = 'info') {
+            const messages = document.getElementById('messages');
+            messages.innerHTML = type === 'error' 
+                ? `<div class="error-msg">${message}</div>`
+                : `<div class="success-msg">${message}</div>`;
+            setTimeout(() => messages.innerHTML = '', 5000);
+        }
+        
+        async function makeRequest(url, method = 'GET', body = null) {
+            console.log(`[REQUEST] ${method} ${url}`);
+            if (body) console.log('[REQUEST BODY]', body);
+            
+            try {
+                const options = {
+                    method,
+                    headers: { 'apikey': API_KEY }
+                };
+                if (body) {
+                    options.headers['Content-Type'] = 'application/json';
+                    options.body = JSON.stringify(body);
+                }
+                
+                console.log('[REQUEST HEADERS]', options.headers);
+                const response = await fetch(url, options);
+                const text = await response.text();
+                console.log(`[RESPONSE] Status: ${response.status}, Body:`, text);
+                
+                try {
+                    const parsed = JSON.parse(text);
+                    console.log('[PARSED RESPONSE]', parsed);
+                    return parsed;
+                } catch {
+                    console.log('[RESPONSE NOT JSON]', text);
+                    return { text, status: response.status };
+                }
+            } catch (error) {
+                console.error('[REQUEST ERROR]', error);
+                console.error('Error details:', error.message, error.stack);
+                return null;
+            }
+        }
+        
+        async function checkEvolutionAPI() {
+            const response = await fetch(`${BASE_URL}/manager/api/instances`, {
+                headers: { 'apikey': API_KEY }
+            }).catch(() => null);
+            
+            const evolutionStatus = document.getElementById('evolution-status');
+            const evolutionText = document.getElementById('evolution-text');
+            
+            if (response && response.ok) {
+                evolutionStatus.className = 'status-item status-ok';
+                evolutionText.textContent = 'Running';
+                return true;
+            } else {
+                evolutionStatus.className = 'status-item status-error';
+                evolutionText.textContent = 'Not Running';
+                return false;
+            }
+        }
+        
+        async function checkStatus() {
+            const evolutionRunning = await checkEvolutionAPI();
+            if (!evolutionRunning) {
+                showMessage('Evolution API is not running. Docker may still be downloading images.', 'error');
+                return;
+            }
+            
+            const data = await makeRequest(`${BASE_URL}/instance/connectionState/${INSTANCE_NAME}`);
+            const whatsappStatus = document.getElementById('whatsapp-status');
+            const whatsappText = document.getElementById('whatsapp-text');
+            
+            if (data && data.instance) {
+                const state = data.instance.state;
+                if (state === 'open') {
+                    whatsappStatus.className = 'status-item status-ok';
+                    whatsappText.textContent = 'Connected';
+                    document.getElementById('qr-content').innerHTML = '<p style="color: #28a745; font-size: 24px;">Successfully Connected!</p>';
+                    clearInterval(checkInterval);
+                    showMessage('WhatsApp is connected! You can now send messages.', 'success');
+                } else if (state === 'connecting') {
+                    whatsappStatus.className = 'status-item status-waiting';
+                    whatsappText.textContent = 'Connecting...';
+                } else {
+                    whatsappStatus.className = 'status-item status-error';
+                    whatsappText.textContent = state || 'Disconnected';
+                }
+            } else {
+                whatsappStatus.className = 'status-item status-error';
+                whatsappText.textContent = 'No Instance';
+                showMessage('No WhatsApp instance found. Click "Create Instance" to start.', 'error');
+            }
+        }
+        
+        async function createInstance() {
+            console.log('[CREATE INSTANCE] Starting creation...');
+            showMessage('Creating WhatsApp instance...', 'info');
+            
+            const requestBody = {
+                instanceName: INSTANCE_NAME,
+                integration: 'WHATSAPP-BAILEYS',
+                qrcode: true,
+                token: API_KEY
+            };
+            
+            console.log('[CREATE INSTANCE] Request body:', requestBody);
+            
+            const data = await makeRequest(
+                `${BASE_URL}/instance/create`,
+                'POST',
+                requestBody
+            );
+            
+            console.log('[CREATE INSTANCE] Response:', data);
+            
+            if (data && (data.instance || data.qrcode)) {
+                console.log('[CREATE INSTANCE] Success! Instance data:', data.instance);
+                showMessage('Instance created successfully!', 'success');
+                setTimeout(() => {
+                    console.log('[CREATE INSTANCE] Now getting QR code...');
+                    getQRCode();
+                }, 2000);
+            } else if (data && data.error) {
+                console.error('[CREATE INSTANCE] Error:', data.error, data.message);
+                showMessage(`Failed: ${data.message || data.error}`, 'error');
+            } else {
+                console.error('[CREATE INSTANCE] Unknown error:', data);
+                showMessage('Failed to create instance. Check if Evolution API is running.', 'error');
+            }
+        }
+        
+        async function getQRCode() {
+            console.log('[GET QR CODE] Starting...');
+            const data = await makeRequest(`${BASE_URL}/instance/connect/${INSTANCE_NAME}`);
+            const qrContent = document.getElementById('qr-content');
+            
+            console.log('[QR CODE DATA]', data);
+            
+            if (data && data.base64) {
+                console.log('[QR CODE] Found base64 directly');
+                // Check if base64 already has data URI prefix
+                const imgSrc = data.base64.startsWith('data:') 
+                    ? data.base64 
+                    : `data:image/png;base64,${data.base64}`;
+                qrContent.innerHTML = `<img id="qrcode" src="${imgSrc}" alt="QR Code">`;
+                showMessage('QR Code loaded! Scan with WhatsApp.', 'success');
+            } else if (data && data.qrcode && data.qrcode.base64) {
+                console.log('[QR CODE] Found base64 in qrcode object');
+                qrContent.innerHTML = `<img id="qrcode" src="${data.qrcode.base64}" alt="QR Code">`;
+                showMessage('QR Code loaded! Scan with WhatsApp.', 'success');
+            } else if (data && data.qr) {
+                console.log('[QR CODE] Found qr field');
+                qrContent.innerHTML = `<img id="qrcode" src="${data.qr}" alt="QR Code">`;
+                showMessage('QR Code loaded! Scan with WhatsApp.', 'success');
+            } else if (data && data.code) {
+                console.log('[QR CODE] Found code field, generating QR from text');
+                // If we get a text code, we could use a QR library to generate it
+                qrContent.innerHTML = `<p>QR Code Text: ${data.code}</p><p style="color: #dc3545;">Text QR code received - need QR generator library</p>`;
+            } else {
+                console.log('[QR CODE] No QR data found in response');
+                console.log('Available keys in response:', data ? Object.keys(data) : 'null response');
+                qrContent.innerHTML = '<p style="color: #dc3545;">QR Code not available. Click "Create Instance" first.</p>';
+            }
+        }
+        
+        // Check AI PBX status
+        async function checkAIPBX() {
+            try {
+                const response = await fetch('http://localhost:3000/health');
+                const data = await response.json();
+                if (data.status === 'OK') {
+                    document.getElementById('ai-pbx-status').className = 'status-item status-ok';
+                    document.getElementById('ai-pbx-text').textContent = 'Running';
+                }
+            } catch {
+                document.getElementById('ai-pbx-status').className = 'status-item status-error';
+                document.getElementById('ai-pbx-text').textContent = 'Not Running';
+            }
+        }
+        
+        // Initialize
+        console.log('[INIT] Starting Evolution QR Interface');
+        console.log('[INIT] API Key:', API_KEY);
+        console.log('[INIT] Instance Name:', INSTANCE_NAME);
+        console.log('[INIT] Base URL:', BASE_URL);
+        
+        checkAIPBX();
+        checkStatus();
+        
+        // Auto-refresh status
+        checkInterval = setInterval(() => {
+            console.log('[AUTO-REFRESH] Checking status...');
+            checkStatus();
+        }, 5000);
+    </script>
+</body>
+</html>

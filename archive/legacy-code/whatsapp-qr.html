@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI PBX - WhatsApp QR Code</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h1 { color: #25D366; margin-bottom: 10px; }
+        .status { 
+            padding: 10px 20px; 
+            border-radius: 25px; 
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .connecting { background: #fff3cd; color: #856404; }
+        .connected { background: #d4edda; color: #155724; }
+        .disconnected { background: #f8d7da; color: #721c24; }
+        .qr-container {
+            margin: 30px 0;
+            padding: 20px;
+            border: 2px dashed #ddd;
+            border-radius: 12px;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+        #qrcode { max-width: 280px; max-height: 280px; }
+        .instructions {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .instructions h3 { margin-top: 0; color: #1976d2; }
+        .instructions ol { padding-left: 20px; }
+        .instructions li { margin: 8px 0; }
+        button {
+            background: #25D366;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover { background: #128C7E; }
+        .error { color: #dc3545; margin: 20px 0; }
+        .loading { color: #666; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI PBX WhatsApp Connection</h1>
+        <p>Connect your WhatsApp to the AI Assistant</p>
+        
+        <div id="status" class="status connecting">Checking connection...</div>
+        
+        <div class="qr-container">
+            <div id="qr-content">
+                <div class="loading">Loading QR Code...</div>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h3>📱 How to Connect:</h3>
+            <ol>
+                <li>Open <strong>WhatsApp</strong> on your phone</li>
+                <li>Tap <strong>Menu</strong> (3 dots) → <strong>Linked Devices</strong></li>
+                <li>Tap <strong>"Link a Device"</strong></li>
+                <li>Scan the QR code above</li>
+                <li>Wait for "Connected" status</li>
+                <li>Send a message to your number to test!</li>
+            </ol>
+        </div>
+        
+        <button onclick="checkStatus()">🔄 Refresh Status</button>
+        <button onclick="getQRCode()">📱 Refresh QR Code</button>
+        <button onclick="restartInstance()">🔄 Restart Connection</button>
+        
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        const API_KEY = 'ai-pbx-evolution-key-2024';
+        const INSTANCE_NAME = 'ai-pbx-instance';
+        const BASE_URL = 'http://localhost:8080';
+        
+        let statusCheckInterval;
+        
+        function showMessage(message, type = 'info') {
+            const messages = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = type === 'error' ? 'error' : 'loading';
+            div.textContent = message;
+            messages.appendChild(div);
+            setTimeout(() => div.remove(), 5000);
+        }
+        
+        async function makeRequest(url, method = 'GET') {
+            try {
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'apikey': API_KEY }
+                });
+                return await response.json();
+            } catch (error) {
+                console.error('Request failed:', error);
+                return null;
+            }
+        }
+        
+        async function checkStatus() {
+            const data = await makeRequest(`${BASE_URL}/instance/connectionState/${INSTANCE_NAME}`);
+            const statusEl = document.getElementById('status');
+            
+            if (data && data.instance) {
+                const state = data.instance.state;
+                statusEl.textContent = `📊 Status: ${state}`;
+                
+                if (state === 'open') {
+                    statusEl.className = 'status connected';
+                    statusEl.textContent = '✅ WhatsApp Connected! Ready to receive messages.';
+                    clearInterval(statusCheckInterval);
+                    document.getElementById('qr-content').innerHTML = '<div style="color: #28a745; font-size: 24px;">🎉 Successfully Connected!</div>';
+                } else if (state === 'connecting') {
+                    statusEl.className = 'status connecting';
+                    getQRCode(); // Auto-refresh QR code when connecting
+                } else {
+                    statusEl.className = 'status disconnected';
+                    statusEl.textContent = `❌ Status: ${state}`;
+                }
+            } else {
+                statusEl.className = 'status disconnected';
+                statusEl.textContent = '❌ Cannot connect to Evolution API';
+            }
+        }
+        
+        async function getQRCode() {
+            const data = await makeRequest(`${BASE_URL}/instance/connect/${INSTANCE_NAME}`);
+            const qrContent = document.getElementById('qr-content');
+            
+            if (data && data.base64) {
+                qrContent.innerHTML = `<img id="qrcode" src="data:image/png;base64,${data.base64}" alt="QR Code">`;
+                showMessage('QR Code refreshed! Scan with WhatsApp.');
+            } else {
+                qrContent.innerHTML = '<div class="loading">⏳ QR Code not ready yet...<br><small>The instance might be starting up.</small></div>';
+                // Try again in 5 seconds
+                setTimeout(getQRCode, 5000);
+            }
+        }
+        
+        async function restartInstance() {
+            showMessage('Restarting WhatsApp instance...');
+            await makeRequest(`${BASE_URL}/instance/restart/${INSTANCE_NAME}`, 'POST');
+            setTimeout(() => {
+                checkStatus();
+                getQRCode();
+            }, 3000);
+        }
+        
+        // Initialize
+        checkStatus();
+        getQRCode();
+        
+        // Auto-refresh status every 5 seconds when not connected
+        statusCheckInterval = setInterval(checkStatus, 5000);
+    </script>
+</body>
+</html>

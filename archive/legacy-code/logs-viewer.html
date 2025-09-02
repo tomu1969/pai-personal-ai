@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI PBX - Log Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: #2d2d30;
+            padding: 15px 20px;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 18px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-online {
+            background: #4ec9b0;
+        }
+        
+        .status-offline {
+            background: #f48771;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .controls {
+            background: #252526;
+            padding: 10px 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #3e3e42;
+        }
+        
+        .control-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        select, input, button {
+            background: #3c3c3c;
+            color: #cccccc;
+            border: 1px solid #3e3e42;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        
+        select:focus, input:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+        
+        button {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background: #094771;
+            border-color: #007acc;
+        }
+        
+        button:active {
+            transform: translateY(1px);
+        }
+        
+        button.active {
+            background: #007acc;
+            color: white;
+        }
+        
+        .log-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #1e1e1e;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        
+        .log-entry {
+            margin-bottom: 2px;
+            padding: 4px 8px;
+            border-left: 3px solid transparent;
+            font-family: 'SF Mono', Monaco, monospace;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        
+        .log-entry:hover {
+            background: #2a2a2a;
+        }
+        
+        .log-info {
+            border-left-color: #3794ff;
+            color: #9cdcfe;
+        }
+        
+        .log-error {
+            border-left-color: #f48771;
+            color: #f48771;
+            background: rgba(244, 135, 113, 0.1);
+        }
+        
+        .log-warn {
+            border-left-color: #ffcc00;
+            color: #dcdcaa;
+            background: rgba(255, 204, 0, 0.1);
+        }
+        
+        .log-debug {
+            border-left-color: #b5cea8;
+            color: #858585;
+        }
+        
+        .log-success {
+            border-left-color: #4ec9b0;
+            color: #4ec9b0;
+        }
+        
+        .log-webhook {
+            border-left-color: #c586c0;
+            color: #c586c0;
+        }
+        
+        .log-message {
+            border-left-color: #ce9178;
+            color: #ce9178;
+            background: rgba(206, 145, 120, 0.1);
+        }
+        
+        .timestamp {
+            color: #6a9955;
+            margin-right: 10px;
+        }
+        
+        .service {
+            color: #569cd6;
+            margin-right: 10px;
+        }
+        
+        .level {
+            font-weight: bold;
+            margin-right: 10px;
+            text-transform: uppercase;
+            font-size: 11px;
+        }
+        
+        .stats-bar {
+            background: #252526;
+            padding: 10px 20px;
+            border-top: 1px solid #3e3e42;
+            display: flex;
+            gap: 30px;
+            font-size: 12px;
+        }
+        
+        .stat {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .stat-label {
+            color: #858585;
+        }
+        
+        .stat-value {
+            color: #d4d4d4;
+            font-weight: bold;
+        }
+        
+        .filter-badge {
+            background: #007acc;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            margin-left: 10px;
+        }
+        
+        .clear-button {
+            background: #c73e3a;
+        }
+        
+        .clear-button:hover {
+            background: #a82824;
+        }
+        
+        .search-box {
+            flex: 1;
+            max-width: 300px;
+        }
+        
+        .highlight {
+            background: #515c6a;
+            color: #fff;
+            padding: 0 2px;
+        }
+        
+        .no-logs {
+            text-align: center;
+            color: #6a6a6a;
+            padding: 50px;
+            font-size: 14px;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #3794ff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            <span class="status-indicator status-online" id="status-indicator"></span>
+            AI PBX Log Viewer
+        </h1>
+        <div>
+            <span id="connection-status">Connected</span>
+            <span class="filter-badge" id="active-filter" style="display: none;"></span>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label>Service:</label>
+            <select id="service-filter">
+                <option value="all">All Services</option>
+                <option value="ai-pbx">AI PBX</option>
+                <option value="evolution">Evolution API</option>
+                <option value="postgres">PostgreSQL</option>
+                <option value="redis">Redis</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label>Level:</label>
+            <select id="level-filter">
+                <option value="all">All Levels</option>
+                <option value="error">Errors</option>
+                <option value="warn">Warnings</option>
+                <option value="info">Info</option>
+                <option value="debug">Debug</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label>Type:</label>
+            <select id="type-filter">
+                <option value="all">All Types</option>
+                <option value="webhook">Webhooks</option>
+                <option value="message">Messages</option>
+                <option value="database">Database</option>
+                <option value="api">API Calls</option>
+            </select>
+        </div>
+        
+        <input type="text" id="search-box" class="search-box" placeholder="Search logs...">
+        
+        <button id="pause-button" onclick="togglePause()">⏸ Pause</button>
+        <button id="auto-scroll-button" class="active" onclick="toggleAutoScroll()">↓ Auto Scroll</button>
+        <button class="clear-button" onclick="clearLogs()">Clear</button>
+    </div>
+    
+    <div class="log-container" id="log-container">
+        <div class="no-logs">Waiting for logs... <span class="loading"></span></div>
+    </div>
+    
+    <div class="stats-bar">
+        <div class="stat">
+            <span class="stat-label">Total:</span>
+            <span class="stat-value" id="total-logs">0</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Errors:</span>
+            <span class="stat-value" id="error-count" style="color: #f48771;">0</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Warnings:</span>
+            <span class="stat-value" id="warn-count" style="color: #ffcc00;">0</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Messages:</span>
+            <span class="stat-value" id="message-count" style="color: #ce9178;">0</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Webhooks:</span>
+            <span class="stat-value" id="webhook-count" style="color: #c586c0;">0</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Uptime:</span>
+            <span class="stat-value" id="uptime">00:00:00</span>
+        </div>
+    </div>
+    
+    <script>
+        // Configuration
+        const MAX_LOGS = 1000;
+        let logs = [];
+        let filteredLogs = [];
+        let isPaused = false;
+        let autoScroll = true;
+        let searchTerm = '';
+        let stats = {
+            total: 0,
+            errors: 0,
+            warnings: 0,
+            messages: 0,
+            webhooks: 0
+        };
+        let startTime = Date.now();
+        
+        // Mock log generation for testing
+        const logTemplates = [
+            { level: 'info', message: 'Webhook received', type: 'webhook', service: 'ai-pbx' },
+            { level: 'info', message: 'Processing incoming message from 5511999887766', type: 'message', service: 'ai-pbx' },
+            { level: 'success', message: 'Message sent successfully', type: 'message', service: 'ai-pbx' },
+            { level: 'debug', message: 'Database query executed', type: 'database', service: 'ai-pbx' },
+            { level: 'warn', message: 'AI analysis failed, using fallback', type: 'api', service: 'ai-pbx' },
+            { level: 'error', message: 'Failed to connect to Evolution API', type: 'api', service: 'evolution' },
+            { level: 'info', message: 'Assistant enabled for conversation', type: 'message', service: 'ai-pbx' },
+            { level: 'info', message: 'Health check passed', type: 'api', service: 'ai-pbx' },
+            { level: 'debug', message: 'Redis cache hit for key: session_123', type: 'database', service: 'redis' },
+            { level: 'info', message: 'New contact created: John Doe', type: 'database', service: 'ai-pbx' },
+        ];
+        
+        function formatTimestamp(date) {
+            return date.toLocaleTimeString('en-US', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit',
+                millisecond: '3-digit'
+            }).replace(',', '.');
+        }
+        
+        function addLog(logData) {
+            if (isPaused) return;
+            
+            const log = {
+                timestamp: new Date(),
+                level: logData.level || 'info',
+                message: logData.message,
+                service: logData.service || 'ai-pbx',
+                type: logData.type || 'general',
+                raw: JSON.stringify(logData)
+            };
+            
+            logs.push(log);
+            
+            // Keep only last MAX_LOGS entries
+            if (logs.length > MAX_LOGS) {
+                logs.shift();
+            }
+            
+            // Update stats
+            stats.total++;
+            if (log.level === 'error') stats.errors++;
+            if (log.level === 'warn') stats.warnings++;
+            if (log.type === 'message') stats.messages++;
+            if (log.type === 'webhook') stats.webhooks++;
+            
+            applyFilters();
+            updateStats();
+        }
+        
+        function renderLog(log) {
+            const levelClass = `log-${log.level}`;
+            const typeClass = log.type ? `log-${log.type}` : '';
+            
+            let message = log.message;
+            if (searchTerm) {
+                const regex = new RegExp(`(${searchTerm})`, 'gi');
+                message = message.replace(regex, '<span class="highlight">$1</span>');
+            }
+            
+            return `
+                <div class="log-entry ${levelClass} ${typeClass}">
+                    <span class="timestamp">${formatTimestamp(log.timestamp)}</span>
+                    <span class="service">[${log.service}]</span>
+                    <span class="level level-${log.level}">${log.level}</span>
+                    <span>${message}</span>
+                </div>
+            `;
+        }
+        
+        function applyFilters() {
+            const serviceFilter = document.getElementById('service-filter').value;
+            const levelFilter = document.getElementById('level-filter').value;
+            const typeFilter = document.getElementById('type-filter').value;
+            
+            filteredLogs = logs.filter(log => {
+                if (serviceFilter !== 'all' && log.service !== serviceFilter) return false;
+                if (levelFilter !== 'all' && log.level !== levelFilter) return false;
+                if (typeFilter !== 'all' && log.type !== typeFilter) return false;
+                if (searchTerm && !log.message.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+                return true;
+            });
+            
+            renderLogs();
+            updateFilterBadge();
+        }
+        
+        function renderLogs() {
+            const container = document.getElementById('log-container');
+            
+            if (filteredLogs.length === 0) {
+                container.innerHTML = '<div class="no-logs">No logs match your filters</div>';
+                return;
+            }
+            
+            container.innerHTML = filteredLogs.map(log => renderLog(log)).join('');
+            
+            if (autoScroll) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+        
+        function updateStats() {
+            document.getElementById('total-logs').textContent = stats.total;
+            document.getElementById('error-count').textContent = stats.errors;
+            document.getElementById('warn-count').textContent = stats.warnings;
+            document.getElementById('message-count').textContent = stats.messages;
+            document.getElementById('webhook-count').textContent = stats.webhooks;
+        }
+        
+        function updateUptime() {
+            const elapsed = Date.now() - startTime;
+            const hours = Math.floor(elapsed / 3600000);
+            const minutes = Math.floor((elapsed % 3600000) / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            
+            document.getElementById('uptime').textContent = 
+                `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        function updateFilterBadge() {
+            const badge = document.getElementById('active-filter');
+            const filters = [];
+            
+            if (document.getElementById('service-filter').value !== 'all') {
+                filters.push(document.getElementById('service-filter').value);
+            }
+            if (document.getElementById('level-filter').value !== 'all') {
+                filters.push(document.getElementById('level-filter').value);
+            }
+            if (document.getElementById('type-filter').value !== 'all') {
+                filters.push(document.getElementById('type-filter').value);
+            }
+            if (searchTerm) {
+                filters.push(`"${searchTerm}"`);
+            }
+            
+            if (filters.length > 0) {
+                badge.textContent = filters.join(', ');
+                badge.style.display = 'inline';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+        
+        function togglePause() {
+            isPaused = !isPaused;
+            const button = document.getElementById('pause-button');
+            button.textContent = isPaused ? '▶ Resume' : '⏸ Pause';
+            button.classList.toggle('active', isPaused);
+        }
+        
+        function toggleAutoScroll() {
+            autoScroll = !autoScroll;
+            const button = document.getElementById('auto-scroll-button');
+            button.classList.toggle('active', autoScroll);
+        }
+        
+        function clearLogs() {
+            if (confirm('Clear all logs?')) {
+                logs = [];
+                filteredLogs = [];
+                stats = { total: 0, errors: 0, warnings: 0, messages: 0, webhooks: 0 };
+                renderLogs();
+                updateStats();
+            }
+        }
+        
+        // Real-time log fetching from AI PBX
+        async function fetchLogs() {
+            try {
+                // This would connect to your actual log endpoint
+                const response = await fetch('http://localhost:3000/api/logs/stream', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'text/event-stream',
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Failed to connect');
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const text = decoder.decode(value);
+                    const lines = text.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const logData = JSON.parse(line.slice(6));
+                                addLog(logData);
+                            } catch (e) {
+                                console.error('Failed to parse log:', e);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Log streaming error:', error);
+                document.getElementById('connection-status').textContent = 'Disconnected';
+                document.getElementById('status-indicator').className = 'status-indicator status-offline';
+                
+                // Retry connection after 5 seconds
+                setTimeout(fetchLogs, 5000);
+            }
+        }
+        
+        // Simulate logs for demo (remove this in production)
+        function simulateLogs() {
+            setInterval(() => {
+                if (!isPaused && Math.random() > 0.3) {
+                    const template = logTemplates[Math.floor(Math.random() * logTemplates.length)];
+                    addLog({
+                        ...template,
+                        message: template.message + (Math.random() > 0.5 ? ` [${Date.now()}]` : '')
+                    });
+                }
+            }, 2000);
+        }
+        
+        // Event listeners
+        document.getElementById('service-filter').addEventListener('change', applyFilters);
+        document.getElementById('level-filter').addEventListener('change', applyFilters);
+        document.getElementById('type-filter').addEventListener('change', applyFilters);
+        document.getElementById('search-box').addEventListener('input', (e) => {
+            searchTerm = e.target.value;
+            applyFilters();
+        });
+        
+        // Initialize
+        setInterval(updateUptime, 1000);
+        
+        // Try to connect to real logs, fall back to simulation
+        fetchLogs().catch(() => {
+            console.log('Using simulated logs for demo');
+            simulateLogs();
+        });
+        
+        // Add some initial logs
+        addLog({ level: 'info', message: 'Log viewer initialized', type: 'general' });
+        addLog({ level: 'info', message: 'Connecting to AI PBX...', type: 'api' });
+        addLog({ level: 'success', message: 'Connected to AI PBX', type: 'api' });
+    </script>
+</body>
+</html>

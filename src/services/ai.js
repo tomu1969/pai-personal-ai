@@ -6,6 +6,13 @@ class AIService {
   constructor() {
     this.apiKey = process.env.OPENAI_API_KEY || config.openai.apiKey;
     
+    logger.debug('AI Service Constructor Debug', {
+      envKey: process.env.OPENAI_API_KEY ? `${process.env.OPENAI_API_KEY.substring(0, 10)}...` : 'undefined',
+      configKey: config.openai.apiKey ? `${config.openai.apiKey.substring(0, 10)}...` : 'undefined',
+      finalKey: this.apiKey ? `${this.apiKey.substring(0, 10)}...` : 'undefined',
+      keyIncludesYourApi: this.apiKey ? this.apiKey.includes('your-api') : 'N/A'
+    });
+    
     if (!this.apiKey || this.apiKey.includes('your-api')) {
       logger.warn('OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.');
       this.enabled = false;

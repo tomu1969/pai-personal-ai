@@ -100,8 +100,19 @@ class MessageProcessorService {
         }
       }
 
-      // Ultra-simplified: assume all message types can be processed
-      const assistantWillProcess = true;
+      // Check if message type should be processed based on assistant preferences
+      const messageTypeCheck = await this.shouldProcessMessageType(parsedMessage);
+      const assistantWillProcess = messageTypeCheck.shouldProcess;
+
+      // Early return if message type is not allowed
+      if (!assistantWillProcess) {
+        logger.info('Message type not allowed by assistant preferences', {
+          processingId,
+          phone: parsedMessage.phone,
+          reason: messageTypeCheck.reason,
+        });
+        return { processed: false, reason: messageTypeCheck.reason };
+      }
 
       // Step 2: Basic message filtering
       const basicAnalysis = filterService.analyzeMessage(parsedMessage.content, {
@@ -254,7 +265,7 @@ class MessageProcessorService {
         response: responseResult,
         aiProcessed: true, // Using WhatsApp Assistant
         assistantProcessed: assistantWillProcess,
-        messageTypeFilterReason: assistantWillProcess ? null : shouldProcessMessageType.reason,
+        messageTypeFilterReason: assistantWillProcess ? null : messageTypeCheck.reason,
       };
 
       logger.info('Message processing completed', {
@@ -263,7 +274,7 @@ class MessageProcessorService {
         conversationId: conversation.id,
         responseSent: !!responseResult?.sent,
         assistantProcessed: assistantWillProcess,
-        messageTypeFilter: assistantWillProcess ? null : shouldProcessMessageType.reason,
+        messageTypeFilter: assistantWillProcess ? null : messageTypeCheck.reason,
         priority: basicAnalysis.priority,
         category: basicAnalysis.category,
       });
@@ -295,6 +306,11 @@ class MessageProcessorService {
       let responseText = null;
 
       // Ultra-simple AI response generation
+      logger.debug('AI Service Check', { 
+        isEnabled: aiService.isEnabled(),
+        phone: contact.phone
+      });
+      
       if (aiService.isEnabled()) {
         const assistant = await assistantService.ensureInitialized();
         

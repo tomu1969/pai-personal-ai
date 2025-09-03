@@ -31,8 +31,8 @@ const config = {
   assistant: {
     defaultStatus: process.env.DEFAULT_ASSISTANT_STATUS === 'true',
     autoResponseTemplate: process.env.AUTO_RESPONSE_TEMPLATE
-      || 'Hi! This is {{owner_name}}\'s personal assistant. I\'m currently helping filter messages. '
-      + 'What do you need assistance with?',
+      || 'Hola {{contact_name}}! Soy PAI, el asistente personal de {{owner_name}}. '
+      + '¿En qué puedo ayudarte hoy?',
     ownerName: process.env.OWNER_NAME || 'Assistant Owner',
     summaryIntervalHours: parseInt(process.env.SUMMARY_INTERVAL_HOURS, 10) || 6,
   },

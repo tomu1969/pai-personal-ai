@@ -2,6 +2,7 @@ const { Message } = require('../models');
 const logger = require('../utils/logger');
 const messageRetrieval = require('./messageRetrieval');
 const assistantAI = require('./assistantAI');
+const assistantService = require('./assistant');
 
 class AssistantMessageHandler {
   constructor() {
@@ -28,15 +29,23 @@ class AssistantMessageHandler {
     broadcastTyping(conversationId, true, 'assistant');
 
     try {
+      // Get assistant configuration from database
+      const assistantConfig = await assistantService.getStatus();
+      
       logger.debug('ASSISTANT HANDLER: Starting AI processing', {
         content: content.substring(0, 100),
         conversationId,
+        assistantName: assistantConfig.assistantName,
+        ownerName: assistantConfig.ownerName,
       });
 
-      // Use AI to parse intent and generate response
+      // Use AI to parse intent and generate response with configuration
       const aiResult = await assistantAI.processMessage(content, {
         conversationId,
         contactId: this.ASSISTANT_CONTACT_ID,
+        systemPrompt: assistantConfig.systemPrompt,
+        ownerName: assistantConfig.ownerName,
+        assistantName: assistantConfig.assistantName,
       });
 
       logger.debug('ASSISTANT HANDLER: AI processing completed', {
@@ -100,9 +109,18 @@ class AssistantMessageHandler {
           responseContent = aiResult.response;
         }
       } else if (aiResult.intent === 'clarification_needed') {
-        // Handle cases where AI needs more information
-        responseContent = aiResult.clarification_question
-          || 'I\'d like to help you find what you\'re looking for. Could you be more specific about what messages, contacts, or time period you\'re interested in?';
+        // Handle cases where AI needs more information - use PAI's configured response
+        const clarificationResponse = await assistantAI.generateResponse(
+          'conversation',
+          {},
+          content,
+          {
+            systemPrompt: assistantConfig.systemPrompt,
+            ownerName: assistantConfig.ownerName,
+            assistantName: assistantConfig.assistantName,
+          },
+        );
+        responseContent = clarificationResponse;
       } else {
         // Use AI-generated response for help, conversation, or low-confidence requests
         responseContent = aiResult.response;

@@ -22,6 +22,17 @@ class AssistantService {
         defaults: {
           enabled: config.assistant.defaultStatus,
           ownerName: config.assistant.ownerName,
+          assistantName: 'PAI',
+          systemPrompt: `Your name is PAI. You are a personal AI assistant that answers WhatsApp messages on behalf of your owner, Tomás. 
+Always greet each sender by their name. 
+Always reply in the same language as the last message received. 
+Always identify yourself as "Pai, Tomás' Assistant" if in English, or "Pai, el asistente de Tomás" if in Spanish. 
+Keep responses polite, concise, and professional, adjusting tone to match the sender (casual if casual, formal if formal). 
+**Always** ask relevant follow-up questions to clarify intent or move the conversation forward. 
+If the sender message is vague, ask for clarification instead of assuming. 
+Suggest next steps only when appropriate. 
+Only stop asking once you've clarified the sender's intention or request. 
+Once you've clarified the sender's request or intent, paraphrase it and express that you will convey it to Tomás so he can get back to the sender.`,
           autoResponseTemplate: config.assistant.autoResponseTemplate,
           messagesProcessed: 0,
           settings: {
@@ -256,11 +267,12 @@ class AssistantService {
   }
 
   /**
-   * Check if assistant should respond to a message
-   * Based on various criteria like time, sender, message type, etc.
+   * Ultra-simplified: should respond to this message?
+   * Remove all complex logic - just check basic conditions
    */
   async shouldRespond(message, contact, conversation) {
     try {
+      // Basic checks only
       if (!await this.isEnabled()) {
         return false;
       }
@@ -280,63 +292,30 @@ class AssistantService {
         return false;
       }
 
-      // Use AI to determine if this message requires a response (pure AI decision)
+      // Use AI's simple decision logic
       const aiService = require('./ai');
-      if (aiService.isEnabled()) {
-        try {
-          // Get recent conversation context for better AI analysis  
-          const recentMessages = await Message.findAll({
-            where: {
-              conversationId: conversation.id,
-              createdAt: {
-                [require('sequelize').Op.gte]: new Date(Date.now() - 30 * 60 * 1000), // Last 30 minutes
-              },
-            },
-            order: [['createdAt', 'DESC']],
-            limit: 5,
-          });
+      const assistant = await this.ensureInitialized();
+      
+      const shouldRespond = await aiService.shouldRespond(message.content, {
+        ownerName: assistant.ownerName,
+        senderName: contact.name,
+        conversationId: conversation.id,
+      });
 
-          const recentContext = recentMessages.map((msg) => 
-            `${msg.sender === 'assistant' ? 'PAI' : contact.name}: ${msg.content}`
-          ).reverse().join('\n');
+      logger.debug(`Ultra-simple AI decision: ${shouldRespond ? 'RESPOND' : 'NO RESPONSE'}`, {
+        conversationId: conversation.id,
+        content: message.content.substring(0, 50),
+        senderName: contact.name,
+      });
 
-          const assistant = await this.ensureInitialized();
-          const analysis = await aiService.analyzeMessage(message.content, {
-            ownerName: assistant.ownerName,
-            senderName: contact.name,
-            recentMessages: recentContext,
-            conversationHistory: recentMessages.length > 0,
-          });
-
-          const shouldRespond = analysis.requiresResponse === true;
-
-          logger.debug(`AI decision: ${shouldRespond ? 'RESPOND' : 'NO RESPONSE'}`, {
-            conversationId: conversation.id,
-            reason: analysis.responseReason,
-            confidence: analysis.confidence,
-            content: message.content.substring(0, 50),
-            intent: analysis.intent,
-          });
-
-          return shouldRespond;
-        } catch (aiError) {
-          logger.error('AI analysis failed in shouldRespond', {
-            error: aiError.message,
-            conversationId: conversation.id,
-          });
-          // Default to not responding if AI fails
-          return false;
-        }
-      }
-
-      // If AI is disabled, default to basic response logic
-      return true;
+      return shouldRespond;
     } catch (error) {
       logger.error('Failed to determine if assistant should respond', {
         messageId: message.id,
         error: error.message,
       });
-      return false;
+      // Default to responding when in doubt
+      return true;
     }
   }
 

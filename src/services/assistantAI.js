@@ -4,16 +4,35 @@ const config = require('../config');
 
 class AssistantAI {
   constructor() {
-    this.openai = new OpenAI({
-      apiKey: config.openai.apiKey,
-    });
-    this.model = config.openai.model;
+    // Check if OpenAI API key is properly configured
+    if (config.openai.apiKey && !config.openai.apiKey.includes('your-')) {
+      try {
+        this.openai = new OpenAI({
+          apiKey: config.openai.apiKey,
+        });
+        this.model = config.openai.model;
+        this.aiEnabled = true;
+        logger.info('AssistantAI initialized with OpenAI API');
+      } catch (error) {
+        logger.warn('Failed to initialize OpenAI client, using fallback mode', { error: error.message });
+        this.aiEnabled = false;
+      }
+    } else {
+      logger.info('OpenAI API key not configured, using fallback mode');
+      this.aiEnabled = false;
+    }
   }
 
   /**
    * Parse user intent using AI instead of regex patterns
    */
   async parseIntent(userMessage, context = {}) {
+    // If AI is not available, use fallback immediately
+    if (!this.aiEnabled) {
+      logger.debug('Using fallback intent parsing (AI disabled)');
+      return this.fallbackIntentParsing(userMessage);
+    }
+    
     try {
       const systemPrompt = `You are an intelligent assistant that analyzes user messages to extract intent and structured parameters for database queries.
 
@@ -197,7 +216,17 @@ RESPONSE FORMAT (JSON only):
    * Generate a response based on the parsed intent
    */
   async generateResponse(intent, parameters, userMessage, context = {}) {
+    // If AI is not available, use simple fallback responses
+    if (!this.aiEnabled) {
+      return this.generateSimpleFallbackResponse(intent, userMessage, context);
+    }
+    
     try {
+      // Use configured system prompt for general conversation
+      const configuredSystemPrompt = this.currentConfig?.systemPrompt || 
+        context.systemPrompt || 
+        'You are a helpful AI assistant';
+      
       let systemPrompt = '';
       let responseMessage = '';
 
@@ -276,12 +305,20 @@ Keep the response conversational but informative. If there are many messages, pr
 
             responseMessage = completion.choices[0].message.content;
           } else {
-            responseMessage = `I couldn't find any contacts matching your search. Try searching by:
+            // No contacts found - use configured system prompt to respond as PAI
+            systemPrompt = configuredSystemPrompt;
 
-👥 **Contact details:**
-• Name ("contacts named John")
-• Recent activity ("who messaged today")
-• Group status ("show me groups")`;
+            const completion = await this.openai.chat.completions.create({
+              model: this.model,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userMessage },
+              ],
+              temperature: 0.7,
+              max_tokens: 300,
+            });
+
+            responseMessage = completion.choices[0].message.content;
           }
           break;
 
@@ -324,7 +361,8 @@ I can help you find and analyze your messages using natural language. Here's wha
 
         case 'conversation':
         default:
-          systemPrompt = 'You are a friendly and helpful AI assistant integrated into a WhatsApp management system. Respond naturally and helpfully.';
+          // Use the configured system prompt from the database
+          systemPrompt = configuredSystemPrompt;
 
           const completion = await this.openai.chat.completions.create({
             model: this.model,
@@ -367,6 +405,13 @@ I can help you find and analyze your messages using natural language. Here's wha
    */
   async processMessage(userMessage, context = {}) {
     try {
+      // Store configuration for use throughout processing
+      this.currentConfig = {
+        systemPrompt: context.systemPrompt || 'You are a helpful AI assistant',
+        ownerName: context.ownerName || 'the owner',
+        assistantName: context.assistantName || 'PAI',
+      };
+
       // Parse intent
       const intentResult = await this.parseIntent(userMessage, context);
 
@@ -401,6 +446,45 @@ I can help you find and analyze your messages using natural language. Here's wha
         success: false,
         tokensUsed: 0,
       };
+    }
+  }
+
+  /**
+   * Generate simple fallback responses when OpenAI is not available
+   */
+  generateSimpleFallbackResponse(intent, userMessage, context = {}) {
+    const greetings = ['Hello', 'Hi there', 'Hey', 'Greetings'];
+    const greeting = greetings[Math.floor(Math.random() * greetings.length)];
+    
+    // Use configured names or fallback defaults
+    const assistantName = this.currentConfig?.assistantName || context.assistantName || 'PAI';
+    const ownerName = this.currentConfig?.ownerName || context.ownerName || 'the owner';
+    
+    switch (intent) {
+      case 'summary':
+        return `${greeting}! I understand you're asking for a summary. I'd be happy to help, but I need an OpenAI API key to provide detailed summaries. For now, you can check your recent conversations in the chat interface.`;
+      
+      case 'message_query':
+        return `${greeting}! You're asking about messages. While I'd love to search through your messages for you, I need an OpenAI API key configured to do that intelligently. You can browse your conversations manually in the chat interface.`;
+      
+      case 'help':
+        return `${greeting}! I'm ${assistantName}, ${ownerName}'s Personal AI assistant. I can help you with:
+        
+📱 **Message Management**: Search and filter your WhatsApp messages
+📊 **Summaries**: Get summaries of your conversations  
+👥 **Contact Info**: Find information about your contacts
+🔍 **Conversation Search**: Find specific chats and conversations
+
+*Note: I need an OpenAI API key to provide intelligent responses. For now, I can provide basic help and information.*`;
+      
+      case 'conversation':
+      default:
+        const responses = [
+          `${greeting}! I'm ${assistantName}, ${ownerName}'s personal AI assistant. I'm currently running in demo mode without OpenAI integration. How can I help you today?`,
+          `${greeting}! I'm here to help! I'm currently in fallback mode since no OpenAI API key is configured. What would you like to know?`,
+          `${greeting}! I'm ${assistantName}, ready to assist you. I'm working in basic mode right now. What can I do for you?`,
+        ];
+        return responses[Math.floor(Math.random() * responses.length)];
     }
   }
 }

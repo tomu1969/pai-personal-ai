@@ -19,7 +19,7 @@
   "keywords": [
     "personal-ai",
     "whatsapp",
-    "ai-assistant", 
+    "ai-assistant",
     "nodejs",
     "react",
     "postgresql",
@@ -33,15 +33,16 @@
   "dependencies": {
     "axios": "^1.5.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
+    "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "helmet": "^7.0.0",
     "joi": "^17.9.2",
     "morgan": "^1.10.0",
     "node-fetch": "^2.6.7",
-    "openai": "^5.17.0",
+    "openai": "^5.19.1",
     "pg": "^8.11.3",
     "pg-hstore": "^2.3.4",
+    "qrcode-terminal": "^0.12.0",
     "rate-limiter-flexible": "^2.4.2",
     "sequelize": "^6.32.1",
     "socket.io": "^4.8.1",
@@ -89,5 +90,17 @@
       "**/tests/**/*.test.js",
       "**/?(*.)+(spec|test).js"
     ]
-  }
+  },
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tomu1969/pai-personal-ai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tomu1969/pai-personal-ai/issues"
+  },
+  "homepage": "https://github.com/tomu1969/pai-personal-ai#readme"
 }

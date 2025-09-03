@@ -177,7 +177,48 @@ npm run test:watch    # Watch mode
 - **assistantAI.js**: Natural language processing and entity extraction
 - **queryBuilder.js**: Converts entities to optimized SQL queries
 - **messageRetrieval.js**: Executes database queries with formatting
+- **whatsapp-assistant.js**: GPT-powered WhatsApp message processing
 - **realtime.js**: WebSocket message broadcasting
+
+## 🤖 WhatsApp Assistant
+
+### GPT-Powered Message Processing
+The new **WhatsApp Assistant** (`src/services/whatsapp-assistant.js`) provides intelligent responses using OpenAI GPT:
+
+- **Per-Contact Conversations**: Maintains separate conversation histories for each contact
+- **Personalized System Prompts**: Uses configurable assistant name and owner information
+- **Context Awareness**: Remembers previous messages in each conversation
+- **Natural Language Processing**: Powered by GPT-4o-mini or GPT-3.5-turbo
+
+### Integration with Evolution API
+```javascript
+// Automatic processing when WhatsApp messages arrive
+const response = await whatsappAssistant.processMessage(
+  message.content,
+  contact.phone,
+  assistantConfig
+);
+```
+
+## 🔧 CLI Tools
+
+### Chat Tool (`chat.js`)
+Interactive command-line chat with PAI assistant:
+
+```bash
+# Start interactive chat session
+node chat.js
+
+# Uses the same GPT model and system prompt as WhatsApp
+# Maintains conversation history during session
+# Reads from prompts/pai_responder.md
+```
+
+**Features:**
+- Real-time conversation with PAI
+- Same personality as WhatsApp assistant
+- Proper signal handling (Ctrl+C)
+- Environment variable support
 
 ## 📊 Features Comparison
 

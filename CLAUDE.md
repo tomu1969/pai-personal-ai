@@ -84,6 +84,12 @@ ai_pbx/
 - 30-minute cooldown system for follow-up messages
 - Response filtering and categorization
 
+**WhatsApp Assistant Service** (`src/services/whatsapp-assistant.js`):
+- GPT-powered message processing with OpenAI
+- Per-contact conversation history management
+- Personalized system prompts with assistant/owner names
+- Context-aware responses using conversation threads
+
 **Chat Service** (`src/services/chat.js`):
 - Conversation management
 - Message persistence
@@ -218,10 +224,11 @@ npx sequelize-cli migration:generate --name migration-name
 
 ### Message Processing Flow:
 1. WhatsApp → Evolution API → Webhook
-2. Webhook parses message → Chat service
+2. Webhook parses message → messageProcessor.js
 3. Assistant service checks if enabled
-4. AI processing → Response generation
-5. Real-time updates via Socket.io
+4. **WhatsApp Assistant** (`whatsapp-assistant.js`) → GPT processing with conversation history
+5. AI-generated response → WhatsApp via Evolution API
+6. Real-time updates via Socket.io
 
 ### Frontend State Management:
 - React hooks for local state
@@ -234,6 +241,29 @@ npx sequelize-cli migration:generate --name migration-name
 - API key protection
 - Webhook signature validation (Evolution API doesn't sign)
 - Environment variable management
+
+## CLI Tools
+
+### Chat Tool (`chat.js`)
+Interactive command-line interface for PAI assistant:
+
+```bash
+# Start chat session
+node chat.js
+
+# Features:
+# - Same GPT model and personality as WhatsApp assistant
+# - Uses prompts/pai_responder.md system prompt
+# - Maintains conversation history during session
+# - Proper environment variable loading
+# - Signal handling (Ctrl+C to exit)
+```
+
+### Archived CLI Tools
+The following tools have been moved to `archive/legacy-code/`:
+- `pai-cli.js` - Alternative CLI with API polling (deprecated)
+- `demo-pai-cli.js` - Demo CLI implementation
+- `show-qr-code.js` - QR code display utility
 
 ## Quick Commands
 

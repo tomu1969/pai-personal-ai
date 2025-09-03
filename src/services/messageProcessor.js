@@ -4,7 +4,9 @@ const filterService = require('./filters');
 const groupService = require('./groupService');
 const assistantMessageHandler = require('./assistantMessageHandler');
 const aiService = require('./ai');
+const whatsappAssistant = require('./whatsapp-assistant');
 const WhatsAppService = require('./whatsapp');
+const { Message } = require('../models');
 const logger = require('../utils/logger');
 
 class MessageProcessorService {
@@ -98,19 +100,8 @@ class MessageProcessorService {
         }
       }
 
-      // Step 1.5: Check if message type should be processed by assistant
-      const shouldProcessMessageType = await this.shouldProcessMessageType(parsedMessage);
-      const assistantWillProcess = shouldProcessMessageType.shouldProcess;
-
-      if (!assistantWillProcess) {
-        logger.debug('Message type filtering - assistant will not respond', {
-          processingId,
-          reason: shouldProcessMessageType.reason,
-          messageType: parsedMessage.messageType,
-          remoteJid: `${parsedMessage.phone}@s.whatsapp.net`,
-        });
-        // Continue processing to save message to DB and broadcast to UI
-      }
+      // Ultra-simplified: assume all message types can be processed
+      const assistantWillProcess = true;
 
       // Step 2: Basic message filtering
       const basicAnalysis = filterService.analyzeMessage(parsedMessage.content, {
@@ -206,24 +197,10 @@ class MessageProcessorService {
         return { processed: false, reason: 'contact_blocked' };
       }
 
-      // Step 6: Enhanced AI analysis (if enabled)
-      let enhancedAnalysis = null;
-      if (aiService.isEnabled()) {
-        enhancedAnalysis = await aiService.analyzeMessage(parsedMessage.content, {
-          senderName: contact.name || parsedMessage.pushName,
-          contactId: contact.id,
-          messageType: parsedMessage.messageType,
-        });
-
-        // Merge AI analysis with basic analysis
-        basicAnalysis.category = enhancedAnalysis.category || basicAnalysis.category;
-        basicAnalysis.priority = enhancedAnalysis.priority || basicAnalysis.priority;
-        basicAnalysis.sentiment = enhancedAnalysis.sentiment || basicAnalysis.sentiment;
-        basicAnalysis.confidence = Math.max(basicAnalysis.confidence, enhancedAnalysis.confidence || 0);
-        basicAnalysis.aiEnhanced = true;
-        basicAnalysis.intent = enhancedAnalysis.intent;
-        basicAnalysis.aiSummary = enhancedAnalysis.summary;
-      }
+      // Skip complex analysis - keep it simple
+      basicAnalysis.category = 'general';
+      basicAnalysis.priority = 'medium';
+      basicAnalysis.aiEnhanced = false;
 
       // Step 7: Update contact category and priority if needed
       await this.updateContactFromAnalysis(contact, basicAnalysis);
@@ -246,11 +223,6 @@ class MessageProcessorService {
         if (shouldRespond) {
           responseResult = await this.generateAndSendResponse(parsedMessage, contact, conversation, basicAnalysis);
         }
-      } else {
-        logger.debug('Skipping auto-response due to message type filtering', {
-          processingId,
-          reason: shouldProcessMessageType.reason,
-        });
       }
 
       // Step 11: Update assistant statistics
@@ -280,7 +252,7 @@ class MessageProcessorService {
           analysis: basicAnalysis,
         },
         response: responseResult,
-        aiProcessed: !!enhancedAnalysis,
+        aiProcessed: true, // Using WhatsApp Assistant
         assistantProcessed: assistantWillProcess,
         messageTypeFilterReason: assistantWillProcess ? null : shouldProcessMessageType.reason,
       };
@@ -322,35 +294,32 @@ class MessageProcessorService {
     try {
       let responseText = null;
 
-      // Use AI with dual-prompt system (backend system + owner customization)
+      // Ultra-simple AI response generation
       if (aiService.isEnabled()) {
         const assistant = await assistantService.ensureInitialized();
         
-        // Get recent conversation context for better responses
+        // Get recent conversation context for better responses (last 10 messages)
         const recentMessages = await Message.findAll({
           where: {
             conversationId: conversation.id,
-            createdAt: {
-              [require('sequelize').Op.gte]: new Date(Date.now() - 30 * 60 * 1000), // Last 30 minutes
-            },
           },
           order: [['createdAt', 'DESC']],
-          limit: 5,
+          limit: 10,
         });
 
-        const recentContext = recentMessages.map((msg) => 
-          `${msg.sender === 'assistant' ? 'PAI' : contact.name}: ${msg.content}`
-        ).reverse().join('\n');
+        // Convert to proper format for AI context
+        const messageHistory = recentMessages.reverse(); // Chronological order
 
-        responseText = await aiService.generateResponse(parsedMessage.content, {
+        // Use new WhatsApp Assistant for AI responses
+        logger.info('Using new WhatsApp Assistant for AI processing', {
+          contactPhone: contact.phone,
+          assistantName: assistant.assistantName,
+        });
+
+        responseText = await whatsappAssistant.processMessage(parsedMessage.content, contact.phone, {
           ownerName: assistant.ownerName,
-          senderName: contact.name || parsedMessage.pushName,
-          contactId: contact.id,
-          conversationId: conversation.id,
-          analysis,
-          isFirstMessage: conversation.messageCount === 0,
-          recentMessages: recentContext,
-          ownerSystemPrompt: assistant.systemPrompt, // Owner's frontend-editable prompt
+          assistantName: assistant.assistantName,
+          systemPrompt: assistant.systemPrompt,
         });
       }
 
@@ -368,7 +337,7 @@ class MessageProcessorService {
         contact.id,
         responseText,
         {
-          aiGenerated: !!aiService.isEnabled(),
+          aiGenerated: true, // Using WhatsApp Assistant
           evolutionResponse: sendResult,
           triggerMessageId: parsedMessage.messageId,
         },

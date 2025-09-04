@@ -1,5 +1,6 @@
 const express = require('express');
 const assistantService = require('../services/assistant');
+const whatsappAssistant = require('../services/whatsapp-assistant');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -206,6 +207,32 @@ router.post('/reset-stats', async (req, res) => {
 
     res.status(500).json({
       error: 'Failed to reset assistant statistics',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * Clear conversation cache
+ * POST /api/assistant/clear-cache
+ */
+router.post('/clear-cache', async (req, res) => {
+  try {
+    whatsappAssistant.clearAllConversationHistories();
+
+    logger.info('Conversation cache cleared via API');
+
+    res.json({
+      message: 'Conversation cache cleared successfully',
+    });
+  } catch (error) {
+    logger.error('Failed to clear conversation cache', {
+      error: error.message,
+      stack: error.stack,
+    });
+
+    res.status(500).json({
+      error: 'Failed to clear conversation cache',
       message: error.message,
     });
   }

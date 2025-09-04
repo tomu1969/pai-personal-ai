@@ -55,14 +55,18 @@ class WhatsAppAssistant {
       logger.info('Processing WhatsApp message', { 
         contactPhone, 
         messageLength: message.length,
-        assistantName: assistantConfig.assistantName 
+        assistantName: assistantConfig.assistantName,
+        contactName: assistantConfig.contactName 
       });
 
       // Get conversation history for this contact
       const history = this.getConversationHistory(contactPhone, assistantConfig);
       
-      // Add user message to history
-      history.push({ role: 'user', content: message });
+      // Add user message to history with sender context if available
+      const userMessage = assistantConfig.contactName 
+        ? `${assistantConfig.contactName}: ${message}`
+        : message;
+      history.push({ role: 'user', content: userMessage });
 
       // Keep history manageable (last 20 messages + system prompt)
       if (history.length > 21) {
@@ -112,6 +116,15 @@ class WhatsAppAssistant {
   clearConversationHistory(contactPhone) {
     this.conversationHistories.delete(contactPhone);
     logger.debug('Cleared conversation history', { contactPhone });
+  }
+
+  /**
+   * Clear all conversation histories
+   */
+  clearAllConversationHistories() {
+    const count = this.conversationHistories.size;
+    this.conversationHistories.clear();
+    logger.info('Cleared all conversation histories', { count });
   }
 
   /**

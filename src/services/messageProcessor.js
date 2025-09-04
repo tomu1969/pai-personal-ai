@@ -336,6 +336,7 @@ class MessageProcessorService {
           ownerName: assistant.ownerName,
           assistantName: assistant.assistantName,
           systemPrompt: assistant.systemPrompt,
+          contactName: contact.name,
         });
       }
 

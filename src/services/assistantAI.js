@@ -237,23 +237,32 @@ RESPONSE FORMAT (JSON only):
         case 'message_query':
         case 'summary':
           if (hasDbResults && context.messages) {
-            systemPrompt = `You are a helpful AI assistant analyzing WhatsApp message data. The user asked: "${userMessage}"
+            // Group messages into conversations for proper formatting
+            const conversationSummaries = this.groupMessagesByConversation(context.messages);
+            
+            // Prepare formatted conversation data for AI
+            const conversationData = conversationSummaries.map(conv => ({
+              timestamp: this.formatConversationTimestamp(conv.startTime, conv.endTime),
+              contact: conv.contactName,
+              summary: conv.summary,
+              messageCount: conv.messages.length
+            }));
 
-You have retrieved ${context.messages.length} messages from the database.
+            systemPrompt = `You are Pai, a helpful AI assistant analyzing WhatsApp message data. The user asked: "${userMessage}"
 
-Provide a helpful, natural response analyzing this data. Include:
-- Key insights or patterns
-- Important messages or contacts
-- Time-based analysis if relevant
-- Clear, organized formatting with emojis
+You have retrieved ${context.messages.length} messages grouped into ${conversationSummaries.length} conversations.
 
-Keep the response conversational but informative. If there are many messages, provide a summary rather than listing everything.`;
+IMPORTANT: Use EXACTLY this format for each conversation, ordering them chronologically:
 
-            // Prepare message data for AI analysis
+${conversationData.map(conv => `${conv.timestamp} ${conv.contact}: ${conv.summary}`).join('\n\n')}
+
+Output ONLY the formatted conversation list above. Do not add introductory text, explanations, or additional commentary. Each conversation should be on its own line with a blank line between conversations.`;
+
             const messageData = {
               total_messages: context.messages.length,
+              conversation_count: conversationSummaries.length,
+              conversations: conversationData,
               metadata: context.metadata,
-              messages: context.messages.slice(0, 20), // Limit to first 20 for token efficiency
               query_info: context.query_info,
             };
 
@@ -261,10 +270,10 @@ Keep the response conversational but informative. If there are many messages, pr
               model: this.model,
               messages: [
                 { role: 'system', content: systemPrompt },
-                { role: 'user', content: `Analyze this message data: ${JSON.stringify(messageData)}` },
+                { role: 'user', content: `Generate summary using this conversation data: ${JSON.stringify(messageData)}` },
               ],
               temperature: 0.3,
-              max_tokens: 500,
+              max_tokens: 800,
             });
 
             responseMessage = completion.choices[0].message.content;
@@ -486,6 +495,169 @@ I can help you find and analyze your messages using natural language. Here's wha
         ];
         return responses[Math.floor(Math.random() * responses.length)];
     }
+  }
+
+  /**
+   * Group messages by contact and time windows for conversation summary format
+   */
+  groupMessagesByConversation(messages) {
+    if (!messages || messages.length === 0) return [];
+
+    // Sort messages by contact and timestamp
+    const sortedMessages = messages.sort((a, b) => {
+      const contactCompare = (a.contact?.name || 'Unknown').localeCompare(b.contact?.name || 'Unknown');
+      if (contactCompare !== 0) return contactCompare;
+      return new Date(a.createdAt) - new Date(b.createdAt);
+    });
+
+    const conversations = [];
+    let currentConversation = null;
+    const CONVERSATION_GAP_MINUTES = 30; // Group messages within 30 minutes
+
+    for (const message of sortedMessages) {
+      const messageTime = new Date(message.createdAt);
+      const contactName = message.contact?.name || 'Unknown';
+      const contactId = message.contact?.id || message.contactId;
+
+      // Start new conversation if:
+      // 1. First message
+      // 2. Different contact
+      // 3. Time gap > 30 minutes
+      const shouldStartNew = !currentConversation ||
+        currentConversation.contactId !== contactId ||
+        (messageTime - currentConversation.endTime) > (CONVERSATION_GAP_MINUTES * 60 * 1000);
+
+      if (shouldStartNew) {
+        // Finalize previous conversation
+        if (currentConversation) {
+          currentConversation.summary = this.generateConversationSummary(currentConversation.messages);
+          conversations.push(currentConversation);
+        }
+
+        // Start new conversation
+        currentConversation = {
+          contactName,
+          contactId,
+          startTime: messageTime,
+          endTime: messageTime,
+          messages: [message],
+        };
+      } else {
+        // Add to existing conversation
+        currentConversation.endTime = messageTime;
+        currentConversation.messages.push(message);
+      }
+    }
+
+    // Don't forget the last conversation
+    if (currentConversation) {
+      currentConversation.summary = this.generateConversationSummary(currentConversation.messages);
+      conversations.push(currentConversation);
+    }
+
+    // Sort conversations chronologically
+    return conversations.sort((a, b) => a.startTime - b.startTime);
+  }
+
+  /**
+   * Generate summary text for a conversation (30-50 tokens)
+   */
+  generateConversationSummary(messages, maxTokens = 40) {
+    if (!messages || messages.length === 0) return 'No activity';
+    
+    // Extract key content from messages
+    const contents = messages
+      .filter(msg => msg.sender === 'user' && msg.content && msg.content.trim())
+      .map(msg => msg.content.trim())
+      .slice(0, 5); // Limit to first 5 messages for token efficiency
+
+    if (contents.length === 0) return 'Sent messages';
+
+    // Simple summarization logic
+    if (contents.length === 1) {
+      const content = contents[0];
+      if (content.length <= 120) return content; // Short enough to use directly
+      return content.substring(0, 100) + '...'; // Truncate long single message
+    }
+
+    // Multiple messages - create summary
+    const allText = contents.join(' ').toLowerCase();
+    
+    // Detect common patterns
+    if (allText.includes('meeting') || allText.includes('reunion')) {
+      return 'Discussed meeting arrangements and scheduling';
+    }
+    if (allText.includes('call') || allText.includes('llamar')) {
+      return 'Requested phone call and coordinated timing';  
+    }
+    if (allText.includes('document') || allText.includes('archivo') || allText.includes('send')) {
+      return 'Shared documents and discussed file transfer';
+    }
+    if (allText.includes('dinner') || allText.includes('lunch') || allText.includes('cena') || allText.includes('almuerzo')) {
+      return 'Made dinner/lunch plans and coordinated location';
+    }
+    if (allText.includes('confirm') || allText.includes('confirmar')) {
+      return 'Requested confirmation and follow-up details';
+    }
+
+    // Default: use first message as base
+    const firstMessage = contents[0];
+    if (firstMessage.length <= 80) {
+      return firstMessage;
+    }
+    
+    // Truncate but try to end at word boundary
+    const truncated = firstMessage.substring(0, 70);
+    const lastSpace = truncated.lastIndexOf(' ');
+    return (lastSpace > 30 ? truncated.substring(0, lastSpace) : truncated) + '...';
+  }
+
+  /**
+   * Format date for summary: DD/MM/YY
+   */
+  formatDateForSummary(date) {
+    const d = new Date(date);
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const year = d.getFullYear().toString().slice(-2);
+    return `${day}/${month}/${year}`;
+  }
+
+  /**
+   * Format time for summary: HH:MM
+   */
+  formatTimeForSummary(date) {
+    const d = new Date(date);
+    const hours = d.getHours().toString().padStart(2, '0');
+    const minutes = d.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
+
+  /**
+   * Format time range: HH:MM–HH:MM (same day) or full timestamp if different days
+   */
+  formatTimeRange(startDate, endDate) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    const startTime = this.formatTimeForSummary(start);
+    const endTime = this.formatTimeForSummary(end);
+    
+    // If same time (single message), just show one timestamp
+    if (startTime === endTime) {
+      return startTime;
+    }
+    
+    return `${startTime}–${endTime}`;
+  }
+
+  /**
+   * Format full conversation timestamp: [DD/MM/YY, HH:MM–HH:MM]
+   */
+  formatConversationTimestamp(startDate, endDate) {
+    const dateStr = this.formatDateForSummary(startDate);
+    const timeRange = this.formatTimeRange(startDate, endDate);
+    return `[${dateStr}, ${timeRange}]`;
   }
 }
 

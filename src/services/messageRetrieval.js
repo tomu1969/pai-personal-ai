@@ -93,6 +93,12 @@ class MessageRetrievalService {
       };
     }
 
+    // Enhanced ordering for conversation grouping - first by contact, then by time
+    query.order = [
+      [{ model: Contact, as: 'contact' }, 'name', 'ASC'],
+      ['createdAt', 'ASC']
+    ];
+
     const messages = await Message.findAll(query);
 
     const metadata = {
@@ -187,6 +193,12 @@ class MessageRetrievalService {
     messageQuery.where.conversationId = {
       [require('sequelize').Op.ne]: '00000000-0000-0000-0000-000000000001',
     };
+
+    // Enhanced ordering for conversation grouping - first by contact, then by time
+    messageQuery.order = [
+      [{ model: Contact, as: 'contact' }, 'name', 'ASC'],
+      ['createdAt', 'ASC']
+    ];
 
     const messages = await Message.findAll(messageQuery);
 

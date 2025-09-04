@@ -237,8 +237,19 @@ RESPONSE FORMAT (JSON only):
         case 'message_query':
         case 'summary':
           if (hasDbResults && context.messages) {
+            console.log('🔍 [CONVERSATION FORMAT] Starting conversation formatting process');
+            console.log('📊 [CONVERSATION FORMAT] Raw messages received:', context.messages.length);
+            
             // Group messages into conversations for proper formatting
             const conversationSummaries = this.groupMessagesByConversation(context.messages);
+            
+            console.log('📈 [CONVERSATION FORMAT] Conversations grouped:', conversationSummaries.length);
+            console.log('🗂️ [CONVERSATION FORMAT] Conversation summaries:', conversationSummaries.map(c => ({
+              contact: c.contactName,
+              messageCount: c.messages.length,
+              timespan: `${c.startTime} - ${c.endTime}`,
+              summary: c.summary
+            })));
             
             // Prepare formatted conversation data for AI
             const conversationData = conversationSummaries.map(conv => ({
@@ -248,15 +259,22 @@ RESPONSE FORMAT (JSON only):
               messageCount: conv.messages.length
             }));
 
+            console.log('⏰ [CONVERSATION FORMAT] Formatted conversation data:', conversationData);
+
             // Generate the formatted conversation list directly without additional AI processing
             if (conversationData.length > 0) {
               responseMessage = conversationData.map(conv => 
                 `${conv.timestamp} ${conv.contact}: ${conv.summary}`
               ).join('\n\n');
+              
+              console.log('✅ [CONVERSATION FORMAT] Final formatted output:');
+              console.log(responseMessage);
             } else {
               const timeValue = parameters.timeframe?.value || 5;
               const timeUnit = parameters.timeframe?.unit || 'hours';
               responseMessage = `No conversations found in the last ${timeValue} ${timeUnit}.`;
+              
+              console.log('❌ [CONVERSATION FORMAT] No conversations found for timeframe:', `${timeValue} ${timeUnit}`);
             }
           } else {
             responseMessage = `I searched for messages but didn't find any matching your criteria. Could you try:
@@ -482,7 +500,13 @@ I can help you find and analyze your messages using natural language. Here's wha
    * Group messages by contact and time windows for conversation summary format
    */
   groupMessagesByConversation(messages) {
-    if (!messages || messages.length === 0) return [];
+    console.log('🔄 [GROUP MESSAGES] Starting conversation grouping');
+    console.log('📥 [GROUP MESSAGES] Input messages:', messages?.length || 0);
+    
+    if (!messages || messages.length === 0) {
+      console.log('❌ [GROUP MESSAGES] No messages to group');
+      return [];
+    }
 
     // Sort messages by contact and timestamp
     const sortedMessages = messages.sort((a, b) => {
@@ -490,6 +514,10 @@ I can help you find and analyze your messages using natural language. Here's wha
       if (contactCompare !== 0) return contactCompare;
       return new Date(a.createdAt) - new Date(b.createdAt);
     });
+
+    console.log('📋 [GROUP MESSAGES] Messages sorted by contact and time');
+    console.log('👥 [GROUP MESSAGES] Unique contacts found:', 
+      [...new Set(sortedMessages.map(m => m.contact?.name || 'Unknown'))]);
 
     const conversations = [];
     let currentConversation = null;
@@ -499,6 +527,8 @@ I can help you find and analyze your messages using natural language. Here's wha
       const messageTime = new Date(message.createdAt);
       const contactName = message.contact?.name || 'Unknown';
       const contactId = message.contact?.id || message.contactId;
+
+      console.log(`📨 [GROUP MESSAGES] Processing message from ${contactName} at ${messageTime.toISOString()}`);
 
       // Start new conversation if:
       // 1. First message
@@ -513,6 +543,7 @@ I can help you find and analyze your messages using natural language. Here's wha
         if (currentConversation) {
           currentConversation.summary = this.generateConversationSummary(currentConversation.messages);
           conversations.push(currentConversation);
+          console.log(`✅ [GROUP MESSAGES] Finalized conversation with ${currentConversation.contactName}: ${currentConversation.messages.length} messages`);
         }
 
         // Start new conversation
@@ -523,10 +554,12 @@ I can help you find and analyze your messages using natural language. Here's wha
           endTime: messageTime,
           messages: [message],
         };
+        console.log(`🆕 [GROUP MESSAGES] Started new conversation with ${contactName}`);
       } else {
         // Add to existing conversation
         currentConversation.endTime = messageTime;
         currentConversation.messages.push(message);
+        console.log(`➕ [GROUP MESSAGES] Added message to existing conversation with ${contactName} (${currentConversation.messages.length} total)`);
       }
     }
 
@@ -534,17 +567,30 @@ I can help you find and analyze your messages using natural language. Here's wha
     if (currentConversation) {
       currentConversation.summary = this.generateConversationSummary(currentConversation.messages);
       conversations.push(currentConversation);
+      console.log(`🏁 [GROUP MESSAGES] Finalized last conversation with ${currentConversation.contactName}: ${currentConversation.messages.length} messages`);
     }
 
     // Sort conversations chronologically
-    return conversations.sort((a, b) => a.startTime - b.startTime);
+    const sortedConversations = conversations.sort((a, b) => a.startTime - b.startTime);
+    
+    console.log('📊 [GROUP MESSAGES] Final conversation groups:', sortedConversations.length);
+    console.log('📈 [GROUP MESSAGES] Conversations by contact:', 
+      sortedConversations.map(c => `${c.contactName} (${c.messages.length} msgs)`));
+    
+    return sortedConversations;
   }
 
   /**
    * Generate summary text for a conversation (30-50 tokens)
    */
   generateConversationSummary(messages, _maxTokens = 40) {
-    if (!messages || messages.length === 0) return 'No activity';
+    console.log('💬 [SUMMARY GENERATION] Generating summary for conversation');
+    console.log('📨 [SUMMARY GENERATION] Total messages:', messages?.length || 0);
+    
+    if (!messages || messages.length === 0) {
+      console.log('❌ [SUMMARY GENERATION] No messages to summarize');
+      return 'No activity';
+    }
     
     // Extract key content from messages
     const contents = messages
@@ -552,45 +598,68 @@ I can help you find and analyze your messages using natural language. Here's wha
       .map(msg => msg.content.trim())
       .slice(0, 5); // Limit to first 5 messages for token efficiency
 
-    if (contents.length === 0) return 'Sent messages';
+    console.log('📝 [SUMMARY GENERATION] User messages extracted:', contents.length);
+    console.log('💭 [SUMMARY GENERATION] Message contents preview:', contents.map(c => c.substring(0, 50) + '...'));
+
+    if (contents.length === 0) {
+      console.log('⚠️ [SUMMARY GENERATION] No user messages found, using fallback');
+      return 'Sent messages';
+    }
 
     // Simple summarization logic
     if (contents.length === 1) {
       const content = contents[0];
-      if (content.length <= 120) return content; // Short enough to use directly
-      return content.substring(0, 100) + '...'; // Truncate long single message
+      console.log('1️⃣ [SUMMARY GENERATION] Single message summary');
+      if (content.length <= 120) {
+        console.log('✂️ [SUMMARY GENERATION] Short message, using directly:', content);
+        return content; // Short enough to use directly
+      }
+      const truncated = content.substring(0, 100) + '...';
+      console.log('✂️ [SUMMARY GENERATION] Long message truncated:', truncated);
+      return truncated; // Truncate long single message
     }
 
     // Multiple messages - create summary
     const allText = contents.join(' ').toLowerCase();
+    console.log('🔍 [SUMMARY GENERATION] Multiple messages, analyzing patterns');
+    console.log('🔤 [SUMMARY GENERATION] Combined text preview:', allText.substring(0, 100) + '...');
     
     // Detect common patterns
     if (allText.includes('meeting') || allText.includes('reunion')) {
+      console.log('📅 [SUMMARY GENERATION] Pattern detected: Meeting');
       return 'Discussed meeting arrangements and scheduling';
     }
     if (allText.includes('call') || allText.includes('llamar')) {
+      console.log('📞 [SUMMARY GENERATION] Pattern detected: Call');
       return 'Requested phone call and coordinated timing';  
     }
     if (allText.includes('document') || allText.includes('archivo') || allText.includes('send')) {
+      console.log('📄 [SUMMARY GENERATION] Pattern detected: Document');
       return 'Shared documents and discussed file transfer';
     }
     if (allText.includes('dinner') || allText.includes('lunch') || allText.includes('cena') || allText.includes('almuerzo')) {
+      console.log('🍽️ [SUMMARY GENERATION] Pattern detected: Meal');
       return 'Made dinner/lunch plans and coordinated location';
     }
     if (allText.includes('confirm') || allText.includes('confirmar')) {
+      console.log('✅ [SUMMARY GENERATION] Pattern detected: Confirmation');
       return 'Requested confirmation and follow-up details';
     }
 
     // Default: use first message as base
     const firstMessage = contents[0];
+    console.log('🔄 [SUMMARY GENERATION] No pattern matched, using first message as base');
     if (firstMessage.length <= 80) {
+      console.log('📝 [SUMMARY GENERATION] Short first message, using directly:', firstMessage);
       return firstMessage;
     }
     
     // Truncate but try to end at word boundary
     const truncated = firstMessage.substring(0, 70);
     const lastSpace = truncated.lastIndexOf(' ');
-    return (lastSpace > 30 ? truncated.substring(0, lastSpace) : truncated) + '...';
+    const finalSummary = (lastSpace > 30 ? truncated.substring(0, lastSpace) : truncated) + '...';
+    console.log('✂️ [SUMMARY GENERATION] First message truncated:', finalSummary);
+    return finalSummary;
   }
 
   /**

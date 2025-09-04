@@ -248,35 +248,16 @@ RESPONSE FORMAT (JSON only):
               messageCount: conv.messages.length
             }));
 
-            systemPrompt = `You are Pai, a helpful AI assistant analyzing WhatsApp message data. The user asked: "${userMessage}"
-
-You have retrieved ${context.messages.length} messages grouped into ${conversationSummaries.length} conversations.
-
-IMPORTANT: Use EXACTLY this format for each conversation, ordering them chronologically:
-
-${conversationData.map(conv => `${conv.timestamp} ${conv.contact}: ${conv.summary}`).join('\n\n')}
-
-Output ONLY the formatted conversation list above. Do not add introductory text, explanations, or additional commentary. Each conversation should be on its own line with a blank line between conversations.`;
-
-            const messageData = {
-              total_messages: context.messages.length,
-              conversation_count: conversationSummaries.length,
-              conversations: conversationData,
-              metadata: context.metadata,
-              query_info: context.query_info,
-            };
-
-            const completion = await this.openai.chat.completions.create({
-              model: this.model,
-              messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: `Generate summary using this conversation data: ${JSON.stringify(messageData)}` },
-              ],
-              temperature: 0.3,
-              max_tokens: 800,
-            });
-
-            responseMessage = completion.choices[0].message.content;
+            // Generate the formatted conversation list directly without additional AI processing
+            if (conversationData.length > 0) {
+              responseMessage = conversationData.map(conv => 
+                `${conv.timestamp} ${conv.contact}: ${conv.summary}`
+              ).join('\n\n');
+            } else {
+              const timeValue = parameters.timeframe?.value || 5;
+              const timeUnit = parameters.timeframe?.unit || 'hours';
+              responseMessage = `No conversations found in the last ${timeValue} ${timeUnit}.`;
+            }
           } else {
             responseMessage = `I searched for messages but didn't find any matching your criteria. Could you try:
 
@@ -461,7 +442,7 @@ I can help you find and analyze your messages using natural language. Here's wha
   /**
    * Generate simple fallback responses when OpenAI is not available
    */
-  generateSimpleFallbackResponse(intent, userMessage, context = {}) {
+  generateSimpleFallbackResponse(intent, _userMessage, context = {}) {
     const greetings = ['Hello', 'Hi there', 'Hey', 'Greetings'];
     const greeting = greetings[Math.floor(Math.random() * greetings.length)];
     
@@ -562,7 +543,7 @@ I can help you find and analyze your messages using natural language. Here's wha
   /**
    * Generate summary text for a conversation (30-50 tokens)
    */
-  generateConversationSummary(messages, maxTokens = 40) {
+  generateConversationSummary(messages, _maxTokens = 40) {
     if (!messages || messages.length === 0) return 'No activity';
     
     // Extract key content from messages

@@ -239,7 +239,7 @@ const sendMessage = async (req, res) => {
       };
     } else {
       // Regular conversation - send via WhatsApp service
-      const whatsappService = require('../services/whatsapp');
+      const whatsappService = require('../services/whatsapp/whatsapp');
       const whatsapp = new whatsappService();
 
       try {
@@ -299,7 +299,7 @@ const sendMessage = async (req, res) => {
       });
 
       // Broadcast the sent message to real-time subscribers
-      const realtimeService = require('../services/realtime');
+      const realtimeService = require('../services/utils/realtime');
       realtimeService.broadcastNewMessage(id, messageWithContact);
 
       // If this is the Assistant conversation, process the message for Assistant response

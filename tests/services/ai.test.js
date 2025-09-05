@@ -1,5 +1,5 @@
 const axios = require('axios');
-const aiService = require('../../src/services/ai');
+const aiService = require('../../src/services/ai/assistantAI');
 const config = require('../../src/config');
 
 jest.mock('axios');

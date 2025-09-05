@@ -17,16 +17,16 @@
  * @since September 2025
  */
 
-const assistantService = require('./assistant');
-const conversationService = require('./conversation');
-const filterService = require('./filters');
-const groupService = require('./groupService');
-const assistantMessageHandler = require('./assistantMessageHandler');
-const aiService = require('./ai');
-const whatsappAssistant = require('./whatsapp-assistant');
+const assistantService = require('../assistant');
+const conversationService = require('../utils/conversation');
+const filterService = require('../utils/filters');
+const groupService = require('../utils/groupService');
+const assistantMessageHandler = require('../assistantMessageHandler');
+const aiService = require('../ai/assistantAI');
+const whatsappAssistant = require('../ai/whatsapp-assistant');
 const WhatsAppService = require('./whatsapp');
-const { Message } = require('../models');
-const logger = require('../utils/logger');
+const { Message } = require('../../models');
+const logger = require('../../utils/logger');
 
 /**
  * Core message processing pipeline for WhatsApp messages

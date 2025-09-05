@@ -1,4 +1,4 @@
-const filterService = require('../../src/services/filters');
+const filterService = require('../../src/services/utils/filters');
 
 describe('MessageFilterService', () => {
   describe('analyzeMessage', () => {

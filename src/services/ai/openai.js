@@ -11,8 +11,8 @@
  */
 
 const axios = require('axios');
-const config = require('../config');
-const logger = require('../utils/logger');
+const config = require('../../config');
+const logger = require('../../utils/logger');
 
 /**
  * OpenAI API service for direct API communication

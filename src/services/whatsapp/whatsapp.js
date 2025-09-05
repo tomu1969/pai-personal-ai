@@ -11,8 +11,8 @@
  */
 
 const axios = require('axios');
-const config = require('../config');
-const logger = require('../utils/logger');
+const config = require('../../config');
+const logger = require('../../utils/logger');
 
 /**
  * WhatsApp service for Evolution API integration

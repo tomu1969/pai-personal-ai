@@ -4,31 +4,49 @@ Complete step-by-step guide for connecting WhatsApp to PAI and understanding how
 
 ## 🔧 Step-by-Step WhatsApp Connection Process
 
-### **Phase 1: System Startup**
+### **Phase 1: System Startup (Unified Launch)**
 
-1. **Start the Backend Server**
+1. **One-Command Launch**
    ```bash
+   # Set your OpenAI API key
+   export OPENAI_API_KEY='sk-proj-your-key-here'
+   
+   # Launch complete system
+   ./launch-pai.sh
+   ```
+   
+   **What this does automatically:**
+   - ✅ Verifies all dependencies (Node.js, Docker, ports)
+   - 🐳 Starts Evolution API container (port 8080)
+   - 🗄️ Starts PostgreSQL and Redis databases
+   - ⚙️ Launches Express backend server (port 3000)
+   - 🎨 Starts Vite React frontend (port 3001)
+   - 🔍 Performs comprehensive health checks
+   - 📊 Displays service status and access URLs
+
+2. **Alternative Launch Methods**
+   ```bash
+   # Using npm
+   npm run launch
+   
+   # Debug mode with detailed logging
+   npm run launch:debug
+   
+   # Check system health
+   npm run monitor
+   ```
+
+3. **Manual Launch (if needed)**
+   ```bash
+   # Backend only
    npm start
-   ```
-   - Loads environment variables from `.env`
-   - Initializes Express server on port 3000
-   - Connects to PostgreSQL database
-   - Sets up WebSocket server for real-time updates
-
-2. **Start Evolution API (WhatsApp Gateway)**
-   ```bash
-   docker-compose up -d
-   ```
-   - Starts Evolution API container on port 8080
-   - Creates WhatsApp instance: `ai-pbx-instance`
-   - Configures webhook endpoint: `http://localhost:3000/webhook`
-
-3. **Start React Frontend**
-   ```bash
+   
+   # Frontend only  
    cd client && npm run dev
+   
+   # Docker services only
+   cd docker/evolution && docker-compose up -d
    ```
-   - Starts Vite dev server on port 5173
-   - Connects to backend API and WebSocket
 
 ### **Phase 2: WhatsApp Connection**
 
@@ -277,51 +295,96 @@ Contains the system prompt that defines PAI's personality and behavior.
 ## 🚀 Quick Start Commands
 
 ```bash
-# 1. Start all services
-npm start                    # Backend (port 3000)
-cd client && npm run dev     # Frontend (port 5173)
-docker-compose up -d         # Evolution API (port 8080)
+# 1. One-command launch (recommended)
+export OPENAI_API_KEY='your-key-here'
+./launch-pai.sh
 
-# 2. Connect WhatsApp
-# Visit: http://localhost:8080/instance/connect/ai-pbx-instance
+# OR using npm
+npm run launch
+
+# 2. Monitor system health
+npm run monitor
+
+# 3. Connect WhatsApp
+# Visit: http://localhost:3000/qr-responder
 # Scan QR code with your phone
 
-# 3. Enable assistant
+# 4. Configure assistant (web interface)
+# Visit: http://localhost:3001
+# Click gear icon → Configure settings
+
+# 5. Test by sending yourself a WhatsApp message
+```
+
+### **Legacy Manual Commands**
+```bash
+# Manual service startup (if needed)
+npm start                    # Backend (port 3000)
+cd client && npm run dev     # Frontend (port 3001)
+cd docker/evolution && docker-compose up -d  # Docker services
+
+# Direct API assistant toggle
 curl -X POST http://localhost:3000/api/assistant/toggle \
      -H "Content-Type: application/json" \
      -d '{"enabled": true}'
-
-# 4. Test by sending yourself a WhatsApp message
 ```
 
 ## 🔍 Monitoring & Debugging
 
-### Check System Status
+### **New Launch System Tools**
+```bash
+# Comprehensive system health check
+npm run monitor
+
+# Continuous monitoring dashboard
+npm run monitor:watch
+
+# Check system dependencies
+npm run check-deps
+
+# Launch system debug mode
+npm run launch:debug
+
+# Service status dashboard
+./scripts/service-monitor.sh dashboard
+```
+
+### **API Health Checks**
 ```bash
 # Backend health
-curl http://localhost:3000/api/status
+curl http://localhost:3000/health
 
-# WhatsApp connection
+# WhatsApp connection status  
 curl http://localhost:3000/api/whatsapp/status
 
 # Assistant configuration
 curl http://localhost:3000/api/assistant/config
 
 # Evolution API instance status
-curl -H "apikey: your-api-key" \
-     http://localhost:8080/instance/connectionState/ai-pbx-instance
+curl -H "apikey: pai_evolution_api_key_2025" \
+     http://localhost:8080/instance/connectionState/aipbx
 ```
 
-### View Logs
+### **Log Files**
 ```bash
-# Application logs
-tail -f logs/app.log
+# Launch system logs
+tail -f logs/launch_*.log
 
-# Error logs
+# Backend service logs
+tail -f logs/backend_*.log
+
+# Frontend service logs  
+tail -f logs/frontend_*.log
+
+# Docker services logs
+tail -f logs/docker_*.log
+
+# Legacy application logs
+tail -f logs/app.log
 tail -f logs/error.log
 
-# Evolution API logs
-docker-compose logs -f evolution-api
+# Evolution API container logs
+docker-compose -f docker/evolution/docker-compose.yml logs -f evolution-api
 ```
 
 ## 🐛 Common Issues & Solutions
@@ -375,5 +438,6 @@ Now PAI will automatically respond to your WhatsApp messages using GPT intellige
 ---
 
 **Last Updated:** September 2025  
-**PAI Version:** 1.0.0  
-**Evolution API:** v2.0.9
+**PAI Version:** 1.1.0 (Unified Launch System)  
+**Evolution API:** v2.0.9  
+**Launch System:** v1.0.0

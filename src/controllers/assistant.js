@@ -1,6 +1,6 @@
 const express = require('express');
 const assistantService = require('../services/assistant');
-const whatsappAssistant = require('../services/whatsapp-assistant');
+const whatsappAssistant = require('../services/ai/whatsapp-assistant');
 const logger = require('../utils/logger');
 
 const router = express.Router();

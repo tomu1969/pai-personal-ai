@@ -1,5 +1,5 @@
-const evolutionMultiInstance = require('../services/evolutionMultiInstance');
-const paiAssistantWhatsApp = require('../services/paiAssistantWhatsApp');
+const evolutionMultiInstance = require('../services/whatsapp/evolutionMultiInstance');
+const paiAssistantWhatsApp = require('../services/ai/paiAssistantWhatsApp');
 const logger = require('../utils/logger');
 
 /**

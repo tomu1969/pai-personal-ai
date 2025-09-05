@@ -6,6 +6,12 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
+    "launch": "./launch-pai.sh",
+    "launch:debug": "DEBUG=true ./launch-pai.sh --debug",
+    "launch:check": "./launch-pai.sh --check-only",
+    "check-deps": "./scripts/check-dependencies.sh",
+    "monitor": "./scripts/service-monitor.sh",
+    "monitor:watch": "./scripts/service-monitor.sh continuous",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch",

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const evolutionMultiInstance = require('../services/evolutionMultiInstance');
+const evolutionMultiInstance = require('../services/whatsapp/evolutionMultiInstance');
 const logger = require('../utils/logger');
 
 router.get('/qr-direct', async (req, res) => {

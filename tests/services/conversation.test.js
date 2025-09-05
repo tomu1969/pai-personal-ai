@@ -1,7 +1,7 @@
 const {
   Contact, Conversation, Message, Assistant,
 } = require('../../src/models');
-const conversationService = require('../../src/services/conversation');
+const conversationService = require('../../src/services/utils/conversation');
 
 // Mock the models
 jest.mock('../../src/models', () => ({

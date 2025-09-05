@@ -11,8 +11,8 @@
  */
 
 const { OpenAI } = require('openai');
-const logger = require('../utils/logger');
-const config = require('../config');
+const logger = require('../../utils/logger');
+const config = require('../../config');
 
 /**
  * Core AI assistant service for intelligent message processing

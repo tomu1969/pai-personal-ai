@@ -1,5 +1,5 @@
 const axios = require('axios');
-const WhatsAppService = require('../../src/services/whatsapp');
+const WhatsAppService = require('../../src/services/whatsapp/whatsapp');
 
 // Mock axios
 jest.mock('axios');

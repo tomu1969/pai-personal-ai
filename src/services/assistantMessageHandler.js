@@ -1,7 +1,7 @@
 const { Message } = require('../models');
 const logger = require('../utils/logger');
-const messageRetrieval = require('./messageRetrieval');
-const assistantAI = require('./assistantAI');
+const messageRetrieval = require('./database/messageRetrieval');
+const assistantAI = require('./ai/assistantAI');
 const assistantService = require('./assistant');
 
 class AssistantMessageHandler {

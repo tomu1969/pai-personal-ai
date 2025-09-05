@@ -1,6 +1,6 @@
-const { GroupMetadata } = require('../models');
-const WhatsAppService = require('./whatsapp');
-const logger = require('../utils/logger');
+const { GroupMetadata } = require('../../models');
+const WhatsAppService = require('../whatsapp/whatsapp');
+const logger = require('../../utils/logger');
 
 class GroupService {
   constructor() {
@@ -260,7 +260,7 @@ class GroupService {
    */
   async syncGroupsFromContacts() {
     try {
-      const { Contact } = require('../models');
+      const { Contact } = require('../../models');
 
       // Get all group contacts
       const groupContacts = await Contact.findAll({

@@ -1,5 +1,5 @@
 // const { validate } = require('../middleware/validation');
-const WhatsAppService = require('../services/whatsapp');
+const WhatsAppService = require('../services/whatsapp/whatsapp');
 const logger = require('../utils/logger');
 
 const whatsappService = new WhatsAppService();
@@ -182,7 +182,7 @@ const handleConnectionUpdate = async (data) => {
 const processIncomingMessage = async (message) => {
   try {
     // eslint-disable-next-line global-require
-    const messageProcessor = require('../services/messageProcessor');
+    const messageProcessor = require('../services/whatsapp/messageProcessor');
 
     logger.info('Processing message through assistant system', {
       messageId: message.messageId,
@@ -205,7 +205,7 @@ const processIncomingMessage = async (message) => {
 
       // Broadcast new message to real-time subscribers
       if (result.message && result.conversation?.id) {
-        const realtimeService = require('../services/realtime');
+        const realtimeService = require('../services/utils/realtime');
         realtimeService.broadcastNewMessage(result.conversation.id, result.message);
       }
     } else {

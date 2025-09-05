@@ -1,9 +1,9 @@
 const {
   Contact, Conversation, Message, sequelize,
-} = require('../models');
-const logger = require('../utils/logger');
+} = require('../../models');
+const logger = require('../../utils/logger');
 const filterService = require('./filters');
-const aiService = require('./ai');
+const aiService = require('../ai/assistantAI');
 
 class ConversationService {
   /**

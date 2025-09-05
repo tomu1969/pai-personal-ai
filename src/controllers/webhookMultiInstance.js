@@ -1,6 +1,6 @@
-const evolutionMultiInstance = require('../services/evolutionMultiInstance');
-const messageProcessor = require('../services/messageProcessor');
-const paiAssistantWhatsApp = require('../services/paiAssistantWhatsApp');
+const evolutionMultiInstance = require('../services/whatsapp/evolutionMultiInstance');
+const messageProcessor = require('../services/whatsapp/messageProcessor');
+const paiAssistantWhatsApp = require('../services/ai/paiAssistantWhatsApp');
 const logger = require('../utils/logger');
 
 /**
@@ -215,7 +215,7 @@ async function handleMessageUpsert(data, whatsappInstance, instanceAlias) {
 
         // Broadcast to real-time subscribers
         if (result.message && result.conversation?.id) {
-          const realtimeService = require('../services/realtime');
+          const realtimeService = require('../services/utils/realtime');
           realtimeService.broadcastNewMessage(result.conversation.id, result.message);
         }
       }

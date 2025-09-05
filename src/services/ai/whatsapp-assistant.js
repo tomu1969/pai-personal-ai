@@ -17,7 +17,7 @@ const path = require('path');
 // Force load .env file, override existing environment variables  
 require('dotenv').config({ override: true });
 const { OpenAI } = require('openai');
-const logger = require('../utils/logger');
+const logger = require('../../utils/logger');
 
 /**
  * WhatsApp-specific AI assistant for personalized message responses
@@ -42,7 +42,7 @@ class WhatsAppAssistant {
   constructor() {
     // Load system prompt
     this.systemPrompt = fs.readFileSync(
-      path.join(__dirname, '../../prompts/pai_responder.md'),
+      path.join(__dirname, '../../../prompts/pai_responder.md'),
       'utf8'
     );
 

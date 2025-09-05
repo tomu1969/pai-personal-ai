@@ -11,8 +11,8 @@
  */
 
 const WhatsAppService = require('./whatsapp');
-const config = require('../config');
-const logger = require('../utils/logger');
+const config = require('../../config');
+const logger = require('../../utils/logger');
 
 /**
  * Multi-instance Evolution API manager

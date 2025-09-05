@@ -7,7 +7,7 @@
 
 const request = require('supertest');
 const { Message, Conversation, Contact } = require('../src/models');
-const messageProcessor = require('../src/services/messageProcessor');
+const messageProcessor = require('../src/services/whatsapp/messageProcessor');
 
 describe('Message Synchronization Fix', () => {
   

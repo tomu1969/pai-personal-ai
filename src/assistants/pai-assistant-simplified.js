@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { OpenAI } = require('openai');
-const messageSearchService = require('../services/messageSearch');
+const messageSearchService = require('../services/database/messageSearch');
 const logger = require('../utils/logger');
 
 class SimplifiedPaiAssistant {

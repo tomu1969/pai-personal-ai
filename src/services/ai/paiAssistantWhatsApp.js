@@ -1,6 +1,6 @@
-const SimplifiedPaiAssistant = require('../assistants/pai-assistant-simplified');
-const messageSearchService = require('./messageSearch');
-const logger = require('../utils/logger');
+const SimplifiedPaiAssistant = require('../../assistants/pai-assistant-simplified');
+const messageSearchService = require('../database/messageSearch');
+const logger = require('../../utils/logger');
 
 /**
  * PAI Assistant WhatsApp Service

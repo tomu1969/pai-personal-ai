@@ -1,16 +1,16 @@
-const messageProcessor = require('../../src/services/messageProcessor');
+const messageProcessor = require('../../src/services/whatsapp/messageProcessor');
 const assistantService = require('../../src/services/assistant');
-const filterService = require('../../src/services/filters');
-const aiService = require('../../src/services/ai');
-const conversationService = require('../../src/services/conversation');
-const whatsappService = require('../../src/services/whatsapp');
+const filterService = require('../../src/services/utils/filters');
+const aiService = require('../../src/services/ai/assistantAI');
+const conversationService = require('../../src/services/utils/conversation');
+const whatsappService = require('../../src/services/whatsapp/whatsapp');
 
 // Mock all services
 jest.mock('../../src/services/assistant');
-jest.mock('../../src/services/filters');
-jest.mock('../../src/services/ai');
-jest.mock('../../src/services/conversation');
-jest.mock('../../src/services/whatsapp');
+jest.mock('../../src/services/utils/filters');
+jest.mock('../../src/services/ai/assistantAI');
+jest.mock('../../src/services/utils/conversation');
+jest.mock('../../src/services/whatsapp/whatsapp');
 
 describe('MessageProcessorService', () => {
   beforeEach(() => {

@@ -7,7 +7,7 @@ const {
   summaryQuerySchema,
 } = require('../utils/schemas');
 const logger = require('../utils/logger');
-const groupService = require('../services/groupService');
+const groupService = require('../services/utils/groupService');
 const paiAssistantController = require('../controllers/paiAssistantController');
 
 const router = express.Router();
@@ -175,7 +175,7 @@ router.get('/status', async (req, res) => {
 // WhatsApp connection status endpoint
 router.get('/whatsapp/status', async (req, res) => {
   try {
-    const whatsappService = require('../services/whatsapp');
+    const whatsappService = require('../services/whatsapp/whatsapp');
     const whatsapp = new whatsappService();
 
     const instanceStatus = await whatsapp.getInstanceStatus();
@@ -206,7 +206,7 @@ router.get('/whatsapp/status', async (req, res) => {
 // Get WhatsApp QR Code for connection
 router.get('/whatsapp/qrcode', async (req, res) => {
   try {
-    const whatsappService = require('../services/whatsapp');
+    const whatsappService = require('../services/whatsapp/whatsapp');
     const whatsapp = new whatsappService();
 
     // First check if already connected
@@ -247,7 +247,7 @@ router.get('/whatsapp/qrcode', async (req, res) => {
 // Sync chats from WhatsApp
 router.post('/whatsapp/sync', async (req, res) => {
   try {
-    const whatsappService = require('../services/whatsapp');
+    const whatsappService = require('../services/whatsapp/whatsapp');
     const whatsapp = new whatsappService();
 
     logger.info('Starting WhatsApp chat sync', {
@@ -281,7 +281,7 @@ router.post('/whatsapp/sync', async (req, res) => {
 // Get chat sync status/info
 router.get('/whatsapp/sync/status', async (req, res) => {
   try {
-    const whatsappService = require('../services/whatsapp');
+    const whatsappService = require('../services/whatsapp/whatsapp');
     const whatsapp = new whatsappService();
 
     // Get basic stats about current chats
@@ -509,7 +509,7 @@ router.post('/groups/sync-from-contacts', async (req, res) => {
 // Debug endpoint for WebSocket connections
 router.get('/debug/websocket', (req, res) => {
   try {
-    const realtimeService = require('../services/realtime');
+    const realtimeService = require('../services/utils/realtime');
     const stats = realtimeService.getStats();
     const assistantRoomName = 'conversation_00000000-0000-0000-0000-000000000001';
     const assistantRoomSize = realtimeService.io?.sockets.adapter.rooms.get(assistantRoomName)?.size || 0;

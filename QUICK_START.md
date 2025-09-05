@@ -22,14 +22,14 @@ PAI System consists of two WhatsApp assistants:
 - 📊 Provides conversation summaries
 - 💬 Query interface for finding specific information
 
-## 🚀 **Option 1: Full Stack Setup (Recommended)**
+## 🚀 **Option 1: Unified Launch (Recommended)**
 
 ### **Step 1: Get Your OpenAI API Key**
 1. Visit: https://platform.openai.com/api-keys
 2. Sign up/login → "Create new secret key"
 3. Copy the key (starts with `sk-proj-...`)
 
-### **Step 2: Clone and Configure**
+### **Step 2: Clone and Launch**
 ```bash
 # Clone repository
 git clone <repository-url>
@@ -37,15 +37,32 @@ cd ai_pbx
 
 # Set your OpenAI API key
 export OPENAI_API_KEY='sk-proj-your-actual-key-here'
+
+# Launch complete system with one command
+./launch-pai.sh
 ```
 
-### **Step 3: Start the Full System**
-```bash
-# Navigate to full-stack setup
-cd docker/full-stack
+**That's it!** The unified launch script automatically:
+- ✅ Verifies all dependencies (Node.js, Docker, ports)
+- 🐳 Starts Docker services (Evolution API, PostgreSQL, Redis)  
+- ⚙️ Launches backend server (port 3000)
+- 🎨 Starts frontend development server (port 3001)
+- 🔍 Performs comprehensive health checks
+- 📊 Displays service status and access URLs
 
-# Start all services (Frontend, Backend, Evolution API, Databases)
-./start.sh
+### **Alternative Commands**
+```bash
+# Using npm
+npm run launch
+
+# Debug mode with detailed logging  
+npm run launch:debug
+
+# Check system dependencies only
+npm run check-deps
+
+# Monitor service health
+npm run monitor
 ```
 
 ### **Step 4: Connect Your WhatsApp Devices**
@@ -212,37 +229,69 @@ HOST=0.0.0.0
 
 ## ❗ **Troubleshooting**
 
-### **Services Won't Start:**
+### **Launch System Diagnostics:**
+```bash
+# Check what's preventing launch
+npm run check-deps
+
+# View detailed startup logs
+npm run launch:debug
+
+# Monitor system health
+npm run monitor
+
+# Check service status
+./scripts/service-monitor.sh dashboard
+```
+
+### **Common Issues:**
+
+**🔧 Dependency Problems:**
+```bash
+# Install Node.js 18+
+nvm install 18 && nvm use 18
+
+# Start Docker Desktop
+open -a Docker
+
+# Free up ports
+lsof -ti:3000,3001,8080,5432,6379 | xargs kill
+```
+
+**🐳 Docker Issues:**
 ```bash
 # Check Docker status
 docker info
 
-# View service logs
+# Restart Docker services
+cd docker/evolution && docker-compose restart
+
+# View service logs  
 docker-compose logs evolution-api
-docker-compose logs ai-pbx-backend
 ```
 
-### **WhatsApp Not Connecting:**
-1. Check QR code pages load: http://localhost:3000/qr-responder
-2. Verify Evolution API is running: http://localhost:8080
-3. Try refreshing QR code after 30 seconds
+**📱 WhatsApp Not Connecting:**
+1. Verify services are running: `npm run monitor`
+2. Check QR code pages: http://localhost:3000/qr-responder
+3. Verify Evolution API: http://localhost:8080
 4. Check instance status: http://localhost:8080/instance/connectionState/aipbx
 
-### **AI Not Responding:**
-1. Verify OpenAI API key is set: `echo $OPENAI_API_KEY`
-2. Check backend health: http://localhost:3000/health
-3. View backend logs for errors
-4. Ensure assistant is enabled in web interface
+**🤖 AI Not Responding:**
+1. Check OpenAI key: `echo $OPENAI_API_KEY`
+2. Verify backend health: http://localhost:3000/health  
+3. Check assistant settings in web interface
+4. View logs: `tail -f logs/launch_*.log`
 
-### **Database Issues:**
+**🚨 System Recovery:**
 ```bash
-# Reset database
-cd docker/full-stack
-./reset.sh
+# Stop everything
+pkill -f "node src/app.js"
+pkill -f "vite"
+docker-compose -f docker/evolution/docker-compose.yml down
 
-# Manual database reset
-docker volume rm pai_postgres_data
-./start.sh
+# Clean restart
+rm -f logs/*.pid
+./launch-pai.sh
 ```
 
 ## 📚 **Next Steps**

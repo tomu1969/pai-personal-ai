@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const logger = require('../utils/logger');
+const logger = require('../../utils/logger');
 
 class QueryBuilder {
   constructor() {
@@ -147,7 +147,7 @@ class QueryBuilder {
     } else if (sender.name) {
       // Filter by contact name (requires join)
       query.include.push({
-        model: require('../models').Contact,
+        model: require('../../models').Contact,
         as: 'contact',
         where: {
           name: { [Op.iLike]: `%${sender.name}%` },
@@ -210,7 +210,7 @@ class QueryBuilder {
 
     // This applies to conversation-level queries
     query.include.push({
-      model: require('../models').Conversation,
+      model: require('../../models').Conversation,
       as: 'conversation',
       where: {
         priority: { [Op.in]: priority },
@@ -228,7 +228,7 @@ class QueryBuilder {
     const defaultIncludes = this.getDefaultIncludes();
 
     // Always include contact info unless already added
-    const hasContactInclude = query.include.some((inc) => inc.model === require('../models').Contact || inc.as === 'contact');
+    const hasContactInclude = query.include.some((inc) => inc.model === require('../../models').Contact || inc.as === 'contact');
 
     if (!hasContactInclude) {
       query.include.push(defaultIncludes.find((inc) => inc.as === 'contact'));
@@ -236,7 +236,7 @@ class QueryBuilder {
 
     // Add conversation include for certain intents
     if (['conversation_query', 'summary'].includes(intent)) {
-      const hasConversationInclude = query.include.some((inc) => inc.model === require('../models').Conversation || inc.as === 'conversation');
+      const hasConversationInclude = query.include.some((inc) => inc.model === require('../../models').Conversation || inc.as === 'conversation');
 
       if (!hasConversationInclude) {
         query.include.push(defaultIncludes.find((inc) => inc.as === 'conversation'));
@@ -255,16 +255,16 @@ class QueryBuilder {
   getDefaultIncludes() {
     return [
       {
-        model: require('../models').Contact,
+        model: require('../../models').Contact,
         as: 'contact',
         attributes: ['id', 'name', 'phone', 'profilePicture', 'isGroup'],
       },
       {
-        model: require('../models').Conversation,
+        model: require('../../models').Conversation,
         as: 'conversation',
         attributes: ['id', 'priority', 'status', 'category'],
         include: [{
-          model: require('../models').Contact,
+          model: require('../../models').Contact,
           as: 'contact',
           attributes: ['id', 'name', 'phone', 'isGroup'],
         }],
@@ -300,7 +300,7 @@ class QueryBuilder {
     const query = {
       where: {},
       include: [{
-        model: require('../models').Contact,
+        model: require('../../models').Contact,
         as: 'contact',
         attributes: ['id', 'name', 'phone', 'isGroup'],
       }],

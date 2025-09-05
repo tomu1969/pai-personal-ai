@@ -1,5 +1,5 @@
-const { Message, Contact, Conversation } = require('../models');
-const logger = require('../utils/logger');
+const { Message, Contact, Conversation } = require('../../models');
+const logger = require('../../utils/logger');
 const queryBuilder = require('./queryBuilder');
 
 class MessageRetrievalService {

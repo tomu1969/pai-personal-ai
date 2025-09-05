@@ -1,5 +1,5 @@
 const { Server } = require('socket.io');
-const logger = require('../utils/logger');
+const logger = require('../../utils/logger');
 
 class RealtimeService {
   constructor() {

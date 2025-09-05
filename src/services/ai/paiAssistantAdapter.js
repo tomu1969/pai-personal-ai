@@ -1,5 +1,5 @@
-const PaiAssistantService = require('../assistants/pai-assistant/service');
-const logger = require('../utils/logger');
+const PaiAssistantService = require('../../assistants/pai-assistant/service');
+const logger = require('../../utils/logger');
 
 class PaiAssistantAdapter {
   constructor() {

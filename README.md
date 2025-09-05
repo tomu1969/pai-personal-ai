@@ -64,33 +64,43 @@ WhatsApp ↔ Evolution API ↔ Node.js Backend ↔ React Frontend
 - Node.js 18+
 - Docker & Docker Compose
 - OpenAI API key
-- PostgreSQL
 
-### Installation
+### One-Command Launch
 
 ```bash
-# 1. Clone and install backend
+# Clone the repository
 git clone https://github.com/[your-username]/pai-personal-ai.git
 cd pai-personal-ai
-npm install
 
-# 2. Install frontend
-cd client
-npm install
-cd ..
+# Set your OpenAI API key
+export OPENAI_API_KEY='sk-proj-your-api-key-here'
 
-# 3. Environment setup
-cp .env.example .env
-# Edit .env with your credentials
+# Launch the complete system
+./launch-pai.sh
+```
 
-# 4. Start services
-docker-compose up -d  # Evolution API + PostgreSQL
-npm run migrate       # Database setup
-npm run seed         # Default assistant
+**That's it!** The unified launch script will:
+- ✅ Verify all dependencies automatically
+- 🐳 Start Docker services (Evolution API, PostgreSQL, Redis)
+- ⚙️ Launch backend server (port 3000)
+- 🎨 Start frontend development server (port 3001)
+- 🔍 Perform health checks on all services
+- 📊 Display access URLs and next steps
 
-# 5. Start development
-npm run dev          # Backend (port 3000)
-cd client && npm run dev  # Frontend (port 5173)
+### Alternative Commands
+
+```bash
+# Using npm
+npm run launch
+
+# Debug mode with detailed logging
+npm run launch:debug
+
+# Check dependencies only
+npm run check-deps
+
+# Monitor service health
+npm run monitor
 ```
 
 ### Configuration
@@ -148,37 +158,56 @@ AI Processing:
 
 ```
 pai-personal-ai/
-├── src/                    # Backend (Node.js/Express)
+├── launch-pai.sh              # 🚀 Unified system launcher
+├── scripts/                   # 🛠️ Utility scripts
+│   ├── check-dependencies.sh  # System verification
+│   └── service-monitor.sh     # Health monitoring
+├── src/                       # Backend (Node.js/Express)
 │   ├── services/
-│   │   ├── assistantAI.js         # Entity extraction + AI responses
-│   │   ├── queryBuilder.js        # SQL query generation
-│   │   ├── messageRetrieval.js    # Database query execution
-│   │   └── assistantMessageHandler.js # Processing pipeline
-│   ├── controllers/        # API endpoints
-│   ├── models/            # Sequelize database models
-│   └── routes/            # Express routing
-├── client/                # React frontend
-│   ├── src/components/    # React components
-│   └── src/services/      # API + WebSocket clients
-├── archive/               # Legacy and deprecated files
-└── docs/                 # Documentation
+│   │   ├── ai/               # AI and OpenAI integration
+│   │   ├── whatsapp/         # WhatsApp messaging
+│   │   ├── utils/            # Utility functions
+│   │   └── database/         # Database operations
+│   ├── controllers/          # API endpoints
+│   ├── models/              # Sequelize database models
+│   └── routes/              # Express routing
+├── client/                   # React frontend
+│   ├── src/components/      # React components
+│   └── src/services/        # API + WebSocket clients
+├── docker/                  # Docker configurations
+│   ├── evolution/           # Evolution API setup
+│   └── full-stack/         # Complete stack setup
+├── archive/                 # Legacy and deprecated files
+├── docs/                   # Documentation
+└── logs/                   # System logs
 ```
 
-### Testing
+### Management Commands
 
 ```bash
-npm test              # Unit tests
-npm run test:coverage # Coverage report
-npm run test:watch    # Watch mode
+# System Launch
+./launch-pai.sh           # Start complete system
+npm run launch:debug      # Debug mode with detailed logging
+
+# System Monitoring
+npm run monitor           # Check service health
+npm run monitor:watch     # Continuous monitoring
+npm run check-deps        # Verify system dependencies
+
+# Development
+npm test                  # Unit tests
+npm run test:coverage     # Coverage report
+npm run test:watch        # Watch mode
 ```
 
 ### Key Services
 
-- **assistantAI.js**: Natural language processing and entity extraction
-- **queryBuilder.js**: Converts entities to optimized SQL queries
-- **messageRetrieval.js**: Executes database queries with formatting
-- **whatsapp-assistant.js**: GPT-powered WhatsApp message processing
-- **realtime.js**: WebSocket message broadcasting
+- **🚀 Launch System**: `launch-pai.sh` - Unified system startup with dependency checking
+- **🔍 Health Monitoring**: `service-monitor.sh` - Real-time service health tracking
+- **🧠 AI Processing**: `ai/assistantAI.js` - Natural language processing and entity extraction
+- **📊 Query Engine**: `database/queryBuilder.js` - Converts entities to optimized SQL queries
+- **💬 WhatsApp Integration**: `whatsapp/whatsapp.js` - Evolution API integration
+- **🔄 Real-time Updates**: `utils/realtime.js` - WebSocket message broadcasting
 
 ## 🤖 WhatsApp Assistant
 
@@ -246,6 +275,14 @@ node chat.js
 
 ## 📈 Recent Updates (September 2025)
 
+✅ **v1.1.0 - Unified Launch System**
+- 🚀 **One-Command Launch**: Complete system startup with `./launch-pai.sh`
+- 🔍 **Smart Dependency Checking**: Automated verification of Node.js, Docker, ports, and resources
+- 📊 **Real-time Health Monitoring**: Service status dashboard with continuous monitoring
+- 🛡️ **Enhanced Error Handling**: Graceful shutdown, cleanup, and recovery processes
+- 📝 **Comprehensive Logging**: Timestamped, color-coded logs with separate files per service
+- 🍎 **macOS Compatible**: Works with older Bash versions (3.2+)
+
 ✅ **v1.0.0 - PAI Launch**
 - Complete rewrite from AI PBX to PAI - Personal AI
 - AI-powered entity extraction replaces regex patterns  
@@ -269,8 +306,10 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## 🔗 Links
 
 - [GitHub Repository](https://github.com/[your-username]/pai-personal-ai)
-- [Documentation](docs/)
-- [API Reference](docs/api/)
+- [📚 Documentation](docs/)
+- [🚀 Launch System Guide](docs/LAUNCH_SYSTEM.md)
+- [📱 WhatsApp Setup Guide](docs/WHATSAPP_CONNECTION_GUIDE.md)
+- [🔧 API Reference](docs/api/) (coming soon)
 
 ---
 

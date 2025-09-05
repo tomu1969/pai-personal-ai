@@ -61,6 +61,18 @@ const handleWebhook = async (req, res) => {
       body: JSON.stringify(req.body).substring(0, 500),
     });
 
+    // Check if this is a PAI Assistant instance message that should be routed specially
+    if (req.body.instance === 'pai-assistant') {
+      logger.info('Routing PAI Assistant message to multi-instance handler', {
+        event,
+        instance: req.body.instance
+      });
+      
+      // Import and route to PAI Assistant handler
+      const webhookMultiInstance = require('./webhookMultiInstance');
+      return await webhookMultiInstance.handlePaiAssistantWebhook(req, res);
+    }
+
     // Handle different types of webhook events
     switch (event) {
       case 'messages.upsert':

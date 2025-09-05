@@ -20,13 +20,13 @@ const logger = require('../../utils/logger');
  * 
  * Architecture:
  * - PAI Responder: Main WhatsApp line for auto-responses (instance: 'main')
- * - PAI Assistant: Secondary line for message queries (instance: 'pai_assistant')
+ * - PAI Assistant: Secondary line for message queries (instance: 'pai-assistant')
  * 
  * @class EvolutionMultiInstanceService
  * @example
  * const multiInstance = new EvolutionMultiInstanceService();
  * await multiInstance.initialize();
- * const qr = await multiInstance.getQRCode('pai_assistant');
+ * const qr = await multiInstance.getQRCode('pai-assistant');
  */
 class EvolutionMultiInstanceService {
   constructor() {
@@ -54,14 +54,14 @@ class EvolutionMultiInstanceService {
       });
 
       // Register PAI Assistant instance
-      await this.registerInstance('pai_assistant', {
+      await this.registerInstance('pai-assistant', {
         instanceId: config.evolution.paiAssistantInstanceId || 'pai-assistant',
         apiUrl: config.evolution.apiUrl,
         apiKey: config.evolution.apiKey,
         webhookUrl: config.evolution.paiAssistantWebhookUrl || `${config.server.host}:${config.server.port}/webhook/pai-assistant`,
         webhookPath: '/webhook/pai-assistant',
         description: 'PAI Assistant - Query Interface Line',
-        assistantType: 'pai_assistant'
+        assistantType: 'pai-assistant'
       });
 
       this.initialized = true;

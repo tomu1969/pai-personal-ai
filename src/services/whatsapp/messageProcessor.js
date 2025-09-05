@@ -23,6 +23,7 @@ const filterService = require('../utils/filters');
 const groupService = require('../utils/groupService');
 const assistantMessageHandler = require('../assistantMessageHandler');
 const aiService = require('../ai/assistantAI');
+const newAIService = require('../ai');
 const whatsappAssistant = require('../ai/whatsapp-assistant');
 const WhatsAppService = require('./whatsapp');
 const { Message } = require('../../models');
@@ -277,7 +278,13 @@ class MessageProcessorService {
       // Step 10: Check if we should send auto-response (only if assistant will process this message type)
       let responseResult = null;
       if (assistantWillProcess) {
-        const shouldRespond = await assistantService.shouldRespond(savedMessage, contact, conversation);
+        // Use the new AI service for checking if should respond
+        const context = {
+          senderName: contact.name,
+          conversationId: conversation.id,
+          contactId: contact.id
+        };
+        const shouldRespond = await newAIService.shouldRespond(savedMessage.content, context);
         if (shouldRespond) {
           responseResult = await this.generateAndSendResponse(parsedMessage, contact, conversation, basicAnalysis);
         }
@@ -354,11 +361,11 @@ class MessageProcessorService {
 
       // Ultra-simple AI response generation
       logger.debug('AI Service Check', { 
-        isEnabled: aiService.isEnabled(),
+        isEnabled: await newAIService.isEnabled(),
         phone: contact.phone
       });
       
-      if (aiService.isEnabled()) {
+      if (await newAIService.isEnabled()) {
         const assistant = await assistantService.ensureInitialized();
         
         // Get recent conversation context for better responses (last 10 messages)
@@ -549,13 +556,14 @@ class MessageProcessorService {
   /**
    * Get processing statistics
    */
-  getProcessingStats() {
+  async getProcessingStats() {
+    const aiEnabled = await newAIService.isEnabled();
     return {
       queueLength: this.processingQueue.length,
       isProcessing: this.isProcessing,
       services: {
         assistant: assistantService.isInitialized,
-        ai: aiService.isEnabled(),
+        ai: aiEnabled,
         whatsapp: !!this.whatsappService,
       },
     };
@@ -597,7 +605,8 @@ class MessageProcessorService {
    */
   async shouldProcessMessageType(parsedMessage) {
     try {
-      const assistantStatus = await assistantService.getStatus();
+      // Use the new AI service which gets PAI Responder preferences
+      const assistantStatus = await newAIService.getStatus();
       const preferences = assistantStatus.messageTypePreferences || {
         allMessages: true,
         individualMessages: true,

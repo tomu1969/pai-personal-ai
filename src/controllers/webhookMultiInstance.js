@@ -61,8 +61,8 @@ const handlePaiAssistantWebhook = async (req, res) => {
     });
 
     // Get PAI Assistant instance
-    const paiInstance = evolutionMultiInstance.getInstance('pai_assistant');
-    const instanceConfig = evolutionMultiInstance.getInstanceConfig('pai_assistant');
+    const paiInstance = evolutionMultiInstance.getInstance('pai-assistant');
+    const instanceConfig = evolutionMultiInstance.getInstanceConfig('pai-assistant');
 
     // Validate webhook signature
     const signature = req.headers['x-hub-signature-256'] || req.headers['x-signature'];
@@ -77,9 +77,9 @@ const handlePaiAssistantWebhook = async (req, res) => {
     }
 
     // Process webhook events specifically for PAI Assistant
-    await processPaiAssistantWebhook(req.body, paiInstance, 'pai_assistant');
+    await processPaiAssistantWebhook(req.body, paiInstance, 'pai-assistant');
 
-    return res.status(200).json({ success: true, instance: 'pai_assistant' });
+    return res.status(200).json({ success: true, instance: 'pai-assistant' });
   } catch (error) {
     logger.error('PAI Assistant webhook processing error', {
       error: error.message,
@@ -257,7 +257,7 @@ async function handlePaiAssistantMessage(messageData, whatsappInstance, instance
 
     if (result.success && result.response) {
       // Send response back via PAI Assistant instance
-      await evolutionMultiInstance.sendMessage('pai_assistant', parsedMessage.phone, result.response);
+      await evolutionMultiInstance.sendMessage('pai-assistant', parsedMessage.phone, result.response);
 
       logger.info('PAI Assistant response sent successfully', {
         instance: instanceAlias,
@@ -282,7 +282,7 @@ async function handlePaiAssistantMessage(messageData, whatsappInstance, instance
 
     // Send error response to user
     try {
-      await evolutionMultiInstance.sendMessage('pai_assistant', 
+      await evolutionMultiInstance.sendMessage('pai-assistant', 
         parsedMessage?.phone, 
         "I'm sorry, I encountered an error processing your request. Please try again later.\n\n_PAI Assistant_"
       );

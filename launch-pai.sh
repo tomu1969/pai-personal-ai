@@ -180,26 +180,142 @@ wait_for_port() {
 check_existing_services() {
     log_step "🔍" "Checking for existing services"
     
-    local conflicts=0
+    local pai_services=0
+    local other_conflicts=0
+    local pai_service_ports=()
     
     # Check for running processes on required ports
     local ports=(3000 3001 8080 5432 6379)
     for port in "${ports[@]}"; do
         if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
-            local pid=$(lsof -ti:$port)
-            local process_name=$(ps -p $pid -o comm= 2>/dev/null || echo "unknown")
-            log_warning "Port $port is already in use by process $process_name (PID: $pid)"
-            conflicts=$((conflicts + 1))
+            local pids=$(lsof -ti:$port)
+            local found_pai_service=false
+            
+            # Check each PID that's using this port
+            for pid in $pids; do
+                local process_name=$(ps -p $pid -o comm= 2>/dev/null || echo "unknown")
+                local args=$(ps -p $pid -o args= 2>/dev/null || echo "")
+                
+                # Check if it's a PAI service
+                local is_pai_service=false
+                case $port in
+                    3000)
+                        if [[ "$process_name" == "node" ]] && [[ "$args" == *"app.js"* || "$args" == *"src/app.js"* ]]; then
+                            is_pai_service=true
+                            log_info "Found PAI Backend running on port $port (PID: $pid)"
+                            found_pai_service=true
+                        fi
+                        ;;
+                    3001)
+                        if [[ "$process_name" == "node" ]] && [[ "$args" == *"vite"* || "$args" == *"dev"* || "$args" == *"client"* || "$args" == *"/client/"* ]]; then
+                            is_pai_service=true
+                            log_info "Found PAI Frontend running on port $port (PID: $pid)"
+                            found_pai_service=true
+                        fi
+                        ;;
+                    8080)
+                        if docker ps --format "table {{.Names}}" | grep -E "(evolution_api|evolution-api)" 2>/dev/null; then
+                            is_pai_service=true
+                            log_info "Found PAI Evolution API running on port $port"
+                            found_pai_service=true
+                        fi
+                        ;;
+                    5432)
+                        if docker ps --format "table {{.Names}}" | grep -E "(evolution-postgres|postgres_evolution)" 2>/dev/null; then
+                            is_pai_service=true
+                            log_info "Found PAI PostgreSQL running on port $port"
+                            found_pai_service=true
+                        fi
+                        ;;
+                    6379)
+                        if docker ps --format "table {{.Names}}" | grep -E "(evolution-redis|redis_evolution)" 2>/dev/null; then
+                            is_pai_service=true
+                            log_info "Found PAI Redis running on port $port"
+                            found_pai_service=true
+                        fi
+                        ;;
+                esac
+                
+                # If not a PAI service, log it as a potential conflict
+                if [[ "$is_pai_service" == "false" ]]; then
+                    log_debug "Non-PAI process on port $port: $process_name (PID: $pid)"
+                fi
+            done
+            
+            # Decide how to categorize this port
+            if [[ "$found_pai_service" == "true" ]]; then
+                pai_services=$((pai_services + 1))
+                pai_service_ports+=($port)
+            else
+                log_warning "Port $port is in use by non-PAI processes"
+                other_conflicts=$((other_conflicts + 1))
+            fi
         fi
     done
     
-    if [[ $conflicts -gt 0 ]]; then
-        echo -e "\n${YELLOW}Found $conflicts port conflicts. Options:${NC}"
+    # Handle the different scenarios
+    if [[ $pai_services -gt 0 && $other_conflicts -eq 0 ]]; then
+        echo -e "\n${GREEN}Found $pai_services PAI service(s) already running.${NC}"
+        echo "Options:"
+        echo "1. Use existing services (recommended)"
+        echo "2. Restart all services"
+        echo "3. Exit"
+        echo
+        if [[ -t 0 ]]; then
+            read -p "Choose option [1-3]: " choice
+        else
+            echo "Non-interactive mode detected. Using option 1 (use existing services)."
+            choice=1
+        fi
+        
+        case $choice in
+            1)
+                log_info "Using existing PAI services..."
+                export REUSE_EXISTING_SERVICES=true
+                export PAI_SERVICES_RUNNING=true
+                # Store running service ports for later use
+                export RUNNING_SERVICE_PORTS="${pai_service_ports[*]}"
+                
+                # Track which specific services are running
+                export DOCKER_SERVICES_RUNNING=false
+                export BACKEND_RUNNING=false
+                export FRONTEND_RUNNING=false
+                
+                # Check which specific services are running
+                for port in "${pai_service_ports[@]}"; do
+                    case $port in
+                        8080|5432|6379) export DOCKER_SERVICES_RUNNING=true ;;
+                        3000) export BACKEND_RUNNING=true ;;
+                        3001) export FRONTEND_RUNNING=true ;;
+                    esac
+                done
+                ;;
+            2)
+                log_info "Will restart all PAI services..."
+                stop_existing_pai_services
+                export REUSE_EXISTING_SERVICES=false
+                ;;
+            3|*)
+                log_info "Exiting..."
+                exit 0
+                ;;
+        esac
+    elif [[ $other_conflicts -gt 0 ]]; then
+        echo -e "\n${YELLOW}Found $other_conflicts non-PAI service conflicts.${NC}"
+        if [[ $pai_services -gt 0 ]]; then
+            echo "Also found $pai_services PAI services running."
+        fi
+        echo "Options:"
         echo "1. Stop conflicting services and rerun this script"
         echo "2. Continue anyway (may cause issues)"
         echo "3. Exit and resolve conflicts manually"
         echo
-        read -p "Choose option [1-3]: " choice
+        if [[ -t 0 ]]; then
+            read -p "Choose option [1-3]: " choice
+        else
+            echo "Non-interactive mode detected. Choosing option 3 (exit)."
+            choice=3
+        fi
         
         case $choice in
             1)
@@ -216,7 +332,34 @@ check_existing_services() {
         esac
     else
         log_success "No port conflicts detected"
+        export REUSE_EXISTING_SERVICES=false
     fi
+}
+
+# Stop existing PAI services
+stop_existing_pai_services() {
+    log_info "Stopping existing PAI services..."
+    
+    # Stop Node.js processes (backend/frontend)
+    for port in 3000 3001; do
+        local pid=$(lsof -ti:$port 2>/dev/null | head -1)
+        if [[ -n "$pid" ]]; then
+            log_info "Stopping process on port $port (PID: $pid)"
+            kill -TERM "$pid" 2>/dev/null || true
+            sleep 2
+            if kill -0 "$pid" 2>/dev/null; then
+                kill -KILL "$pid" 2>/dev/null || true
+            fi
+        fi
+    done
+    
+    # Stop Docker containers
+    if docker ps --format "table {{.Names}}" | grep -E "(evolution_api|evolution-postgres|evolution-redis|postgres_evolution|redis_evolution)" >/dev/null 2>&1; then
+        log_info "Stopping PAI Docker containers..."
+        docker-compose down 2>/dev/null || true
+    fi
+    
+    log_success "Existing PAI services stopped"
 }
 
 # Load and validate environment
@@ -242,7 +385,12 @@ setup_environment() {
             echo "1. Set it in your environment: export OPENAI_API_KEY='your-key-here'"
             echo "2. Add it to the .env file"
             echo
-            read -p "Do you want to continue without OpenAI? [y/N]: " continue_without_openai
+            if [[ -t 0 ]]; then
+                read -p "Do you want to continue without OpenAI? [y/N]: " continue_without_openai
+            else
+                echo "Non-interactive mode detected. Continuing without OpenAI."
+                continue_without_openai="y"
+            fi
             if [[ ! "$continue_without_openai" =~ ^[Yy]$ ]]; then
                 log_info "Please configure OpenAI API key and rerun the script"
                 exit 0
@@ -299,6 +447,35 @@ start_docker_services() {
     if ! docker info >/dev/null 2>&1; then
         log_error "Docker is not running. Please start Docker Desktop first"
         exit 1
+    fi
+    
+    # Check if PAI Docker containers are already running (both old and new naming)
+    local existing_containers=""
+    if docker ps --format "table {{.Names}}" | grep -E "(evolution_api|evolution-api)" >/dev/null 2>&1; then
+        existing_containers="$existing_containers evolution_api"
+    fi
+    if docker ps --format "table {{.Names}}" | grep -E "(evolution-postgres|postgres_evolution)" >/dev/null 2>&1; then
+        existing_containers="$existing_containers postgres"
+    fi
+    if docker ps --format "table {{.Names}}" | grep -E "(evolution-redis|redis_evolution)" >/dev/null 2>&1; then
+        existing_containers="$existing_containers redis"
+    fi
+    
+    # If all required containers are already running, skip docker-compose
+    if [[ "$existing_containers" == *"evolution_api"* && "$existing_containers" == *"postgres"* && "$existing_containers" == *"redis"* ]]; then
+        log_success "All PAI Docker containers are already running - skipping docker-compose"
+        log_info "Using existing containers:"
+        docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "(evolution|postgres|redis)" | sed 's/^/  • /'
+        
+        # Still need to wait for services to be ready
+        log_info "Verifying existing services are ready..."
+        wait_for_port 5432 30
+        wait_for_port 6379 30  
+        wait_for_port 8080 30
+        
+        STARTED_SERVICES="$STARTED_SERVICES docker"
+        log_success "Existing Docker services verified and ready"
+        return 0
     fi
     
     cd "$PROJECT_ROOT/docker/evolution"
@@ -400,7 +577,10 @@ start_frontend() {
     # Get frontend port from vite config
     local frontend_port=3001
     if [[ -f "vite.config.ts" ]]; then
-        frontend_port=$(grep -E "port:\s*[0-9]+" vite.config.ts | sed 's/.*port:\s*\([0-9]*\).*/\1/' || echo "3001")
+        frontend_port=$(grep -E "port:\s*[0-9]+" vite.config.ts | awk -F'[: ,]' '{print $2}' | grep -o '[0-9]*' | head -1)
+        if [[ -z "$frontend_port" ]]; then
+            frontend_port=3001
+        fi
     fi
     
     # Start frontend development server
@@ -587,7 +767,10 @@ main() {
     log_info "Logs will be saved to: $MAIN_LOG"
     echo
     
-    # Run dependency verification first
+    # Check for existing services first
+    check_existing_services
+    
+    # Run dependency verification
     log_step "🔍" "Running dependency verification"
     if [[ -x "$PROJECT_ROOT/scripts/check-dependencies.sh" ]]; then
         if "$PROJECT_ROOT/scripts/check-dependencies.sh"; then
@@ -602,12 +785,28 @@ main() {
     fi
     
     # Execute launch sequence
-    check_existing_services
     setup_environment
     install_dependencies
-    start_docker_services
-    start_backend
-    start_frontend
+    
+    # Start services that aren't already running
+    if [[ "${DOCKER_SERVICES_RUNNING:-false}" == "false" ]]; then
+        start_docker_services
+    else
+        log_info "Docker services already running - skipping docker startup"
+    fi
+    
+    if [[ "${BACKEND_RUNNING:-false}" == "false" ]]; then
+        start_backend
+    else
+        log_info "Backend already running - skipping backend startup"
+    fi
+    
+    if [[ "${FRONTEND_RUNNING:-false}" == "false" ]]; then
+        start_frontend  
+    else
+        log_info "Frontend already running - skipping frontend startup"
+    fi
+    
     post_startup_validation
     
     # Show success information

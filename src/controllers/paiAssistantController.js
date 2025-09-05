@@ -19,7 +19,7 @@ const getPaiAssistantQR = async (req, res) => {
       await evolutionMultiInstance.initialize();
     }
 
-    const qrResult = await evolutionMultiInstance.getQRCode('pai_assistant');
+    const qrResult = await evolutionMultiInstance.getQRCode('pai-assistant');
     
     return res.json({
       success: true,
@@ -56,7 +56,7 @@ const getPaiAssistantStatus = async (req, res) => {
       await evolutionMultiInstance.initialize();
     }
 
-    const statusResult = await evolutionMultiInstance.getConnectionStatus('pai_assistant');
+    const statusResult = await evolutionMultiInstance.getConnectionStatus('pai-assistant');
     
     return res.json({
       success: true,
@@ -192,7 +192,7 @@ const sendTestMessage = async (req, res) => {
     
     await evolutionMultiInstance.initialize();
     
-    const sendResult = await evolutionMultiInstance.sendMessage('pai_assistant', phone, message);
+    const sendResult = await evolutionMultiInstance.sendMessage('pai-assistant', phone, message);
     
     return res.json({
       success: true,

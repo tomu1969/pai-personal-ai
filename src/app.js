@@ -91,7 +91,7 @@ app.use((req, res) => {
 
 app.use(errorHandler);
 
-const startServer = () => {
+const startServer = async () => {
   // Listen on all interfaces (0.0.0.0) to accept connections from Docker
   const listenHost = '0.0.0.0';
   const server = app.listen(config.server.port, listenHost, () => {
@@ -103,6 +103,15 @@ const startServer = () => {
   // Initialize real-time service
   const realtimeService = require('./services/utils/realtime');
   realtimeService.initialize(server);
+
+  // Initialize multi-instance service
+  const evolutionMultiInstance = require('./services/whatsapp/evolutionMultiInstance');
+  try {
+    await evolutionMultiInstance.initialize();
+    logger.info('Multi-instance service initialized successfully');
+  } catch (error) {
+    logger.error('Failed to initialize multi-instance service', { error: error.message });
+  }
 
   const gracefulShutdown = (signal) => {
     logger.info(`Received ${signal}, shutting down gracefully...`);

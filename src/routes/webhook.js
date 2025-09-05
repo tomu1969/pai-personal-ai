@@ -10,6 +10,10 @@ const router = express.Router();
 router.post('/main', webhookMultiInstance.handleMainWebhook);
 router.post('/pai-assistant', webhookMultiInstance.handlePaiAssistantWebhook);
 
+// PAI Assistant specific event endpoints (webhookByEvents: true)
+router.post('/pai-assistant/messages-upsert', webhookMultiInstance.handlePaiAssistantWebhook);
+router.post('/pai-assistant/connection-update', webhookMultiInstance.handlePaiAssistantWebhook);
+
 // Main webhook endpoint for Evolution API (backward compatibility)
 router.post('/', webhookController.handleWebhook);
 

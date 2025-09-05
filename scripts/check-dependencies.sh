@@ -1,6 +1,5 @@
 #!/bin/bash
-# PAI System - Dependency Verification Script
-# Verifies all required dependencies and system requirements
+# PAI System - Minimal Dependency Verification Script (Bash 3.2+ compatible)
 
 set -e
 
@@ -12,6 +11,11 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 BOLD='\033[1m'
+
+# Global variables
+ERRORS=0
+WARNINGS=0
+REQUIRED_PORTS="3000 3001 8080 5432 6379"
 
 # Logging functions
 log_info() {
@@ -34,11 +38,6 @@ log_header() {
     echo -e "\n${BOLD}${BLUE}=== $1 ===${NC}\n"
 }
 
-# Global variables
-ERRORS=0
-WARNINGS=0
-REQUIRED_PORTS=(3000 3001 8080 5432 6379)
-
 # Check if command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
@@ -49,76 +48,104 @@ port_available() {
     local port=$1
     if command_exists lsof; then
         ! lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1
-    elif command_exists netstat; then
-        ! netstat -tuln | grep -q ":$port "
     else
-        # Fallback: try to bind to port
-        (echo >/dev/tcp/localhost/$port) >/dev/null 2>&1
-        return $?
+        # Fallback: try to connect
+        if (echo >/dev/tcp/localhost/$port) >/dev/null 2>&1; then
+            return 1  # Port is in use
+        else
+            return 0  # Port is available
+        fi
     fi
 }
 
-# Version comparison
-version_compare() {
-    if [[ $1 == $2 ]]; then
-        return 0
+# Check if a port is used by PAI's own services
+port_used_by_pai_service() {
+    local port=$1
+    
+    if ! command_exists lsof; then
+        return 1  # Can't determine, assume not PAI
     fi
-    local IFS=.
-    local i ver1=($1) ver2=($2)
-    # Fill empty fields in ver1 with zeros
-    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++)); do
-        ver1[i]=0
-    done
-    for ((i=0; i<${#ver1[@]}; i++)); do
-        if [[ -z ${ver2[i]} ]]; then
-            # Fill empty fields in ver2 with zeros
-            ver2[i]=0
-        fi
-        if ((10#${ver1[i]} > 10#${ver2[i]})); then
-            return 1
-        fi
-        if ((10#${ver1[i]} < 10#${ver2[i]})); then
-            return 2
-        fi
-    done
-    return 0
+    
+    # Get the process using the port
+    local pid=$(lsof -ti:$port 2>/dev/null | head -1)
+    if [[ -z "$pid" ]]; then
+        return 1  # No process found
+    fi
+    
+    # Check what process is running
+    local cmd=$(ps -p $pid -o comm= 2>/dev/null || echo "")
+    local args=$(ps -p $pid -o args= 2>/dev/null || echo "")
+    
+    case $port in
+        3000)
+            # Backend port - check if it's our Node.js backend
+            if [[ "$cmd" == "node" ]] && [[ "$args" == *"app.js"* || "$args" == *"src/app.js"* ]]; then
+                return 0  # It's PAI backend
+            fi
+            ;;
+        3001)
+            # Frontend port - check if it's our Node.js dev server
+            if [[ "$cmd" == "node" ]] && [[ "$args" == *"vite"* || "$args" == *"dev"* || "$args" == *"client"* || "$args" == *"/client/"* ]]; then
+                return 0  # It's PAI frontend
+            fi
+            ;;
+        8080|5432|6379)
+            # Docker services - check if it's our Docker containers
+            if command_exists docker; then
+                case $port in
+                    8080)
+                        if docker ps --format "table {{.Names}}" | grep -E "(evolution_api|evolution-api)"; then
+                            return 0  # It's PAI Evolution API
+                        fi
+                        ;;
+                    5432)
+                        if docker ps --format "table {{.Names}}" | grep -E "(evolution-postgres|postgres_evolution)"; then
+                            return 0  # It's PAI PostgreSQL
+                        fi
+                        ;;
+                    6379)
+                        if docker ps --format "table {{.Names}}" | grep -E "(evolution-redis|redis_evolution)"; then
+                            return 0  # It's PAI Redis
+                        fi
+                        ;;
+                esac
+            fi
+            ;;
+    esac
+    
+    return 1  # Not a PAI service
 }
 
+# Get service description for a port
+get_port_service_description() {
+    local port=$1
+    case $port in
+        3000) echo "PAI Backend" ;;
+        3001) echo "PAI Frontend" ;;
+        8080) echo "Evolution API" ;;
+        5432) echo "PostgreSQL" ;;
+        6379) echo "Redis" ;;
+        *) echo "Unknown Service" ;;
+    esac
+}
+
+# Simple version check - just check major version
 check_node_version() {
-    local min_version="18.0.0"
-    local current_version=$(node --version | sed 's/v//')
+    local current_version=$(node --version | sed 's/v//' | cut -d. -f1)
+    local min_major=18
     
-    version_compare $current_version $min_version
-    local result=$?
-    
-    if [[ $result -eq 2 ]]; then
-        log_error "Node.js version $current_version is too old. Minimum required: $min_version"
+    if [[ $current_version -ge $min_major ]]; then
+        log_success "Node.js version $(node --version) is compatible (>= v18)"
+        return 0
+    else
+        log_error "Node.js version $(node --version) is too old. Minimum required: v18"
         ERRORS=$((ERRORS + 1))
         return 1
-    else
-        log_success "Node.js version $current_version is compatible"
-        return 0
     fi
 }
 
-check_npm_version() {
-    local min_version="8.0.0"
-    local current_version=$(npm --version)
-    
-    version_compare $current_version $min_version
-    local result=$?
-    
-    if [[ $result -eq 2 ]]; then
-        log_warning "npm version $current_version is old. Recommended: $min_version+"
-        WARNINGS=$((WARNINGS + 1))
-    else
-        log_success "npm version $current_version is compatible"
-    fi
-}
-
-# Main dependency checks
+# Main checks
 log_header "PAI System - Dependency Verification"
-
 log_info "Starting dependency verification..."
 
 # 1. Check Node.js
@@ -133,7 +160,8 @@ fi
 
 # 2. Check npm
 if command_exists npm; then
-    check_npm_version
+    npm_version=$(npm --version)
+    log_success "npm version $npm_version is available"
 else
     log_error "npm not found. npm should be installed with Node.js"
     ERRORS=$((ERRORS + 1))
@@ -143,7 +171,7 @@ fi
 log_header "Docker Environment"
 if command_exists docker; then
     if docker info >/dev/null 2>&1; then
-        local docker_version=$(docker --version | sed 's/Docker version //' | sed 's/,.*//')
+        docker_version=$(docker --version | sed 's/Docker version //' | sed 's/,.*//')
         log_success "Docker $docker_version is running"
     else
         log_error "Docker is installed but not running. Please start Docker Desktop"
@@ -157,90 +185,38 @@ fi
 
 # 4. Check Docker Compose
 if command_exists docker-compose || docker compose version >/dev/null 2>&1; then
-    local compose_version=""
-    if command_exists docker-compose; then
-        compose_version=$(docker-compose --version | sed 's/.*version //' | sed 's/,.*//')
-        log_success "Docker Compose $compose_version is available"
-    else
-        compose_version=$(docker compose version --short 2>/dev/null || echo "built-in")
-        log_success "Docker Compose $compose_version (built-in) is available"
-    fi
+    log_success "Docker Compose is available"
 else
     log_error "Docker Compose not found. Please install docker-compose"
     ERRORS=$((ERRORS + 1))
 fi
 
-# 5. Check Git (optional but recommended)
-if command_exists git; then
-    local git_version=$(git --version | sed 's/git version //')
-    log_success "Git $git_version is available"
-else
-    log_warning "Git not found. Recommended for development"
-    WARNINGS=$((WARNINGS + 1))
-fi
-
-# 6. Check required ports
+# 5. Check required ports
 log_header "Port Availability"
-for port in "${REQUIRED_PORTS[@]}"; do
+PAI_SERVICES_RUNNING=0
+for port in $REQUIRED_PORTS; do
     if port_available $port; then
         log_success "Port $port is available"
     else
-        case $port in
-            3000) log_error "Port $port is in use (required for PAI Backend)" ;;
-            3001) log_error "Port $port is in use (required for PAI Frontend)" ;;
-            8080) log_error "Port $port is in use (required for Evolution API)" ;;
-            5432) log_error "Port $port is in use (required for PostgreSQL)" ;;
-            6379) log_error "Port $port is in use (required for Redis)" ;;
-        esac
-        ERRORS=$((ERRORS + 1))
+        service_desc=$(get_port_service_description $port)
+        if port_used_by_pai_service $port; then
+            log_warning "Port $port is in use by PAI $service_desc (already running)"
+            PAI_SERVICES_RUNNING=$((PAI_SERVICES_RUNNING + 1))
+        else
+            log_error "Port $port is in use by non-PAI service (required for $service_desc)"
+            ERRORS=$((ERRORS + 1))
+        fi
     fi
 done
 
-# 7. Check disk space
-log_header "System Resources"
-if command_exists df; then
-    local available_space=$(df -h . | awk 'NR==2 {print $4}' | sed 's/[^0-9.]//g')
-    local available_gb=$(echo "$available_space" | head -c -1)
-    
-    if (( $(echo "$available_gb >= 2" | bc -l 2>/dev/null || echo "1") )); then
-        log_success "Sufficient disk space available (${available_space}GB)"
-    else
-        log_warning "Low disk space: ${available_space}GB available. Recommended: 2GB+"
-        WARNINGS=$((WARNINGS + 1))
-    fi
-else
-    log_warning "Cannot check disk space (df command not available)"
-    WARNINGS=$((WARNINGS + 1))
+# Summary of PAI services status
+if [[ $PAI_SERVICES_RUNNING -gt 0 ]]; then
+    echo
+    log_info "Detected $PAI_SERVICES_RUNNING PAI service(s) already running"
+    log_info "These can be reused or restarted by the launch script"
 fi
 
-# 8. Check memory
-if command_exists free; then
-    local available_mem=$(free -m | awk 'NR==2{printf "%.0f", $7/1024}')
-    if [[ $available_mem -ge 2 ]]; then
-        log_success "Sufficient memory available (${available_mem}GB free)"
-    else
-        log_warning "Low memory: ${available_mem}GB available. Recommended: 2GB+"
-        WARNINGS=$((WARNINGS + 1))
-    fi
-elif command_exists vm_stat; then
-    # macOS
-    local free_pages=$(vm_stat | grep "Pages free" | awk '{print $3}' | tr -d '.')
-    local page_size=$(vm_stat | grep "page size" | awk '{print $8}')
-    local free_mb=$((free_pages * page_size / 1024 / 1024))
-    local free_gb=$((free_mb / 1024))
-    
-    if [[ $free_gb -ge 2 ]]; then
-        log_success "Sufficient memory available (~${free_gb}GB free)"
-    else
-        log_warning "Low memory: ~${free_gb}GB available. Recommended: 2GB+"
-        WARNINGS=$((WARNINGS + 1))
-    fi
-else
-    log_warning "Cannot check memory usage"
-    WARNINGS=$((WARNINGS + 1))
-fi
-
-# 9. Check environment files
+# 6. Check configuration files
 log_header "Configuration Files"
 if [[ -f ".env" ]]; then
     log_success ".env file found"
@@ -252,13 +228,6 @@ if [[ -f ".env" ]]; then
         log_warning "OPENAI_API_KEY not found in .env file"
         WARNINGS=$((WARNINGS + 1))
     fi
-    
-    if grep -q "DATABASE_URL=" .env; then
-        log_success "DATABASE_URL is configured"
-    else
-        log_warning "DATABASE_URL not found in .env file"
-        WARNINGS=$((WARNINGS + 1))
-    fi
 elif [[ -f ".env.example" ]]; then
     log_warning ".env file not found, but .env.example exists"
     log_info "You can copy .env.example to .env and configure it"
@@ -268,7 +237,7 @@ else
     WARNINGS=$((WARNINGS + 1))
 fi
 
-# 10. Check package.json files
+# 7. Check package.json files
 if [[ -f "package.json" ]]; then
     log_success "Backend package.json found"
 else
@@ -281,21 +250,6 @@ if [[ -f "client/package.json" ]]; then
 else
     log_error "Frontend package.json not found"
     ERRORS=$((ERRORS + 1))
-fi
-
-# 11. Check node_modules
-if [[ -d "node_modules" ]]; then
-    log_success "Backend dependencies appear to be installed"
-else
-    log_warning "Backend node_modules not found. Run 'npm install'"
-    WARNINGS=$((WARNINGS + 1))
-fi
-
-if [[ -d "client/node_modules" ]]; then
-    log_success "Frontend dependencies appear to be installed"
-else
-    log_warning "Frontend node_modules not found. Run 'cd client && npm install'"
-    WARNINGS=$((WARNINGS + 1))
 fi
 
 # Final summary
@@ -314,14 +268,12 @@ else
     log_error "❌ Found $ERRORS critical errors and $WARNINGS warnings"
     echo -e "\n${RED}${BOLD}Please fix the errors above before launching the system${NC}\n"
     
-    if [[ $ERRORS -gt 0 ]]; then
-        echo -e "${BOLD}Common solutions:${NC}"
-        echo "• Install Node.js 18+: https://nodejs.org/"
-        echo "• Install Docker Desktop: https://www.docker.com/products/docker-desktop"
-        echo "• Stop services using required ports"
-        echo "• Run 'npm install' and 'cd client && npm install'"
-        echo "• Configure .env file with your API keys"
-    fi
+    echo -e "${BOLD}Common solutions:${NC}"
+    echo "• Install Node.js 18+: https://nodejs.org/"
+    echo "• Install Docker Desktop: https://www.docker.com/products/docker-desktop"
+    echo "• Stop services using required ports"
+    echo "• Run 'npm install' and 'cd client && npm install'"
+    echo "• Configure .env file with your API keys"
     
     exit 1
 fi

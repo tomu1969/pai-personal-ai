@@ -12,6 +12,9 @@ const config = {
     instanceId: process.env.EVOLUTION_INSTANCE_ID,
     webhookUrl: process.env.WEBHOOK_URL,
     webhookSecret: process.env.WEBHOOK_SECRET,
+    // PAI Assistant instance configuration
+    paiAssistantInstanceId: process.env.PAI_ASSISTANT_INSTANCE_ID || 'pai-assistant',
+    paiAssistantWebhookUrl: process.env.PAI_ASSISTANT_WEBHOOK_URL || `http://${process.env.HOST || 'localhost'}:${process.env.PORT || 3000}/webhook/pai-assistant`,
   },
   openai: {
     apiKey: process.env.OPENAI_API_KEY,

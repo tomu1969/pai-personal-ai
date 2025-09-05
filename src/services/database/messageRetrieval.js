@@ -13,9 +13,10 @@ class MessageRetrievalService {
    * @param {string} intent - The user's intent
    * @param {object} entities - Extracted entities from AI
    * @param {object} context - Additional context (user, conversation, etc.)
+   * @param {string} originalMessage - Original user message for fallback detection
    * @returns {Promise<object>} Retrieved messages with metadata
    */
-  async retrieveMessages(intent, entities, context = {}) {
+  async retrieveMessages(intent, entities, context = {}, originalMessage = '') {
     logger.info('Retrieving messages', {
       intent,
       entities: JSON.stringify(entities),
@@ -40,19 +41,19 @@ class MessageRetrievalService {
 
       switch (intent) {
         case 'message_query':
-          result = await this.handleMessageQuery(entities, context);
+          result = await this.handleMessageQuery(entities, context, originalMessage);
           break;
         case 'contact_query':
-          result = await this.handleContactQuery(entities, context);
+          result = await this.handleContactQuery(entities, context, originalMessage);
           break;
         case 'conversation_query':
-          result = await this.handleConversationQuery(entities, context);
+          result = await this.handleConversationQuery(entities, context, originalMessage);
           break;
         case 'summary':
-          result = await this.handleSummaryQuery(entities, context);
+          result = await this.handleSummaryQuery(entities, context, originalMessage);
           break;
         default:
-          result = await this.handleDefaultQuery(entities, context);
+          result = await this.handleDefaultQuery(entities, context, originalMessage);
       }
 
       logger.info('Messages retrieved successfully', {
@@ -83,8 +84,8 @@ class MessageRetrievalService {
   /**
    * Handle message query intent
    */
-  async handleMessageQuery(entities, context) {
-    const query = queryBuilder.buildQuery('message_query', entities);
+  async handleMessageQuery(entities, context, originalMessage = '') {
+    const query = queryBuilder.buildQuery('message_query', entities, originalMessage);
 
     // Exclude assistant conversation messages unless specifically requested
     if (!context.includeAssistantMessages) {
@@ -124,7 +125,7 @@ class MessageRetrievalService {
   /**
    * Handle contact query intent
    */
-  async handleContactQuery(entities, context) {
+  async handleContactQuery(entities, context, originalMessage = '') {
     const query = queryBuilder.buildContactQuery(entities);
     const contacts = await Contact.findAll(query);
 
@@ -168,7 +169,7 @@ class MessageRetrievalService {
   /**
    * Handle conversation query intent
    */
-  async handleConversationQuery(entities, context) {
+  async handleConversationQuery(entities, context, originalMessage = '') {
     const query = queryBuilder.buildConversationQuery(entities);
     const conversations = await Conversation.findAll(query);
 
@@ -186,8 +187,8 @@ class MessageRetrievalService {
   /**
    * Handle summary query intent
    */
-  async handleSummaryQuery(entities, context) {
-    const messageQuery = queryBuilder.buildQuery('summary', entities);
+  async handleSummaryQuery(entities, context, originalMessage = '') {
+    const messageQuery = queryBuilder.buildQuery('summary', entities, originalMessage);
 
     // Exclude assistant conversation for summaries
     messageQuery.where.conversationId = {
@@ -221,7 +222,7 @@ class MessageRetrievalService {
   /**
    * Handle default/fallback query
    */
-  async handleDefaultQuery(entities, context) {
+  async handleDefaultQuery(entities, context, originalMessage = '') {
     const query = {
       where: {},
       include: queryBuilder.getDefaultIncludes(),

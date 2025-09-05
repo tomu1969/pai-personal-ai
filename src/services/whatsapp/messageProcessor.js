@@ -1,3 +1,22 @@
+/**
+ * @file messageProcessor.js
+ * @description Core message processing pipeline for WhatsApp messages
+ * @module services/whatsapp/messageProcessor
+ * @requires ./assistant - Assistant service for response generation
+ * @requires ./conversation - Conversation management service
+ * @requires ./filters - Message filtering and analysis
+ * @requires ./groupService - WhatsApp group handling
+ * @requires ./assistantMessageHandler - PAI Assistant message processing
+ * @requires ./ai - AI service integration
+ * @requires ./whatsapp-assistant - WhatsApp-specific AI assistant
+ * @requires ./whatsapp - Core WhatsApp service
+ * @requires ../models - Database models
+ * @requires ../utils/logger - Logging utility
+ * @exports MessageProcessorService
+ * @author PAI System
+ * @since September 2025
+ */
+
 const assistantService = require('./assistant');
 const conversationService = require('./conversation');
 const filterService = require('./filters');
@@ -9,7 +28,28 @@ const WhatsAppService = require('./whatsapp');
 const { Message } = require('../models');
 const logger = require('../utils/logger');
 
+/**
+ * Core message processing pipeline for WhatsApp messages
+ * Orchestrates message analysis, filtering, AI processing, and response generation
+ * 
+ * Features:
+ * - Multi-stage message processing pipeline
+ * - Assistant conversation detection and handling
+ * - Message filtering and spam detection
+ * - AI-powered response generation
+ * - Queue-based processing for high throughput
+ * - Error handling and recovery
+ * 
+ * @class MessageProcessorService
+ * @example
+ * const processor = new MessageProcessorService();
+ * const result = await processor.processMessage(webhookMessage);
+ */
 class MessageProcessorService {
+  /**
+   * Initialize message processor with WhatsApp service and processing queue
+   * @constructor
+   */
   constructor() {
     this.whatsappService = new WhatsAppService();
     this.processingQueue = [];
@@ -18,8 +58,15 @@ class MessageProcessorService {
 
   /**
    * Main message processing pipeline
-   * @param {object} parsedMessage - Parsed message from webhook
-   * @returns {Promise<object>} Processing results
+   * Handles all incoming WhatsApp messages through multi-stage processing
+   * 
+   * @param {object} parsedMessage - Parsed message from webhook containing:
+   *   @param {string} parsedMessage.messageId - Unique message ID
+   *   @param {string} parsedMessage.phone - Sender phone number
+   *   @param {string} parsedMessage.content - Message content
+   *   @param {string} parsedMessage.messageType - Type of message (text, image, etc.)
+   *   @param {number} parsedMessage.timestamp - Message timestamp
+   * @returns {Promise<object>} Processing results with success status and actions taken
    */
   async processMessage(parsedMessage) {
     const processingId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

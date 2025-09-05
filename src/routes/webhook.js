@@ -2,10 +2,15 @@ const express = require('express');
 const { validate } = require('../middleware/validation');
 const { webhookSetupSchema } = require('../utils/schemas');
 const webhookController = require('../controllers/webhook');
+const webhookMultiInstance = require('../controllers/webhookMultiInstance');
 
 const router = express.Router();
 
-// Main webhook endpoint for Evolution API
+// Multi-instance webhook endpoints
+router.post('/main', webhookMultiInstance.handleMainWebhook);
+router.post('/pai-assistant', webhookMultiInstance.handlePaiAssistantWebhook);
+
+// Main webhook endpoint for Evolution API (backward compatibility)
 router.post('/', webhookController.handleWebhook);
 
 // Evolution API v2 specific webhook endpoints
@@ -24,6 +29,7 @@ router.post('/contacts-set', webhookController.handleWebhook);
 
 // Webhook management endpoints
 router.get('/status', webhookController.getWebhookStatus);
+router.get('/multi-instance/status', webhookMultiInstance.getMultiInstanceStatus);
 router.post('/setup', validate(webhookSetupSchema), webhookController.setupWebhook);
 router.post('/test', webhookController.testWebhook);
 

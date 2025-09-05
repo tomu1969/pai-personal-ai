@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>QR Test</title>
+</head>
+<body>
+    <h1>PAI Assistant QR Code Test</h1>
+    <div id="status">Loading...</div>
+    <div id="qr-container">
+        <p>Fetching QR code...</p>
+    </div>
+    
+    <script>
+        // Test if JavaScript works at all
+        document.getElementById('status').innerHTML = 'JavaScript is working!';
+        
+        // Try to fetch QR code
+        fetch('/api/pai-assistant/qr')
+            .then(response => response.json())
+            .then(data => {
+                console.log('API Response:', data);
+                document.getElementById('status').innerHTML = 'API call successful!';
+                
+                if (data.success && data.qrCode && data.qrCode.base64) {
+                    document.getElementById('qr-container').innerHTML = 
+                        '<img src="' + data.qrCode.base64 + '" style="max-width: 400px;">' +
+                        '<p>Instance: ' + data.instanceId + '</p>';
+                } else {
+                    document.getElementById('qr-container').innerHTML = 
+                        '<p style="color: red;">Error: ' + (data.message || 'No QR code available') + '</p>';
+                }
+            })
+            .catch(error => {
+                document.getElementById('status').innerHTML = 'Error: ' + error.message;
+                document.getElementById('qr-container').innerHTML = 
+                    '<p style="color: red;">Failed to fetch QR code</p>';
+            });
+    </script>
+</body>
+</html>

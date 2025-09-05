@@ -1,0 +1,65 @@
+# AI PBX Backend Dockerfile
+# Node.js Express application with PostgreSQL and OpenAI integration
+
+FROM node:20-alpine AS base
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    curl \
+    postgresql-client \
+    && rm -rf /var/cache/apk/*
+
+# Copy package files
+COPY package*.json ./
+
+# Install production dependencies
+FROM base AS dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Install all dependencies for development
+FROM base AS dev-dependencies
+RUN npm ci && npm cache clean --force
+
+# Production stage
+FROM base AS production
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY src ./src
+COPY prompts ./prompts
+COPY database ./database
+COPY .sequelizerc ./
+
+# Create logs directory
+RUN mkdir -p logs
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S pai -u 1001 -G nodejs
+RUN chown -R pai:nodejs /app
+USER pai
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=45s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
+
+# Expose port
+EXPOSE 3000
+
+# Start application
+CMD ["npm", "start"]
+
+# Development stage
+FROM base AS development
+COPY --from=dev-dependencies /app/node_modules ./node_modules
+COPY . .
+
+# Create logs directory
+RUN mkdir -p logs
+
+# Development doesn't need non-root user for flexibility
+EXPOSE 3000
+
+# Use nodemon for development
+CMD ["npm", "run", "dev"]

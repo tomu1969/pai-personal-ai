@@ -39,8 +39,8 @@ class AssistantMessageHandler {
         ownerName: assistantConfig.ownerName,
       });
 
-      // Use AI to parse intent and generate response with configuration
-      const aiResult = await assistantAI.processMessage(content, {
+      // Use AI to parse intent only (without generating response yet)
+      const aiResult = await assistantAI.parseIntent(content, {
         conversationId,
         contactId: this.ASSISTANT_CONTACT_ID,
         systemPrompt: assistantConfig.systemPrompt,
@@ -53,7 +53,7 @@ class AssistantMessageHandler {
         hasResult: !!aiResult,
       });
 
-      logger.info('AI processed message', {
+      logger.info('AI parsed intent', {
         intent: aiResult.intent,
         confidence: aiResult.confidence,
         parameters: aiResult.parameters,
@@ -81,6 +81,7 @@ class AssistantMessageHandler {
               contactId: this.ASSISTANT_CONTACT_ID,
               includeAssistantMessages: false, // Exclude assistant messages unless specifically requested
             },
+            content // Pass original message for fallback timeframe correction
           );
 
           if (retrievalResult.success) {
@@ -100,13 +101,21 @@ class AssistantMessageHandler {
             responseContent = `I encountered an issue with your request: ${retrievalResult.error}\n\n${retrievalResult.details ? retrievalResult.details.join(', ') : ''}\n\nCould you please rephrase your question or be more specific?`;
           }
         } catch (retrievalError) {
-          logger.error('Database query failed, using AI response', {
+          logger.error('Database query failed, generating fallback response', {
             error: retrievalError.message,
             intent: aiResult.intent,
             entities: aiResult.entities,
-            aiResponse: aiResult.response,
           });
-          responseContent = aiResult.response;
+          responseContent = await assistantAI.generateResponse(
+            'conversation',
+            {},
+            content,
+            {
+              systemPrompt: assistantConfig.systemPrompt,
+              ownerName: assistantConfig.ownerName,
+              assistantName: assistantConfig.assistantName,
+            },
+          );
         }
       } else if (aiResult.intent === 'clarification_needed') {
         // Handle cases where AI needs more information - use PAI's configured response
@@ -122,8 +131,17 @@ class AssistantMessageHandler {
         );
         responseContent = clarificationResponse;
       } else {
-        // Use AI-generated response for help, conversation, or low-confidence requests
-        responseContent = aiResult.response;
+        // Generate response for help, conversation, or low-confidence requests using generateResponse
+        responseContent = await assistantAI.generateResponse(
+          aiResult.intent || 'conversation',
+          aiResult.entities || {},
+          content,
+          {
+            systemPrompt: assistantConfig.systemPrompt,
+            ownerName: assistantConfig.ownerName,
+            assistantName: assistantConfig.assistantName,
+          },
+        );
       }
 
       // Stop typing indicator

@@ -1,12 +1,35 @@
+/**
+ * @file whatsapp.js
+ * @description Core WhatsApp service for Evolution API integration
+ * @module services/whatsapp/whatsapp
+ * @requires axios
+ * @requires ../config
+ * @requires ../utils/logger
+ * @exports WhatsAppService
+ * @author PAI System
+ * @since September 2025
+ */
+
 const axios = require('axios');
 const config = require('../config');
 const logger = require('../utils/logger');
 
+/**
+ * WhatsApp service for Evolution API integration
+ * Handles message sending, receiving, and connection management
+ * Supports both PAI Responder (main line) and PAI Assistant (query line)
+ * 
+ * @class WhatsAppService
+ * @example
+ * const whatsapp = new WhatsAppService();
+ * await whatsapp.sendMessage('1234567890@s.whatsapp.net', 'Hello!');
+ */
 class WhatsAppService {
-  constructor() {
-    this.baseURL = config.evolution.apiUrl;
-    this.apiKey = config.evolution.apiKey;
-    this.instanceId = config.evolution.instanceId;
+  constructor(customConfig = null) {
+    const evolutionConfig = customConfig?.evolution || config.evolution;
+    this.baseURL = evolutionConfig.apiUrl;
+    this.apiKey = evolutionConfig.apiKey;
+    this.instanceId = evolutionConfig.instanceId;
     this.client = axios.create({
       baseURL: this.baseURL,
       headers: {

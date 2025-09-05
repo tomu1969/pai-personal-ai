@@ -8,6 +8,7 @@ const {
 } = require('../utils/schemas');
 const logger = require('../utils/logger');
 const groupService = require('../services/groupService');
+const paiAssistantController = require('../controllers/paiAssistantController');
 
 const router = express.Router();
 
@@ -530,5 +531,13 @@ router.get('/debug/websocket', (req, res) => {
     });
   }
 });
+
+// PAI Assistant management endpoints
+router.get('/pai-assistant/qr', paiAssistantController.getPaiAssistantQR);
+router.get('/pai-assistant/status', paiAssistantController.getPaiAssistantStatus);
+router.get('/pai-assistant/stats', paiAssistantController.getPaiAssistantStats);
+router.post('/pai-assistant/test', paiAssistantController.testPaiAssistant);
+router.post('/pai-assistant/send-test', paiAssistantController.sendTestMessage);
+router.post('/pai-assistant/clear-conversation', paiAssistantController.clearUserConversation);
 
 module.exports = router;

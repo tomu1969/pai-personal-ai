@@ -16,9 +16,10 @@ class QueryBuilder {
    * Build a Sequelize query from extracted entities
    * @param {string} intent - The extracted intent
    * @param {object} entities - The extracted entities
+   * @param {string} originalMessage - The original user message (for fallback detection)
    * @returns {object} Sequelize query configuration
    */
-  buildQuery(intent, entities) {
+  buildQuery(intent, entities, originalMessage = '') {
     logger.debug('Building database query', {
       intent,
       entities,
@@ -33,8 +34,11 @@ class QueryBuilder {
     };
 
     try {
+      // Apply fallback logic for AI misinterpretation of "today"
+      const correctedEntities = this.correctTimeframeMisinterpretation(entities, originalMessage);
+      
       // Build WHERE clause based on entities
-      this.addTimeframeFilter(query, entities.timeframe);
+      this.addTimeframeFilter(query, correctedEntities.timeframe);
       this.addSenderFilter(query, entities.sender);
       this.addContentFilter(query, entities.content_filter);
       this.addMessageTypeFilter(query, entities.message_type);
@@ -43,9 +47,26 @@ class QueryBuilder {
       // Add include relationships based on intent
       this.addIncludes(query, intent);
 
+      // Create a serializable version of the where clause for logging
+      const loggableWhere = Object.keys(query.where).reduce((acc, key) => {
+        const value = query.where[key];
+        if (key === 'createdAt' && (value[Op.gte] || value[Op.lte])) {
+          acc[key] = { 
+            gte: value[Op.gte]?.toISOString(),
+            lte: value[Op.lte]?.toISOString()
+          };
+        } else if (key === 'conversationId' && value[Op.ne]) {
+          acc[key] = { ne: value[Op.ne] };
+        } else {
+          acc[key] = value;
+        }
+        return acc;
+      }, {});
+
       logger.info('Query built successfully', {
         intent,
-        whereClause: JSON.stringify(query.where),
+        whereClause: JSON.stringify(loggableWhere),
+        rawWhere: JSON.stringify(query.where),
         includeCount: query.include.length,
         limit: query.limit,
       });
@@ -101,12 +122,15 @@ class QueryBuilder {
 
     query.where.createdAt = {
       [Op.gte]: startDate,
+      [Op.lte]: now,
     };
 
     logger.debug('Added timeframe filter', {
       startDate: startDate.toISOString(),
       endDate: now.toISOString(),
       timeframe,
+      dateRange: `${startDate.toISOString()} to ${now.toISOString()}`,
+      whereClauseAfterAdd: JSON.stringify(query.where),
     });
   }
 
@@ -314,6 +338,70 @@ class QueryBuilder {
     }
 
     return errors;
+  }
+
+  /**
+   * Correct AI misinterpretation of timeframe entities
+   * @param {object} entities - The extracted entities
+   * @param {string} originalMessage - The original user message
+   * @returns {object} Corrected entities
+   */
+  correctTimeframeMisinterpretation(entities, originalMessage) {
+    if (!entities.timeframe || !originalMessage) {
+      return entities;
+    }
+
+    const correctedEntities = { ...entities };
+    const timeframe = entities.timeframe;
+    const lowerMessage = originalMessage.toLowerCase();
+
+    // Detect AI misinterpretation: "today" parsed as {"relative":"past","unit":"days","value":1}
+    if (
+      timeframe.relative === 'past' &&
+      timeframe.unit === 'days' &&
+      timeframe.value === 1 &&
+      (lowerMessage.includes('today') || lowerMessage.includes('hoy'))
+    ) {
+      logger.info('Detected AI misinterpretation: "today" parsed as past 1 day, correcting', {
+        originalTimeframe: timeframe,
+        originalMessage,
+      });
+
+      correctedEntities.timeframe = {
+        ...timeframe,
+        relative: 'today',
+        value: 0,
+      };
+
+      logger.info('Corrected timeframe entity', {
+        correctedTimeframe: correctedEntities.timeframe,
+      });
+    }
+
+    // Detect similar misinterpretation for "yesterday"
+    if (
+      timeframe.relative === 'past' &&
+      timeframe.unit === 'days' &&
+      timeframe.value === 1 &&
+      (lowerMessage.includes('yesterday') || lowerMessage.includes('ayer'))
+    ) {
+      logger.info('Detected AI misinterpretation: "yesterday" parsed as past 1 day, correcting', {
+        originalTimeframe: timeframe,
+        originalMessage,
+      });
+
+      correctedEntities.timeframe = {
+        ...timeframe,
+        relative: 'yesterday',
+        value: 1,
+      };
+
+      logger.info('Corrected timeframe entity for yesterday', {
+        correctedTimeframe: correctedEntities.timeframe,
+      });
+    }
+
+    return correctedEntities;
   }
 }
 

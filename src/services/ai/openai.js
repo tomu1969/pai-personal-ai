@@ -1,8 +1,39 @@
+/**
+ * @file openai.js
+ * @description OpenAI API service for direct API communication and message generation
+ * @module services/ai/openai
+ * @requires axios - HTTP client for API requests
+ * @requires ../config - Application configuration
+ * @requires ../utils/logger - Logging utility
+ * @exports AIService
+ * @author PAI System
+ * @since September 2025
+ */
+
 const axios = require('axios');
 const config = require('../config');
 const logger = require('../utils/logger');
 
+/**
+ * OpenAI API service for direct API communication
+ * Provides low-level OpenAI API integration with error handling and timeout management
+ * 
+ * Features:
+ * - Direct OpenAI API communication via axios
+ * - Configurable timeout and retry handling
+ * - Message generation with conversation context
+ * - API key validation and status checking
+ * 
+ * @class AIService
+ * @example
+ * const aiService = new AIService();
+ * const response = await aiService.generateResponse('Hello', { temperature: 0.7 });
+ */
 class AIService {
+  /**
+   * Initialize OpenAI service with API key validation and HTTP client setup
+   * @constructor
+   */
   constructor() {
     this.apiKey = process.env.OPENAI_API_KEY || config.openai.apiKey;
     

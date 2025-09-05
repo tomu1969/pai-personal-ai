@@ -1,8 +1,40 @@
+/**
+ * @file assistantAI.js
+ * @description Core AI assistant service for intent parsing, response generation, and conversation analysis
+ * @module services/ai/assistantAI
+ * @requires openai - OpenAI API client
+ * @requires ../utils/logger - Logging utility
+ * @requires ../config - Application configuration
+ * @exports AssistantAI
+ * @author PAI System
+ * @since September 2025
+ */
+
 const { OpenAI } = require('openai');
 const logger = require('../utils/logger');
 const config = require('../config');
 
+/**
+ * Core AI assistant service for intelligent message processing
+ * Handles intent parsing, response generation, and conversation analysis
+ * 
+ * Features:
+ * - Natural language intent parsing using OpenAI GPT
+ * - Database query parameter extraction
+ * - Contextual response generation
+ * - Conversation summarization
+ * - Fallback responses when AI is unavailable
+ * 
+ * @class AssistantAI
+ * @example
+ * const aiService = require('./services/ai/assistantAI');
+ * const result = await aiService.processMessage('show me messages from today');
+ */
 class AssistantAI {
+  /**
+   * Initialize AI assistant service with OpenAI client
+   * @constructor
+   */
   constructor() {
     // Check if OpenAI API key is properly configured
     if (config.openai.apiKey && !config.openai.apiKey.includes('your-')) {
@@ -25,6 +57,14 @@ class AssistantAI {
 
   /**
    * Parse user intent using AI instead of regex patterns
+   * Analyzes natural language messages to extract intent and structured parameters
+   * 
+   * @param {string} userMessage - The user's natural language message
+   * @param {object} context - Additional context for parsing
+   * @returns {Promise<object>} Parsed intent with confidence, entities, and parameters
+   * @example
+   * const result = await aiService.parseIntent('show me messages from today');
+   * // Returns: { intent: 'message_query', entities: { timeframe: {...} }, confidence: 0.9 }
    */
   async parseIntent(userMessage, context = {}) {
     // If AI is not available, use fallback immediately
@@ -37,6 +77,12 @@ class AssistantAI {
       const systemPrompt = `You are an intelligent assistant that analyzes user messages to extract intent and structured parameters for database queries.
 
 Your job is to classify user messages and extract detailed entities to enable precise database searches.
+
+CRITICAL TIMEFRAME PARSING RULES (MUST FOLLOW EXACTLY):
+- ANY mention of "today" → {"value": 0, "unit": "days", "relative": "today"} - NOT "past"!
+- ANY mention of "yesterday" → {"value": 1, "unit": "days", "relative": "yesterday"} - NOT "past"!
+- "last X minutes/hours/days" → {"value": X, "unit": "minutes/hours/days", "relative": "past"}
+- Do NOT use "relative": "past" for "today" or "yesterday" - use the exact relative values!
 
 AVAILABLE INTENTS:
 1. "message_query" - User wants to search/filter messages
@@ -65,7 +111,7 @@ AVAILABLE INTENTS:
    - No parameters needed
 
 ENTITY EXTRACTION:
-- timeframe: {value: number, unit: "minutes|hours|days|weeks", relative: "past|future"}
+- timeframe: {value: number, unit: "minutes|hours|days|weeks", relative: "past|future|today|yesterday"}
 - sender: {type: "specific|group|assistant|user", name: string}
 - content_filter: {keywords: [string], exclude: [string]}
 - message_type: ["text", "image", "audio", "video", "document"]
@@ -87,7 +133,14 @@ RESPONSE FORMAT (JSON only):
   "missing_params": ["scope", "format"],
   "clarification_question": "string (if clarification_needed)",
   "reasoning": "brief explanation of analysis"
-}`;
+}
+
+IMPORTANT TIMEFRAME EXAMPLES:
+- "messages from today": {"value": 0, "unit": "days", "relative": "today"}
+- "messages from yesterday": {"value": 1, "unit": "days", "relative": "yesterday"} 
+- "messages from last hour": {"value": 1, "unit": "hours", "relative": "past"}
+- "messages from last 30 minutes": {"value": 30, "unit": "minutes", "relative": "past"}
+`;
 
       const completion = await this.openai.chat.completions.create({
         model: this.model,
@@ -136,6 +189,13 @@ RESPONSE FORMAT (JSON only):
 
   /**
    * Parse timeframe string to structured format
+   * Converts natural language time expressions to standardized objects
+   * 
+   * @param {string} timeframe - Natural language time expression
+   * @returns {object} Structured timeframe with value, unit, and relative properties
+   * @example
+   * parseTimeframe('last 30 minutes') // Returns: { value: 30, unit: 'minutes', relative: 'past' }
+   * parseTimeframe('today') // Returns: { value: 0, unit: 'days', relative: 'today' }
    */
   parseTimeframe(timeframe) {
     const timeframeLower = timeframe.toLowerCase();
@@ -155,6 +215,11 @@ RESPONSE FORMAT (JSON only):
 
   /**
    * Fallback intent parsing using simple keyword matching
+   * Used when OpenAI API is unavailable or fails
+   * 
+   * @param {string} userMessage - The user's message to analyze
+   * @returns {object} Basic intent classification with limited confidence
+   * @private
    */
   fallbackIntentParsing(userMessage) {
     const message = userMessage.toLowerCase();
@@ -214,6 +279,13 @@ RESPONSE FORMAT (JSON only):
 
   /**
    * Generate a response based on the parsed intent
+   * Creates contextual responses using OpenAI or fallback to static responses
+   * 
+   * @param {string} intent - Parsed intent from parseIntent()
+   * @param {object} parameters - Extracted parameters for the intent
+   * @param {string} userMessage - Original user message
+   * @param {object} context - Additional context including database results, system prompt, etc.
+   * @returns {Promise<string>} Generated response message
    */
   async generateResponse(intent, parameters, userMessage, context = {}) {
     // If AI is not available, use simple fallback responses
@@ -237,45 +309,115 @@ RESPONSE FORMAT (JSON only):
         case 'message_query':
         case 'summary':
           if (hasDbResults && context.messages) {
-            console.log('🔍 [CONVERSATION FORMAT] Starting conversation formatting process');
-            console.log('📊 [CONVERSATION FORMAT] Raw messages received:', context.messages.length);
+            console.log('🔍 [AI SUMMARY] Processing summary request with database results');
+            console.log('📊 [AI SUMMARY] Raw messages received:', context.messages.length);
+            console.log('🎯 [AI SUMMARY] Intent detected:', intent);
+            console.log('📝 [AI SUMMARY] User message:', userMessage);
             
-            // Group messages into conversations for proper formatting
-            const conversationSummaries = this.groupMessagesByConversation(context.messages);
-            
-            console.log('📈 [CONVERSATION FORMAT] Conversations grouped:', conversationSummaries.length);
-            console.log('🗂️ [CONVERSATION FORMAT] Conversation summaries:', conversationSummaries.map(c => ({
-              contact: c.contactName,
-              messageCount: c.messages.length,
-              timespan: `${c.startTime} - ${c.endTime}`,
-              summary: c.summary
-            })));
-            
-            // Prepare formatted conversation data for AI
-            const conversationData = conversationSummaries.map(conv => ({
-              timestamp: this.formatConversationTimestamp(conv.startTime, conv.endTime),
-              contact: conv.contactName,
-              summary: conv.summary,
-              messageCount: conv.messages.length
-            }));
+            // Create system prompt with explicit format instructions
+            systemPrompt = `${configuredSystemPrompt}
 
-            console.log('⏰ [CONVERSATION FORMAT] Formatted conversation data:', conversationData);
+IMPORTANT CONVERSATION SUMMARY FORMAT:
+When providing conversation summaries, you MUST use this exact format for each conversation:
 
-            // Generate the formatted conversation list directly without additional AI processing
-            if (conversationData.length > 0) {
-              responseMessage = conversationData.map(conv => 
-                `${conv.timestamp} ${conv.contact}: ${conv.summary}`
-              ).join('\n\n');
-              
-              console.log('✅ [CONVERSATION FORMAT] Final formatted output:');
-              console.log(responseMessage);
-            } else {
-              const timeValue = parameters.timeframe?.value || 5;
-              const timeUnit = parameters.timeframe?.unit || 'hours';
-              responseMessage = `No conversations found in the last ${timeValue} ${timeUnit}.`;
-              
-              console.log('❌ [CONVERSATION FORMAT] No conversations found for timeframe:', `${timeValue} ${timeUnit}`);
-            }
+*[DD/MM/YY, HH:MM–HH:MM] ContactName:* Brief action or topic (max 10-15 words)
+
+Examples:
+- *[03/09/25, 14:30–15:45] John Smith:* Discussed project timeline
+- *[03/09/25, 16:00–16:15] Mary Johnson:* Confirmed meeting tomorrow
+
+Rules:
+1. Use single asterisks around timestamp and contact name: *[timestamp] Name:*
+2. Keep summaries under 15 words - focus on main action/topic only
+3. Don't include assistant responses or details like "(assistant)"
+4. Use active voice and action verbs (asked, shared, confirmed, discussed)
+5. Each conversation on a new line with double line breaks between them`;
+
+            console.log('📋 [AI SUMMARY] System prompt prepared with format instructions');
+
+            // Prepare data for AI processing
+            const messageData = {
+              total_messages: context.messages.length,
+              messages: context.messages.map(msg => ({
+                contact: msg.contact?.name || 'Unknown',
+                content: msg.content.substring(0, 200), // Limit content length
+                createdAt: msg.createdAt,
+                sender: msg.sender
+              })),
+              timeframe: parameters.timeframe || context.timeframe || 'last few hours',
+              request_type: intent
+            };
+
+            console.log('🔧 [AI SUMMARY] Prepared message data for AI:', {
+              messageCount: messageData.messages.length,
+              timeframe: messageData.timeframe,
+              firstFewContacts: messageData.messages.slice(0, 3).map(m => m.contact)
+            });
+
+            const completion = await this.openai.chat.completions.create({
+              model: this.model,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: `Please analyze these messages and provide a conversation summary following the exact format specified: ${JSON.stringify(messageData)}` },
+              ],
+              temperature: 0.3,
+              max_tokens: 800,
+            });
+
+            responseMessage = completion.choices[0].message.content;
+            
+            console.log('✅ [AI SUMMARY] AI response generated');
+            console.log('📤 [AI SUMMARY] Final response:', responseMessage.substring(0, 200) + '...');
+          } else {
+            console.log('❌ [AI SUMMARY] No database results found');
+            const timeValue = parameters.timeframe?.value || 5;
+            const timeUnit = parameters.timeframe?.unit || 'hours';
+            responseMessage = `No conversations found in the last ${timeValue} ${timeUnit}.`;
+          }
+          break;
+
+        case 'contact_query':
+          if (hasDbResults && context.contacts) {
+            systemPrompt = 'You are analyzing contact data from a WhatsApp system. Provide a clear, helpful summary of the contacts found.';
+
+            const contactData = {
+              total_contacts: context.contacts.length,
+              contacts: context.contacts.slice(0, 10),
+              messages: context.messages ? context.messages.slice(0, 5) : [],
+            };
+
+            const completion = await this.openai.chat.completions.create({
+              model: this.model,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: `Analyze this contact data: ${JSON.stringify(contactData)}` },
+              ],
+              temperature: 0.3,
+              max_tokens: 400,
+            });
+
+            responseMessage = completion.choices[0].message.content;
+          } else {
+            // No contacts found - use configured system prompt to respond as PAI
+            systemPrompt = configuredSystemPrompt;
+
+            const completion = await this.openai.chat.completions.create({
+              model: this.model,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userMessage },
+              ],
+              temperature: 0.7,
+              max_tokens: 300,
+            });
+
+            responseMessage = completion.choices[0].message.content;
+          }
+          break;
+
+        case 'conversation_query':
+          if (hasDbResults && context.conversations) {
+            responseMessage = `📱 **Found ${context.conversations.length} conversations**\n\n${context.conversations.map((conv) => `• **${conv.contact?.name || 'Unknown'}** (${conv.contact?.phone})\n  Status: ${conv.status}, Priority: ${conv.priority}\n  Last message: ${conv.lastMessageAt}`).join('\n\n')}`;
           } else {
             responseMessage = `I searched for messages but didn't find any matching your criteria. Could you try:
 
@@ -410,6 +552,23 @@ I can help you find and analyze your messages using natural language. Here's wha
 
   /**
    * Complete intent parsing and response generation in one call
+   * Main entry point for processing user messages with full AI pipeline
+   * 
+   * @param {string} userMessage - The user's natural language message
+   * @param {object} context - Processing context including:
+   *   @param {string} context.systemPrompt - AI system prompt for personality
+   *   @param {string} context.ownerName - Owner's name for personalization
+   *   @param {string} context.assistantName - Assistant's name
+   *   @param {Array} context.messages - Database query results
+   *   @param {Array} context.contacts - Contact search results
+   *   @param {Array} context.conversations - Conversation search results
+   * @returns {Promise<object>} Complete processing result with intent, response, and metadata
+   * @example
+   * const result = await aiService.processMessage('show me today\'s messages', {
+   *   systemPrompt: 'You are PAI assistant',
+   *   ownerName: 'John',
+   *   messages: [...] // from database
+   * });
    */
   async processMessage(userMessage, context = {}) {
     try {

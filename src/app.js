@@ -15,6 +15,9 @@ const apiRoutes = require('./routes/api');
 const logsRoutes = require('./routes/logs');
 const chatRoutes = require('./routes/chat');
 const assistantRoutes = require('./controllers/assistant');
+const qrPageRoutes = require('./routes/qr-page');
+const qrAssistantRoutes = require('./routes/qr-assistant');
+const qrResponderRoutes = require('./routes/qr-responder');
 
 const app = express();
 
@@ -41,6 +44,17 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use('/admin', express.static(path.join(__dirname, '../admin/public')));
+app.use('/public', express.static(path.join(__dirname, '../public')));
+
+// PAI Assistant QR Code page
+app.get('/pai-assistant/qr', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/pai-assistant-qr.html'));
+});
+
+// Test QR page
+app.get('/test-qr', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/test-qr.html'));
+});
 
 // Handle favicon requests to avoid 404 errors
 app.get('/favicon.ico', (req, res) => {
@@ -53,6 +67,9 @@ app.use('/api', apiRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/assistant', assistantRoutes);
+app.use('/', qrPageRoutes);
+app.use('/', qrAssistantRoutes);
+app.use('/', qrResponderRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({
@@ -84,7 +101,7 @@ const startServer = () => {
   });
 
   // Initialize real-time service
-  const realtimeService = require('./services/realtime');
+  const realtimeService = require('./services/utils/realtime');
   realtimeService.initialize(server);
 
   const gracefulShutdown = (signal) => {

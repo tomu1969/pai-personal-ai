@@ -1,3 +1,17 @@
+/**
+ * @file whatsapp-assistant.js
+ * @description WhatsApp-specific AI assistant for personalized message responses
+ * @module services/ai/whatsapp-assistant
+ * @requires fs - File system operations
+ * @requires path - Path utilities
+ * @requires dotenv - Environment variable loading
+ * @requires openai - OpenAI API client
+ * @requires ../utils/logger - Logging utility
+ * @exports WhatsAppAssistant
+ * @author PAI System
+ * @since September 2025
+ */
+
 const fs = require('fs');
 const path = require('path');
 // Force load .env file, override existing environment variables  
@@ -5,7 +19,26 @@ require('dotenv').config({ override: true });
 const { OpenAI } = require('openai');
 const logger = require('../utils/logger');
 
+/**
+ * WhatsApp-specific AI assistant for personalized message responses
+ * Manages conversation histories per contact and provides context-aware responses
+ * 
+ * Features:
+ * - Per-contact conversation history management
+ * - Personalized system prompts with owner/assistant names
+ * - Context-aware GPT responses
+ * - WhatsApp message processing and formatting
+ * 
+ * @class WhatsAppAssistant
+ * @example
+ * const assistant = new WhatsAppAssistant();
+ * const response = await assistant.processMessage('Hello', '+1234567890', config);
+ */
 class WhatsAppAssistant {
+  /**
+   * Initialize WhatsApp assistant with system prompt and OpenAI client
+   * @constructor
+   */
   constructor() {
     // Load system prompt
     this.systemPrompt = fs.readFileSync(
@@ -26,6 +59,13 @@ class WhatsAppAssistant {
 
   /**
    * Get or create conversation history for a contact
+   * Maintains per-contact conversation context with personalized system prompts
+   * 
+   * @param {string} contactPhone - Contact's phone number as unique identifier
+   * @param {object} assistantConfig - Assistant configuration from database
+   * @param {string} assistantConfig.ownerName - Owner's name for personalization
+   * @param {string} assistantConfig.assistantName - Assistant's name
+   * @returns {Array} Conversation history array for OpenAI messages
    */
   getConversationHistory(contactPhone, assistantConfig = {}) {
     if (!this.conversationHistories.has(contactPhone)) {

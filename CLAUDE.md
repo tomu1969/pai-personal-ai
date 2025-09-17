@@ -4,24 +4,25 @@ This document provides comprehensive information for Claude AI sessions to under
 
 ## System Overview
 
-PAI System is a dual WhatsApp assistant platform that integrates with Evolution API to provide intelligent message filtering, automated responses, and conversation management with a modern React chat interface.
+PAI System is a triple WhatsApp assistant platform that integrates with Evolution API to provide intelligent message filtering, automated responses, mortgage qualification assistance, and conversation management with a modern React chat interface.
 
-### Dual Assistant Architecture
+### Triple Assistant Architecture
 ```
 WhatsApp Device 1 (PAI Responder) ↔ Evolution API Instance 1 ↔ AI PBX Backend ↔ React Frontend
 WhatsApp Device 2 (PAI Assistant) ↔ Evolution API Instance 2 ↗         ↓
-                                                                PostgreSQL Database
+WhatsApp Device 3 (PAI Mortgage) ↔ Evolution API Instance 3 ↗ PostgreSQL Database
                                                                         ↓
                                                                 OpenAI GPT Integration
 ```
 
 ## Current Status (September 2025)
 
-✅ **Fully Operational Dual Assistant System:**
+✅ **Fully Operational Triple Assistant System:**
 - **PAI Responder**: Main WhatsApp line for auto-responses
-- **PAI Assistant**: Secondary line for message history queries  
+- **PAI Assistant**: Secondary line for message history queries
+- **PAI Mortgage**: Specialized mortgage qualification and guidance assistant
 - WhatsApp integration via Evolution API v2.0.9
-- Multi-instance Evolution service for dual line management
+- Multi-instance Evolution service for triple line management
 - Real-time chat interface with Socket.io
 - Assistant configuration management
 - Message filtering and AI responses
@@ -36,15 +37,19 @@ ai_pbx/
 │   ├── app.js                     # Main application entry
 │   ├── controllers/               # API endpoints
 │   │   ├── webhook.js             # WhatsApp webhook handler
+│   │   ├── webhookMultiInstance.js # Multi-instance webhook routing
 │   │   ├── chat.js                # Chat management
-│   │   └── assistant.js           # Assistant configuration
+│   │   ├── assistant.js           # Assistant configuration
+│   │   └── paiMortgageController.js # PAI Mortgage endpoints
 │   ├── services/                  # Business logic (reorganized)
 │   │   ├── ai/                    # AI services
 │   │   │   ├── assistantAI.js     # Core AI intent parsing & response generation
 │   │   │   ├── openai.js          # Direct OpenAI API integration
 │   │   │   ├── whatsapp-assistant.js # WhatsApp-specific AI assistant
 │   │   │   ├── paiResponderAdapter.js # PAI Responder logic
-│   │   │   └── paiAssistantAdapter.js # PAI Assistant query logic
+│   │   │   ├── paiAssistantAdapter.js # PAI Assistant query logic
+│   │   │   ├── paiMortgageAdapter.js # PAI Mortgage qualification logic
+│   │   │   └── paiMortgageWhatsApp.js # PAI Mortgage WhatsApp integration
 │   │   ├── whatsapp/              # WhatsApp services  
 │   │   │   ├── whatsapp.js        # Core WhatsApp service
 │   │   │   ├── evolutionMultiInstance.js # Multi-instance manager
@@ -64,12 +69,14 @@ ai_pbx/
 │   │   ├── api.js                 # Main API routes
 │   │   ├── webhook.js             # Webhook routes
 │   │   ├── qr-assistant/          # PAI Assistant QR page
-│   │   └── qr-responder/          # PAI Responder QR page
+│   │   ├── qr-responder/          # PAI Responder QR page
+│   │   └── qr-mortgage/           # PAI Mortgage QR page
 │   ├── models/                    # Sequelize database models
 │   │   ├── Assistant.js           # Assistant configuration
 │   │   ├── Contact.js             # Contact management
 │   │   ├── Conversation.js        # Conversation tracking
-│   │   └── Message.js             # Message storage
+│   │   ├── Message.js             # Message storage
+│   │   └── PaiMortgage.js         # PAI Mortgage data model
 │   └── utils/                     # Helper functions
 ├── client/                        # React frontend (Vite + TypeScript)
 │   ├── src/
@@ -104,7 +111,8 @@ ai_pbx/
 │       └── setup-pai-assistant-line.js
 ├── prompts/                       # AI prompts
 │   ├── pai_responder.md           # PAI Responder personality
-│   └── pai_assistant.md           # PAI Assistant personality  
+│   ├── pai_assistant.md           # PAI Assistant personality
+│   └── pai_mortgage.md            # PAI Mortgage personality  
 ├── database/                      # Database migrations
 ├── tests/                         # Test suites
 ├── docs/                          # Documentation
@@ -113,7 +121,7 @@ ai_pbx/
 
 ## Key Components
 
-### Dual Assistant System
+### Triple Assistant System
 
 **PAI Responder (Main Line)**:
 - **Purpose**: Auto-responds to all incoming WhatsApp messages
@@ -129,19 +137,30 @@ ai_pbx/
 - **QR Code**: `http://localhost:3000/qr-assistant`
 - **Personality**: Defined in `prompts/pai_assistant.md`
 
+**PAI Mortgage (Mortgage Specialist)**:
+- **Purpose**: Specialized mortgage qualification and guidance assistant
+- **Instance ID**: `pai-mortgage`
+- **Webhook Path**: `/webhook/pai-mortgage` 
+- **QR Code**: `http://localhost:3000/qr-mortgage`
+- **Personality**: Defined in `prompts/pai_mortgage.md`
+- **Features**: Bilingual support (English/Spanish), mortgage calculations, qualification assessment
+
 ### Backend Services (Reorganized)
 
 **Multi-Instance Evolution Service** (`src/services/whatsapp/evolutionMultiInstance.js`):
-- Manages dual WhatsApp instances
-- Handles QR code generation for both devices
+- Manages triple WhatsApp instances (PAI Responder, PAI Assistant, PAI Mortgage)
+- Handles QR code generation for all devices
 - Routes webhooks to appropriate handlers
 - Connection status monitoring per instance
+- Instance reset and recovery capabilities for QR code limit issues
 
 **AI Services** (`src/services/ai/`):
 - `assistantAI.js`: Core AI intent parsing and response generation
 - `whatsapp-assistant.js`: WhatsApp-specific AI with conversation history
 - `paiResponderAdapter.js`: PAI Responder logic and personality
 - `paiAssistantAdapter.js`: PAI Assistant query processing
+- `paiMortgageAdapter.js`: PAI Mortgage qualification logic
+- `paiMortgageWhatsApp.js`: PAI Mortgage WhatsApp integration
 - `openai.js`: Direct OpenAI API integration
 
 **Message Processing Pipeline** (`src/services/whatsapp/messageProcessor.js`):
@@ -210,11 +229,13 @@ ai_pbx/
 ### Webhook Routes (`/webhook/`):
 - `POST /` - Receive WhatsApp messages (PAI Responder)
 - `POST /pai-assistant` - Receive messages (PAI Assistant)
+- `POST /pai-mortgage` - Receive messages (PAI Mortgage)
 - `GET /status` - Webhook health check
 
 ### QR Code Routes:
 - `GET /qr-responder` - PAI Responder QR code page
 - `GET /qr-assistant` - PAI Assistant QR code page
+- `GET /qr-mortgage` - PAI Mortgage QR code page
 - `GET /qr-direct` - Legacy direct QR access
 
 ## Environment Configuration
@@ -226,10 +247,12 @@ EVOLUTION_API_URL=http://localhost:8080
 EVOLUTION_API_KEY=pai_evolution_api_key_2025
 EVOLUTION_INSTANCE_ID=aipbx
 EVOLUTION_PAI_ASSISTANT_INSTANCE_ID=pai-assistant
+PAI_MORTGAGE_INSTANCE_ID=pai-mortgage
 
 # Webhook URLs  
 WEBHOOK_URL=http://localhost:3000/webhook
 EVOLUTION_PAI_ASSISTANT_WEBHOOK_URL=http://localhost:3000/webhook/pai-assistant
+PAI_MORTGAGE_WEBHOOK_URL=http://localhost:3000/webhook/pai-mortgage
 
 # Database
 DATABASE_URL=postgresql://ai_pbx:aipbx123@localhost:5432/ai_pbx_db
@@ -293,19 +316,21 @@ npx sequelize-cli db:migrate
 npx sequelize-cli migration:generate --name migration-name
 ```
 
-### Testing Dual Assistant Setup:
+### Testing Triple Assistant Setup:
 1. **Connect PAI Responder**: Visit `http://localhost:3000/qr-responder`
 2. **Connect PAI Assistant**: Visit `http://localhost:3000/qr-assistant`
-3. **Test Auto-Response**: Send message to PAI Responder number
-4. **Test Queries**: Send "show me messages from today" to PAI Assistant
+3. **Connect PAI Mortgage**: Visit `http://localhost:3000/qr-mortgage`
+4. **Test Auto-Response**: Send message to PAI Responder number
+5. **Test Queries**: Send "show me messages from today" to PAI Assistant
+6. **Test Mortgage**: Send "I want to apply for a $350,000 mortgage" to PAI Mortgage
 
 ## Evolution API Integration
 
 ### Version: v2.0.9 (Docker)
 - **Container**: `atendai/evolution-api:v2.0.9`
 - **Port**: 8080
-- **Multi-Instance**: Supports dual WhatsApp connections
-- **Webhook**: Handles incoming messages from both instances
+- **Multi-Instance**: Supports triple WhatsApp connections
+- **Webhook**: Handles incoming messages from all instances
 
 ### Key Evolution API Endpoints:
 - `GET /instance/connectionState/{instanceId}` - Check connection
@@ -314,19 +339,102 @@ npx sequelize-cli migration:generate --name migration-name
 - `GET /instance/qrcode/{instanceId}` - Get QR code
 - `POST /instance/create` - Create new instance
 
+## PAI Mortgage Assistant Status (September 2025)
+
+✅ **PAI Mortgage is Now Fully Operational**
+
+### Recent Fixes Applied Today:
+
+**1. OpenAI API Key Integration Fixed**:
+- Fixed environment variable override issue that was preventing API key access
+- Corrected OpenAI configuration loading in PAI Mortgage services
+- Verified API key is properly passed to OpenAI client initialization
+
+**2. Evolution API Authentication Resolved**:
+- Fixed API key mismatches between different Evolution instances
+- Resolved webhook configuration issues with proper "enabled" property
+- Updated webhook payload format to match Evolution API v2.0.9 requirements
+
+**3. Enhanced Webhook Routing**:
+- Added comprehensive multi-instance webhook routing for PAI Mortgage
+- Implemented instance-specific message processing pipeline
+- Added proper error handling and logging for PAI Mortgage messages
+
+**4. Comprehensive Logging and Debugging**:
+- Added detailed logging throughout PAI Mortgage processing pipeline
+- Implemented conversation context tracking
+- Added bilingual response verification (English/Spanish)
+
+**5. QR Code Connection Working**:
+- PAI Mortgage QR code page fully functional at `/qr-mortgage`
+- Instance creation and management working properly
+- Connection status monitoring implemented
+
+**6. Mortgage Qualification Features**:
+- AI-powered mortgage qualification assessment
+- Bilingual support (English/Spanish automatic detection)
+- Real-time mortgage calculations and recommendations
+- FHA, Conventional, VA, and USDA loan program guidance
+
+### Environment Variable Troubleshooting:
+
+**Common Issues and Solutions**:
+
+1. **OpenAI API Key Not Working**:
+   ```bash
+   # Verify key is set correctly
+   echo $OPENAI_API_KEY
+   
+   # Check if key starts with sk-proj- or sk-
+   # Ensure no extra spaces or quotes in .env file
+   ```
+
+2. **Evolution API Key Mismatch**:
+   ```bash
+   # Ensure all instances use same API key
+   EVOLUTION_API_KEY=pai_evolution_api_key_2025
+   
+   # Check Evolution API is accessible
+   curl -H "apikey: pai_evolution_api_key_2025" http://localhost:8080/instance/list
+   ```
+
+3. **Instance Creation Fails**:
+   ```bash
+   # Reset problematic instance
+   node scripts/reset-instance.js pai-mortgage
+   
+   # Check webhook endpoint is responding
+   curl http://localhost:3000/webhook/pai-mortgage
+   ```
+
+### Known Working Configuration:
+```env
+# Verified working environment variables
+OPENAI_API_KEY=sk-proj-your-actual-key-here
+EVOLUTION_API_KEY=pai_evolution_api_key_2025
+PAI_MORTGAGE_INSTANCE_ID=pai-mortgage
+PAI_MORTGAGE_WEBHOOK_URL=http://localhost:3000/webhook/pai-mortgage
+```
+
 ## Known Issues & Solutions
 
-### Issue: Dual Instance Management
+### Issue: Triple Instance Management
 **Solution**: Use `evolutionMultiInstance.js` service for proper instance routing
 
 ### Issue: QR Code JavaScript Not Loading
-**Solution**: Server-side rendered QR pages at `/qr-responder` and `/qr-assistant`
+**Solution**: Server-side rendered QR pages at `/qr-responder`, `/qr-assistant`, and `/qr-mortgage`
 
 ### Issue: Message Routing Between Instances  
-**Solution**: Webhook path-based routing (`/webhook` vs `/webhook/pai-assistant`)
+**Solution**: Webhook path-based routing (`/webhook` vs `/webhook/pai-assistant` vs `/webhook/pai-mortgage`)
 
 ### Issue: Assistant Configuration Conflicts
 **Solution**: Separate prompts and configurations per assistant type
+
+### Issue: QR Code Limit Errors (RESOLVED)
+**Solution**: Automated instance reset capabilities using `scripts/reset-instance.js`
+
+### Issue: Environment Variable Override (RESOLVED)
+**Solution**: Fixed OpenAI API key loading in services, proper environment variable hierarchy
 
 ## Development Notes
 
@@ -336,14 +444,16 @@ npx sequelize-cli migration:generate --name migration-name
 3. `messageProcessor.js` → Processes message with context
 4. **PAI Responder**: Auto-response generation
 5. **PAI Assistant**: Query processing and database search
-6. Response → WhatsApp via correct Evolution instance
-7. Real-time updates via Socket.io
+6. **PAI Mortgage**: Mortgage qualification and guidance
+7. Response → WhatsApp via correct Evolution instance
+8. Real-time updates via Socket.io
 
-### Dual Instance Benefits:
-- **Separation of Concerns**: Auto-responses vs queries
+### Triple Instance Benefits:
+- **Separation of Concerns**: Auto-responses vs queries vs mortgage services
 - **Specialized Prompts**: Different personalities per function
 - **Reduced Conflicts**: No confusion between response types
 - **Scalability**: Independent scaling per function
+- **Service Specialization**: Dedicated mortgage expertise without cluttering other assistants
 
 ### Frontend State Management:
 - React hooks for local state
@@ -380,9 +490,16 @@ curl http://localhost:8080/instance/connectionState/aipbx
 # Check instance status (PAI Assistant) 
 curl http://localhost:8080/instance/connectionState/pai-assistant
 
+# Check instance status (PAI Mortgage)
+curl http://localhost:8080/instance/connectionState/pai-mortgage
+
 # Test webhook routing
 curl -X POST http://localhost:3000/webhook -d '{"test": "responder"}'
 curl -X POST http://localhost:3000/webhook/pai-assistant -d '{"test": "assistant"}'
+curl -X POST http://localhost:3000/webhook/pai-mortgage -d '{"test": "mortgage"}'
+
+# Reset PAI Mortgage instance (if QR code limit reached)
+node scripts/reset-instance.js pai-mortgage
 ```
 
 ## Deployment
@@ -394,23 +511,32 @@ curl -X POST http://localhost:3000/webhook/pai-assistant -d '{"test": "assistant
 - **Volume Persistence**: Data survives container restarts
 
 ### Production Checklist:
-- [ ] Environment variables configured for both instances
+- [ ] Environment variables configured for all three instances
 - [ ] Database migrations run
-- [ ] Both Evolution API instances created
-- [ ] Webhook URLs configured correctly
-- [ ] Both WhatsApp devices connected
-- [ ] Assistant settings configured for both
+- [ ] All Evolution API instances created (aipbx, pai-assistant, pai-mortgage)
+- [ ] Webhook URLs configured correctly for all instances
+- [ ] All three WhatsApp devices connected
+- [ ] Assistant settings configured for all assistants
 - [ ] QR code access secured
 - [ ] Monitoring and logging enabled
+- [ ] PAI Mortgage instance reset script available
+- [ ] OpenAI API key properly configured for all services
 
 ## Recent Updates (September 2025)
 
-- ✅ **Dual Assistant Architecture**: PAI Responder + PAI Assistant
-- ✅ **Multi-Instance Evolution Service**: Manages both WhatsApp connections
+- ✅ **PAI Mortgage Assistant Launch** (September 17, 2025): Fully operational mortgage qualification assistant
+- ✅ **OpenAI API Integration Fixes**: Resolved environment variable override issues
+- ✅ **Evolution API Authentication Fix**: Fixed webhook configuration and API key mismatches
+- ✅ **Triple Assistant Architecture**: PAI Responder + PAI Assistant + PAI Mortgage
+- ✅ **Instance Reset Capabilities**: Automated QR code limit recovery with `reset-instance.js`
+- ✅ **Enhanced Webhook Routing**: Multi-instance message processing pipeline
+- ✅ **Bilingual Support**: English/Spanish automatic language detection for PAI Mortgage
+- ✅ **Comprehensive Logging**: Detailed debugging and error tracking across all services
+- ✅ **Multi-Instance Evolution Service**: Manages three WhatsApp connections
 - ✅ **Repository Reorganization**: Clean folder structure with proper separation
 - ✅ **Comprehensive Documentation**: JSDoc comments on all service files
 - ✅ **Docker Infrastructure**: Full containerization with health checks
-- ✅ **Server-Side QR Pages**: JavaScript-free QR code display
+- ✅ **Server-Side QR Pages**: JavaScript-free QR code display for all instances
 - ✅ **Management Scripts**: Easy deployment and monitoring
 - ✅ **Advanced Message Processing**: Intent parsing and query handling
 - ✅ **Database Service Layer**: Optimized message retrieval and search
@@ -419,15 +545,20 @@ curl -X POST http://localhost:3000/webhook/pai-assistant -d '{"test": "assistant
 
 ### Common Commands for Debugging:
 ```bash
-# Check Evolution API status (both instances)
+# Check Evolution API status (all instances)
 curl http://localhost:8080/instance/connectionState/aipbx
 curl http://localhost:8080/instance/connectionState/pai-assistant
+curl http://localhost:8080/instance/connectionState/pai-mortgage
 
 # Test webhook endpoints
 curl http://localhost:3000/api/whatsapp/status
+curl http://localhost:3000/webhook/pai-mortgage
 
 # Check assistant configurations
 curl http://localhost:3000/api/assistant/config
+
+# Reset PAI Mortgage instance if needed
+node scripts/reset-instance.js pai-mortgage
 
 # Monitor logs by service
 docker-compose logs evolution-api
@@ -435,6 +566,12 @@ docker-compose logs ai-pbx-backend
 
 # View real-time message processing
 tail -f logs/combined.log | grep "Message processing"
+tail -f logs/combined.log | grep "PAI Mortgage"
+
+# Test PAI Mortgage webhook
+curl -X POST http://localhost:3000/webhook/pai-mortgage \
+  -H "Content-Type: application/json" \
+  -d '{"key":{"id":"test","remoteJid":"test@s.whatsapp.net","fromMe":false},"message":{"conversation":"Test mortgage query"},"pushName":"Test User"}'
 ```
 
 ### Docker Management:
@@ -452,4 +589,4 @@ docker-compose ps
 docker-compose down -v
 ```
 
-This guide provides comprehensive context for any Claude session to understand and work effectively with the dual assistant PAI System.
+This guide provides comprehensive context for any Claude session to understand and work effectively with the triple assistant PAI System, including the newly operational PAI Mortgage assistant with all recent fixes and improvements.

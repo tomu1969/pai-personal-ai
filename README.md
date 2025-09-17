@@ -4,12 +4,14 @@
 
 ## 🚀 Status: Fully Operational (September 2025)
 
+✅ **Triple Assistant System** - PAI Responder, PAI Assistant, PAI Mortgage  
 ✅ **Complete WhatsApp Integration** - Evolution API v2.0.9  
 ✅ **AI-Powered Entity Extraction** - OpenAI GPT with structured queries  
 ✅ **Real-time Chat Interface** - React + Socket.io  
 ✅ **Smart Assistant Configuration** - Customizable AI behavior  
 ✅ **Intelligent Database Queries** - Natural language to SQL  
 ✅ **Connection Monitoring** - Live WhatsApp status tracking  
+✅ **Mortgage Qualification System** - Bilingual mortgage guidance assistant  
 
 ## ✨ Key Features
 
@@ -18,6 +20,7 @@
 - **Multiple Intent Types**: `message_query`, `contact_query`, `conversation_query`, `summary`
 - **Smart Responses**: AI-powered responses using real database results
 - **Natural Language Understanding**: "what messages have I received in the last 30 minutes?"
+- **Mortgage Qualification**: AI-powered mortgage assessment and guidance (English/Spanish)
 
 ### 💬 **Modern Chat Interface**
 - Real-time WhatsApp-style messaging
@@ -40,22 +43,24 @@
 ## 🏗️ Architecture
 
 ```
-WhatsApp ↔ Evolution API ↔ Node.js Backend ↔ React Frontend
-                             ↓
-                      AI Entity Extraction
-                             ↓
-                    PostgreSQL + Query Engine
-                             ↓
-                        OpenAI GPT Response
+WhatsApp Device 1 (PAI Responder) ↔ Evolution API Instance 1 ↔ AI PBX Backend ↔ React Frontend
+WhatsApp Device 2 (PAI Assistant) ↔ Evolution API Instance 2 ↗         ↓
+WhatsApp Device 3 (PAI Mortgage) ↔ Evolution API Instance 3 ↗ PostgreSQL Database
+                                                                        ↓
+                                                               AI Entity Extraction
+                                                                        ↓
+                                                                OpenAI GPT Response
 ```
 
 ### Core Components
 
+- **Triple Assistant System**: PAI Responder, PAI Assistant, PAI Mortgage
 - **Entity Extraction Service**: Converts natural language to structured entities
 - **Query Builder**: Transforms entities into optimized database queries  
 - **Message Retrieval**: Executes queries and formats results for AI
 - **Real-time WebSocket**: Instant message broadcasting
 - **Assistant Handler**: Orchestrates AI processing pipeline
+- **Multi-Instance Manager**: Handles three separate WhatsApp connections
 
 ## 🚀 Quick Start
 
@@ -274,6 +279,15 @@ node chat.js
 - `conversation_updated` - Conversation changes
 
 ## 📈 Recent Updates (September 2025)
+
+✅ **v1.2.0 - PAI Mortgage Assistant Launch** (September 17, 2025)
+- 🏠 **PAI Mortgage Assistant**: Fully operational mortgage qualification system
+- 🔧 **OpenAI API Integration Fixes**: Resolved environment variable override issues
+- 🛠️ **Evolution API Authentication Fix**: Fixed webhook configuration and API key mismatches
+- 🌐 **Bilingual Support**: English/Spanish automatic language detection for mortgage guidance
+- 🔄 **Instance Reset Capabilities**: Automated QR code limit recovery with reset scripts
+- 📊 **Enhanced Logging**: Comprehensive debugging and error tracking across all services
+- 🎯 **Specialized Mortgage Features**: Loan qualification, rate information, process guidance
 
 ✅ **v1.1.0 - Unified Launch System**
 - 🚀 **One-Command Launch**: Complete system startup with `./launch-pai.sh`

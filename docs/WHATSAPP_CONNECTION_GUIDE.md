@@ -1,6 +1,6 @@
 # WhatsApp Connection & Message Processing Guide
 
-Complete step-by-step guide for connecting WhatsApp to PAI and understanding how messages flow through the system.
+Complete step-by-step guide for connecting WhatsApp to PAI's triple assistant system and understanding how messages flow through the system.
 
 ## 🔧 Step-by-Step WhatsApp Connection Process
 
@@ -48,49 +48,66 @@ Complete step-by-step guide for connecting WhatsApp to PAI and understanding how
    cd docker/evolution && docker-compose up -d
    ```
 
-### **Phase 2: WhatsApp Connection**
+### **Phase 2: WhatsApp Connection (Triple Assistant)**
 
-4. **Generate QR Code**
-   - Visit: `http://localhost:8080/instance/connect/ai-pbx-instance`
-   - Evolution API generates fresh QR code
-   - QR code expires every 20 seconds, auto-refreshes
+4. **Connect PAI Responder (Main Assistant)**
+   - Visit: `http://localhost:3000/qr-responder`
+   - Scan QR code with your main WhatsApp device
+   - Handles auto-responses to all incoming messages
 
-5. **Scan QR Code with Your Phone**
-   - Open WhatsApp → Menu (3 dots) → Linked Devices
-   - Tap "Link a Device"
-   - Scan the QR code displayed in browser
-   - WhatsApp connects and shows "Connected" status
+5. **Connect PAI Assistant (Query Assistant)**
+   - Visit: `http://localhost:3000/qr-assistant`
+   - Scan QR code with a second WhatsApp device
+   - Handles message history queries and summaries
 
-6. **Verify Connection**
+6. **Connect PAI Mortgage (Mortgage Specialist)**
+   - Visit: `http://localhost:3000/qr-mortgage`
+   - Scan QR code with a third WhatsApp device
+   - Handles mortgage qualification and guidance
+
+7. **Verify All Connections**
    ```bash
-   curl -H "apikey: your-api-key" \
-        http://localhost:8080/instance/connectionState/ai-pbx-instance
+   # Check PAI Responder
+   curl -H "apikey: pai_evolution_api_key_2025" \
+        http://localhost:8080/instance/connectionState/aipbx
+   
+   # Check PAI Assistant
+   curl -H "apikey: pai_evolution_api_key_2025" \
+        http://localhost:8080/instance/connectionState/pai-assistant
+   
+   # Check PAI Mortgage
+   curl -H "apikey: pai_evolution_api_key_2025" \
+        http://localhost:8080/instance/connectionState/pai-mortgage
    ```
-   - Should return: `{"instance": {"state": "open"}}`
+   - All should return: `{"instance": {"state": "open"}}`
 
 ### **Phase 3: Assistant Configuration**
 
-7. **Enable Assistant** (via Frontend or API)
+8. **Enable Assistants** (via Frontend or API)
    - Frontend: Click gear icon → Toggle "Assistant Enabled"
    - API: `POST /api/assistant/toggle` with `{"enabled": true}`
 
-8. **Configure Assistant Settings**
-   - Assistant Name: "Pai" (customizable)
-   - Owner Name: "Tomás" (your name)
-   - System Prompt: Uses `prompts/pai_responder.md`
-   - Auto-response template: Greeting message
+9. **Configure Assistant Settings**
+   - **PAI Responder**: Uses `prompts/pai_responder.md`
+   - **PAI Assistant**: Uses `prompts/pai_assistant.md`
+   - **PAI Mortgage**: Uses `prompts/pai_mortgage.md`
+   - Owner Name: "Tomás" (your name for all assistants)
+   - Auto-response templates: Customizable greeting messages
 
 ## 📨 Message Flow: Receive → Process → Respond
 
-### **Step 1: Message Reception**
+### **Step 1: Message Reception (Multi-Instance)**
 ```
-Your Phone → WhatsApp → Evolution API → PAI Webhook
+Contact's Phone → WhatsApp → Evolution API → Instance-Specific PAI Webhook
 ```
 
 **What happens:**
-1. Someone sends you a WhatsApp message
+1. Someone sends a WhatsApp message to one of your connected numbers
 2. Evolution API receives it via WhatsApp Web protocol
-3. Evolution API POSTs webhook to: `http://localhost:3000/webhook`
+3. Evolution API POSTs webhook to the appropriate endpoint:
+   - PAI Responder: `http://localhost:3000/webhook`
+   - PAI Assistant: `http://localhost:3000/webhook/pai-assistant`
+   - PAI Mortgage: `http://localhost:3000/webhook/pai-mortgage`
 
 **Webhook payload example:**
 ```json
@@ -437,7 +454,8 @@ Now PAI will automatically respond to your WhatsApp messages using GPT intellige
 
 ---
 
-**Last Updated:** September 2025  
-**PAI Version:** 1.1.0 (Unified Launch System)  
+**Last Updated:** September 17, 2025  
+**PAI Version:** 1.2.0 (Triple Assistant System + PAI Mortgage)  
 **Evolution API:** v2.0.9  
 **Launch System:** v1.0.0
+**New Features:** PAI Mortgage Assistant, Enhanced Multi-Instance Support, OpenAI Integration Fixes

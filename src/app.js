@@ -18,6 +18,7 @@ const assistantRoutes = require('./controllers/assistant');
 const qrPageRoutes = require('./routes/qr-page');
 const qrAssistantRoutes = require('./routes/qr-assistant');
 const qrResponderRoutes = require('./routes/qr-responder');
+const qrMortgageRoutes = require('./routes/qr-mortgage');
 
 const app = express();
 
@@ -25,7 +26,14 @@ if (!fs.existsSync('logs')) {
   fs.mkdirSync('logs');
 }
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      'script-src': ["'self'", "'unsafe-inline'"]
+    }
+  }
+}));
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
     ? ['https://your-domain.com']
@@ -51,6 +59,28 @@ app.get('/pai-assistant/qr', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/pai-assistant-qr.html'));
 });
 
+// PAI Mortgage QR Code page
+app.get('/pai-mortgage/qr', (req, res) => {
+  const filePath = path.join(__dirname, '../public/pai-mortgage-qr.html');
+  logger.info('PAI Mortgage QR page requested', {
+    filePath,
+    fileExists: require('fs').existsSync(filePath),
+    publicDir: path.join(__dirname, '../public'),
+    publicDirExists: require('fs').existsSync(path.join(__dirname, '../public'))
+  });
+  
+  if (!require('fs').existsSync(filePath)) {
+    logger.error('PAI Mortgage QR HTML file not found', { filePath });
+    return res.status(404).json({
+      error: 'QR page not found',
+      message: 'PAI Mortgage QR HTML file is missing',
+      expectedPath: filePath
+    });
+  }
+  
+  res.sendFile(filePath);
+});
+
 // Test QR page
 app.get('/test-qr', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/test-qr.html'));
@@ -70,6 +100,7 @@ app.use('/api/assistant', assistantRoutes);
 app.use('/', qrPageRoutes);
 app.use('/', qrAssistantRoutes);
 app.use('/', qrResponderRoutes);
+app.use('/', qrMortgageRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({

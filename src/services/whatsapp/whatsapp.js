@@ -70,33 +70,59 @@ class WhatsAppService {
    * @returns {Promise<object>} Response from Evolution API
    */
   async sendMessage(phone, message, options = {}) {
-    try {
-      // Evolution API v2 format
-      const payload = {
-        number: phone,
-        text: message,
-        ...options,
-      };
+    const maxRetries = 5;
+    const baseDelay = 2000; // 2 seconds
+    const maxDelay = 30000; // 30 seconds
 
-      const response = await this.client.post(
-        `/message/sendText/${this.instanceId}`,
-        payload,
-      );
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Evolution API v2 format
+        const payload = {
+          number: phone,
+          text: message,
+          ...options,
+        };
 
-      logger.info('Message sent successfully', {
-        phone,
-        messageLength: message.length,
-        messageId: response.data?.key?.id,
-      });
+        const response = await this.client.post(
+          `/message/sendText/${this.instanceId}`,
+          payload,
+        );
 
-      return response.data;
-    } catch (error) {
-      logger.error('Failed to send message', {
-        phone,
-        message: error.message,
-        status: error.response?.status,
-      });
-      throw new Error(`Failed to send message: ${error.message}`);
+        logger.info('Message sent successfully', {
+          phone,
+          messageLength: message.length,
+          messageId: response.data?.key?.id,
+          attempt,
+        });
+
+        return response.data;
+      } catch (error) {
+        const isLastAttempt = attempt === maxRetries;
+        const shouldRetry = error.response?.status >= 500 || error.code === 'ECONNRESET' || error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' || error.message.includes('timeout');
+        
+        logger.error('Failed to send message', {
+          phone,
+          message: error.message,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          responseData: error.response?.data,
+          code: error.code,
+          attempt,
+          willRetry: !isLastAttempt && shouldRetry,
+        });
+
+        if (isLastAttempt || !shouldRetry) {
+          throw new Error(`Failed to send message after ${attempt} attempts: ${error.message}`);
+        }
+
+        // Calculate delay with exponential backoff and jitter
+        const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), maxDelay);
+        const jitter = delay * 0.2 * Math.random();
+        const totalDelay = delay + jitter;
+
+        logger.info(`Retrying message send in ${Math.round(totalDelay)}ms`, { phone, attempt });
+        await new Promise(resolve => setTimeout(resolve, totalDelay));
+      }
     }
   }
 
@@ -152,10 +178,9 @@ class WhatsAppService {
   async setWebhook(webhookUrl, events = ['messages.upsert']) {
     try {
       const payload = {
-        webhook: {
-          url: webhookUrl,
-          events,
-        },
+        enabled: true,
+        url: webhookUrl,
+        events,
       };
 
       const response = await this.client.post(

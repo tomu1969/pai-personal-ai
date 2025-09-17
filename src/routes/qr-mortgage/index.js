@@ -4,26 +4,26 @@ const evolutionMultiInstance = require('../../services/whatsapp/evolutionMultiIn
 const logger = require('../../utils/logger');
 
 /**
- * QR Code page for PAI Assistant
- * This instance is for users to query their messages
+ * QR Code page for PAI Mortgage
+ * This instance is for mortgage qualification and guidance
  */
-router.get('/qr-assistant', async (req, res) => {
+router.get('/qr-mortgage', async (req, res) => {
   try {
-    logger.info('PAI Assistant QR page requested');
+    logger.info('PAI Mortgage QR page requested');
     
     // Initialize if needed
     if (!evolutionMultiInstance.initialized) {
       await evolutionMultiInstance.initialize();
     }
 
-    const qrResult = await evolutionMultiInstance.getQRCode('pai-assistant');
+    const qrResult = await evolutionMultiInstance.getQRCode('pai-mortgage');
     
     // Server-side render the QR code directly
     const html = `
 <!DOCTYPE html>
 <html>
 <head>
-    <title>PAI Assistant - QR Code</title>
+    <title>PAI Mortgage - QR Code</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -31,7 +31,7 @@ router.get('/qr-assistant', async (req, res) => {
             margin: 0 auto;
             padding: 20px;
             text-align: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #2E8B57 0%, #228B22 100%);
             min-height: 100vh;
         }
         .container {
@@ -42,7 +42,7 @@ router.get('/qr-assistant', async (req, res) => {
             margin-top: 30px;
         }
         .title {
-            color: #667eea;
+            color: #2E8B57;
             margin-bottom: 10px;
             font-size: 2.5em;
             font-weight: bold;
@@ -57,7 +57,7 @@ router.get('/qr-assistant', async (req, res) => {
             padding: 30px;
             border-radius: 15px;
             margin: 30px 0;
-            border: 3px solid #667eea;
+            border: 3px solid #2E8B57;
         }
         .qr-image {
             max-width: 350px;
@@ -67,7 +67,7 @@ router.get('/qr-assistant', async (req, res) => {
         }
         .badge {
             display: inline-block;
-            background: #667eea;
+            background: #2E8B57;
             color: white;
             padding: 5px 15px;
             border-radius: 20px;
@@ -75,7 +75,7 @@ router.get('/qr-assistant', async (req, res) => {
             margin: 10px 0;
         }
         .warning {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: linear-gradient(135deg, #FF6B35 0%, #FF8E53 100%);
             color: white;
             padding: 20px;
             border-radius: 12px;
@@ -84,23 +84,27 @@ router.get('/qr-assistant', async (req, res) => {
         }
         .feature-list {
             text-align: left;
-            background: #f8f9ff;
-            border-left: 4px solid #667eea;
+            background: #f0f8f0;
+            border-left: 4px solid #2E8B57;
             padding: 20px;
             margin: 20px 0;
             border-radius: 8px;
         }
         .feature-list h4 {
-            color: #667eea;
+            color: #2E8B57;
             margin-bottom: 15px;
         }
         .feature-list ul {
             color: #555;
             line-height: 1.8;
         }
+        .feature-list ol {
+            color: #555;
+            line-height: 1.8;
+        }
         .refresh-link {
             display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #2E8B57 0%, #228B22 100%);
             color: white;
             text-decoration: none;
             padding: 12px 30px;
@@ -136,13 +140,21 @@ router.get('/qr-assistant', async (req, res) => {
             50% { opacity: 0.5; }
             100% { opacity: 1; }
         }
+        .highlight-box {
+            background: linear-gradient(135deg, #2E8B57 0%, #32CD32 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            font-weight: 500;
+        }
     </style>
     <meta http-equiv="refresh" content="30">
 </head>
 <body>
     <div class="container">
-        <h1 class="title">🤖 PAI Assistant</h1>
-        <p class="subtitle">Your Personal AI Message Query Assistant</p>
+        <h1 class="title">🏠 PAI Mortgage</h1>
+        <p class="subtitle">Your Personal AI Mortgage Qualification Assistant</p>
         
         <div class="badge">Instance: ${qrResult.instanceId}</div>
         <div class="status-indicator">
@@ -150,57 +162,84 @@ router.get('/qr-assistant', async (req, res) => {
             <span>Auto-refresh every 30 seconds</span>
         </div>
 
-        <div class="warning">
-            <strong>⚠️ IMPORTANT:</strong> Use a different WhatsApp account than your main line!
-            <br>This is the PAI Assistant line for querying your messages.
+        <div class="highlight-box">
+            <strong>🎯 GET PRE-QUALIFIED INSTANTLY!</strong>
+            <br>Connect to start your mortgage qualification journey with AI-powered guidance.
         </div>
 
         <div class="qr-box">
             <h3>📱 Scan this QR Code</h3>
-            <img class="qr-image" src="${qrResult.qrCode.base64}" alt="PAI Assistant QR Code">
+            <img class="qr-image" src="${qrResult.qrCode.base64}" alt="PAI Mortgage QR Code">
         </div>
 
         <div class="feature-list">
-            <h4>💬 What PAI Assistant Can Do:</h4>
+            <h4>💰 What PAI Mortgage Can Help With:</h4>
             <ul>
-                <li>📊 <strong>"What messages did I get today?"</strong> - Get a summary of today's messages</li>
-                <li>👤 <strong>"Show me messages from John yesterday"</strong> - Filter by contact and date</li>
-                <li>🔍 <strong>"Messages containing 'meeting' from this week"</strong> - Search by content</li>
-                <li>📅 <strong>"Messages from last Monday"</strong> - Query by specific dates</li>
-                <li>📈 <strong>"Give me a summary of this week"</strong> - Get conversation summaries</li>
+                <li>🏡 <strong>"I want to buy a $400,000 house with 20% down"</strong> - Instant qualification check</li>
+                <li>📊 <strong>"What can I qualify for with 720 credit score?"</strong> - Loan amount estimates</li>
+                <li>💵 <strong>"My income is $80k, what's my limit?"</strong> - Affordability analysis</li>
+                <li>📈 <strong>"What are current mortgage rates?"</strong> - Real-time rate information</li>
+                <li>⚖️ <strong>"Compare FHA vs conventional loans"</strong> - Loan program comparison</li>
+                <li>📋 <strong>"What documents do I need?"</strong> - Required documentation checklist</li>
+                <li>🧮 <strong>"Calculate payment for $300k at 7%"</strong> - Mortgage calculations</li>
+                <li>🔄 <strong>"Explain the mortgage process"</strong> - Step-by-step guidance</li>
+            </ul>
+        </div>
+
+        <div class="feature-list">
+            <h4>📋 Qualification Information I Can Help Collect:</h4>
+            <ul>
+                <li>💳 <strong>Credit Score</strong> - Current FICO or VantageScore</li>
+                <li>💰 <strong>Annual Income</strong> - Gross yearly earnings</li>
+                <li>🏠 <strong>Property Value/Loan Amount</strong> - Purchase price or loan needed</li>
+                <li>💵 <strong>Down Payment</strong> - Available cash for down payment</li>
+                <li>📊 <strong>Debt-to-Income Ratio</strong> - Monthly debt obligations</li>
+                <li>🏘️ <strong>Property Type</strong> - Single family, condo, etc.</li>
+                <li>📍 <strong>Location</strong> - State/city for local requirements</li>
             </ul>
         </div>
 
         <div class="feature-list">
             <h4>🚀 How to Connect:</h4>
             <ol>
-                <li>Open WhatsApp on your <strong>secondary device</strong></li>
+                <li>Open WhatsApp on your <strong>device</strong></li>
                 <li>Go to <strong>Settings</strong> → <strong>Linked Devices</strong></li>
                 <li>Tap <strong>"Link a Device"</strong></li>
                 <li>Scan the QR code above</li>
-                <li>Start messaging for instant AI-powered queries!</li>
+                <li>Start your mortgage qualification journey!</li>
             </ol>
         </div>
 
-        <a href="/qr-assistant" class="refresh-link">🔄 Refresh QR Code</a>
+        <div class="feature-list">
+            <h4>🎯 Sample Conversations:</h4>
+            <ul>
+                <li><strong>"I want to buy my first home"</strong> - Get started with basic guidance</li>
+                <li><strong>"750 credit score, $100k income, need $500k loan"</strong> - Quick qualification</li>
+                <li><strong>"What's better for me: FHA or conventional?"</strong> - Loan comparison</li>
+                <li><strong>"How much house can I afford?"</strong> - Affordability calculation</li>
+                <li><strong>"I'm self-employed, what do I need?"</strong> - Specialized guidance</li>
+            </ul>
+        </div>
+
+        <a href="/qr-mortgage" class="refresh-link">🔄 Refresh QR Code</a>
     </div>
 </body>
 </html>`;
     
     res.send(html);
   } catch (error) {
-    logger.error('Failed to render PAI Assistant QR page', {
+    logger.error('Failed to render PAI Mortgage QR page', {
       error: error.message,
       stack: error.stack
     });
     
     res.status(500).send(`
       <html>
-        <body style="font-family: sans-serif; text-align: center; padding: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh;">
+        <body style="font-family: sans-serif; text-align: center; padding: 50px; background: linear-gradient(135deg, #2E8B57 0%, #228B22 100%); min-height: 100vh;">
           <div style="background: white; padding: 40px; border-radius: 20px; max-width: 500px; margin: 0 auto;">
             <h1 style="color: #f5576c;">Failed to Load QR Code</h1>
             <p style="color: #666;">${error.message}</p>
-            <a href="/qr-assistant" style="display: inline-block; background: #667eea; color: white; text-decoration: none; padding: 12px 30px; border-radius: 30px; margin-top: 20px;">Try Again</a>
+            <a href="/qr-mortgage" style="display: inline-block; background: #2E8B57; color: white; text-decoration: none; padding: 12px 30px; border-radius: 30px; margin-top: 20px;">Try Again</a>
           </div>
         </body>
       </html>

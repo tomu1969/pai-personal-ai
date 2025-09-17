@@ -9,6 +9,7 @@ const {
 const logger = require('../utils/logger');
 const groupService = require('../services/utils/groupService');
 const paiAssistantController = require('../controllers/paiAssistantController');
+const paiMortgageController = require('../controllers/paiMortgageController');
 
 const router = express.Router();
 
@@ -539,5 +540,15 @@ router.get('/pai-assistant/stats', paiAssistantController.getPaiAssistantStats);
 router.post('/pai-assistant/test', paiAssistantController.testPaiAssistant);
 router.post('/pai-assistant/send-test', paiAssistantController.sendTestMessage);
 router.post('/pai-assistant/clear-conversation', paiAssistantController.clearUserConversation);
+
+// PAI Mortgage management endpoints
+router.get('/pai-mortgage/qr', paiMortgageController.getPaiMortgageQR);
+router.get('/pai-mortgage/status', paiMortgageController.getPaiMortgageStatus);
+router.get('/pai-mortgage/stats', paiMortgageController.getPaiMortgageStats);
+router.post('/pai-mortgage/test', paiMortgageController.testPaiMortgage);
+router.post('/pai-mortgage/send-test', paiMortgageController.sendTestMessage);
+router.post('/pai-mortgage/clear-conversation', paiMortgageController.clearUserConversation);
+router.get('/pai-mortgage/qualification-report', paiMortgageController.getQualificationReport);
+router.get('/pai-mortgage/rates', paiMortgageController.getCurrentRates);
 
 module.exports = router;

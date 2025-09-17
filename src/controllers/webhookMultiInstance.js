@@ -1,6 +1,7 @@
 const evolutionMultiInstance = require('../services/whatsapp/evolutionMultiInstance');
 const messageProcessor = require('../services/whatsapp/messageProcessor');
 const paiAssistantWhatsApp = require('../services/ai/paiAssistantWhatsApp');
+const paiMortgageWhatsApp = require('../services/ai/paiMortgageWhatsApp');
 const logger = require('../utils/logger');
 
 /**
@@ -91,6 +92,47 @@ const handlePaiAssistantWebhook = async (req, res) => {
 };
 
 /**
+ * Handle PAI Mortgage instance webhooks
+ */
+const handlePaiMortgageWebhook = async (req, res) => {
+  try {
+    logger.info('PAI Mortgage webhook received', {
+      path: req.path,
+      ip: req.ip,
+      bodyKeys: Object.keys(req.body)
+    });
+
+    // Get PAI Mortgage instance
+    const paiInstance = evolutionMultiInstance.getInstance('pai-mortgage');
+    const instanceConfig = evolutionMultiInstance.getInstanceConfig('pai-mortgage');
+
+    // Validate webhook signature
+    const signature = req.headers['x-hub-signature-256'] || req.headers['x-signature'];
+    const rawBody = JSON.stringify(req.body);
+
+    if (!paiInstance.validateWebhookSignature(rawBody, signature)) {
+      logger.warn('Invalid webhook signature for PAI Mortgage instance', {
+        signature,
+        ip: req.ip
+      });
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+
+    // Process webhook events specifically for PAI Mortgage
+    await processPaiMortgageWebhook(req.body, paiInstance, 'pai-mortgage');
+
+    return res.status(200).json({ success: true, instance: 'pai-mortgage' });
+  } catch (error) {
+    logger.error('PAI Mortgage webhook processing error', {
+      error: error.message,
+      stack: error.stack,
+      body: req.body,
+    });
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
  * Process general webhook events
  */
 async function processWebhookEvent(webhookData, whatsappInstance, instanceAlias) {
@@ -168,6 +210,54 @@ async function processPaiAssistantWebhook(webhookData, whatsappInstance, instanc
     }
   } catch (error) {
     logger.error('Error processing PAI Assistant webhook', {
+      error: error.message,
+      instance: instanceAlias,
+      webhookData
+    });
+  }
+}
+
+/**
+ * Process PAI Mortgage specific webhook events
+ */
+async function processPaiMortgageWebhook(webhookData, whatsappInstance, instanceAlias) {
+  try {
+    // For PAI Mortgage, we primarily care about incoming messages and connection updates
+    let data = webhookData;
+    
+    // Handle different webhook formats
+    if (webhookData.data) {
+      data = webhookData.data;
+    }
+
+    // Add detailed logging to see actual webhook structure
+    logger.info('PAI Mortgage webhook data details', {
+      instance: instanceAlias,
+      dataKeys: Object.keys(data),
+      fullData: data,
+      hasConnection: !!data.connection,
+      hasInstance: !!data.instance,
+      hasState: !!data.state,
+      hasStatusReason: !!data.statusReason
+    });
+
+    // Check if this is a message event
+    if (data.key && data.message) {
+      await handlePaiMortgageMessage(data, whatsappInstance, instanceAlias);
+    } 
+    // Check if this is a connection update (could be at root level or in data.connection)
+    else if (data.connection || data.instance || data.state) {
+      await handleConnectionUpdate(data, whatsappInstance, instanceAlias);
+    } 
+    else {
+      logger.warn('Unhandled PAI Mortgage webhook event', { 
+        instance: instanceAlias,
+        dataKeys: Object.keys(data),
+        fullData: data
+      });
+    }
+  } catch (error) {
+    logger.error('Error processing PAI Mortgage webhook', {
       error: error.message,
       instance: instanceAlias,
       webhookData
@@ -295,6 +385,71 @@ async function handlePaiAssistantMessage(messageData, whatsappInstance, instance
 }
 
 /**
+ * Handle message for PAI Mortgage instance
+ */
+async function handlePaiMortgageMessage(messageData, whatsappInstance, instanceAlias) {
+  try {
+    const parsedMessage = whatsappInstance.parseWebhookMessage({ data: messageData });
+
+    if (!parsedMessage) {
+      logger.debug('Skipping invalid or self message for PAI Mortgage', { 
+        instance: instanceAlias,
+        messageData 
+      });
+      return;
+    }
+
+    logger.info('Processing message through PAI Mortgage', {
+      instance: instanceAlias,
+      phone: parsedMessage.phone,
+      messageType: parsedMessage.messageType,
+      contentLength: parsedMessage.content.length,
+      pushName: parsedMessage.pushName,
+    });
+
+    // Process through PAI Mortgage WhatsApp service
+    const result = await paiMortgageWhatsApp.processMessageWithCommands(parsedMessage);
+
+    if (result.success && result.response) {
+      // Send response back via PAI Mortgage instance
+      await evolutionMultiInstance.sendMessage('pai-mortgage', parsedMessage.phone, result.response);
+
+      logger.info('PAI Mortgage response sent successfully', {
+        instance: instanceAlias,
+        phone: parsedMessage.phone,
+        intent: result.intent,
+        responseLength: result.response.length,
+        tokensUsed: result.tokensUsed
+      });
+    } else {
+      logger.warn('PAI Mortgage failed to process message', {
+        instance: instanceAlias,
+        phone: parsedMessage.phone,
+        error: result.error || 'Unknown error'
+      });
+    }
+  } catch (error) {
+    logger.error('Error processing PAI Mortgage message', {
+      error: error.message,
+      instance: instanceAlias,
+      messageData
+    });
+
+    // Send error response to user
+    try {
+      await evolutionMultiInstance.sendMessage('pai-mortgage', 
+        parsedMessage?.phone, 
+        "I'm sorry, I encountered an error processing your mortgage inquiry. Please try again later.\n\n_PAI Mortgage Assistant_"
+      );
+    } catch (sendError) {
+      logger.error('Failed to send error response', {
+        error: sendError.message
+      });
+    }
+  }
+}
+
+/**
  * Handle message updates
  */
 async function handleMessageUpdate(data, whatsappInstance, instanceAlias) {
@@ -322,8 +477,58 @@ async function handleConnectionUpdate(data, whatsappInstance, instanceAlias) {
       instance: instanceAlias,
       connection: data.connection,
       state: data.state,
+      statusReason: data.statusReason,
       lastDisconnect: data.lastDisconnect,
+      fullData: data
     });
+
+    // Enhanced logging for statusReason 428 (precondition_required)
+    if (data.statusReason === 428) {
+      logger.warn('StatusReason 428 detected - precondition_required', {
+        instance: instanceAlias,
+        state: data.state,
+        statusReason: data.statusReason,
+        troubleshooting: {
+          description: 'This usually means WhatsApp requires device verification',
+          commonCauses: ['QR code not scanned', 'Device authentication failed', 'WhatsApp session expired'],
+          nextSteps: ['Ensure QR code is fresh', 'Try scanning with different device', 'Check WhatsApp app version']
+        }
+      });
+    }
+
+    // Handle connection instability for multi-instance setups
+    if (data.state === 'close' && data.statusReason && instanceAlias !== 'main') {
+      const evolutionMultiInstance = require('../services/whatsapp/evolutionMultiInstance');
+      
+      try {
+        const handled = await evolutionMultiInstance.handleConnectionInstability(instanceAlias, data.statusReason);
+        
+        if (handled) {
+          logger.info('Connection instability handled with logout', {
+            instance: instanceAlias,
+            statusReason: data.statusReason
+          });
+        }
+      } catch (stabilityError) {
+        logger.error('Failed to handle connection instability', {
+          instance: instanceAlias,
+          error: stabilityError.message
+        });
+      }
+    }
+
+    // Reset connection failure tracking on successful open state
+    if (data.state === 'open' && instanceAlias !== 'main') {
+      const evolutionMultiInstance = require('../services/whatsapp/evolutionMultiInstance');
+      evolutionMultiInstance.resetConnectionFailures(instanceAlias);
+      
+      logger.info('🎉 WhatsApp device successfully connected!', {
+        instance: instanceAlias,
+        state: data.state,
+        statusReason: data.statusReason,
+        message: 'Instance is now ready to receive and send messages'
+      });
+    }
 
     // TODO: Update instance connection status in database
     // This can be used to show connection status in admin panel
@@ -351,6 +556,8 @@ const handleGenericWebhook = async (req, res) => {
     // Route based on path
     if (webhookPath.includes('pai-assistant')) {
       return await handlePaiAssistantWebhook(req, res);
+    } else if (webhookPath.includes('pai-mortgage')) {
+      return await handlePaiMortgageWebhook(req, res);
     } else {
       return await handleMainWebhook(req, res);
     }
@@ -389,11 +596,14 @@ const getMultiInstanceStatus = async (req, res) => {
 module.exports = {
   handleMainWebhook,
   handlePaiAssistantWebhook,
+  handlePaiMortgageWebhook,
   handleGenericWebhook,
   getMultiInstanceStatus,
   // Export for testing
   processWebhookEvent,
   processPaiAssistantWebhook,
+  processPaiMortgageWebhook,
   handleMessageUpsert,
   handlePaiAssistantMessage,
+  handlePaiMortgageMessage,
 };

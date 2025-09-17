@@ -43,6 +43,12 @@ class EvolutionMultiInstanceService {
 
     try {
       // Register main instance (PAI Responder)
+      logger.debug('Registering main instance with config', {
+        instanceId: config.evolution.instanceId,
+        apiUrl: config.evolution.apiUrl,
+        webhookUrl: config.evolution.webhookUrl
+      });
+      
       await this.registerInstance('main', {
         instanceId: config.evolution.instanceId,
         apiUrl: config.evolution.apiUrl,
@@ -62,6 +68,17 @@ class EvolutionMultiInstanceService {
         webhookPath: '/webhook/pai-assistant',
         description: 'PAI Assistant - Query Interface Line',
         assistantType: 'pai-assistant'
+      });
+
+      // Register PAI Mortgage instance
+      await this.registerInstance('pai-mortgage', {
+        instanceId: config.evolution.paiMortgageInstanceId || 'pai-mortgage-v2',
+        apiUrl: config.evolution.apiUrl,
+        apiKey: config.evolution.apiKey,
+        webhookUrl: config.evolution.paiMortgageWebhookUrl || `${config.server.host}:${config.server.port}/webhook/pai-mortgage`,
+        webhookPath: '/webhook/pai-mortgage',
+        description: 'PAI Mortgage - Mortgage Qualification Line',
+        assistantType: 'pai-mortgage'
       });
 
       this.initialized = true;
@@ -227,7 +244,9 @@ class EvolutionMultiInstanceService {
 
       logger.info('Getting QR code for instance', {
         alias,
-        instanceId: config.instanceId
+        instanceId: config.instanceId,
+        apiUrl: config.apiUrl,
+        fullUrl: `${config.apiUrl}/instance/connect/${config.instanceId}`
       });
 
       const response = await instance.client.get(`/instance/connect/${config.instanceId}`);
@@ -336,6 +355,278 @@ class EvolutionMultiInstanceService {
         error: error.message
       });
       throw error;
+    }
+  }
+
+  /**
+   * Delete Evolution API instance
+   */
+  async deleteInstance(alias) {
+    try {
+      const instance = this.getInstance(alias);
+      const config = this.getInstanceConfig(alias);
+
+      logger.info('Deleting Evolution API instance', {
+        alias,
+        instanceId: config.instanceId
+      });
+
+      const response = await instance.client.delete(`/instance/delete/${config.instanceId}`);
+
+      logger.info('Evolution API instance deleted', {
+        alias,
+        instanceId: config.instanceId,
+        success: response.data.status === 'SUCCESS'
+      });
+
+      return response.data;
+    } catch (error) {
+      logger.error('Failed to delete Evolution API instance', {
+        alias,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Recreate Evolution API instance (delete and create new)
+   */
+  async recreateInstance(alias, instanceConfig = {}) {
+    try {
+      logger.info('Recreating Evolution API instance', {
+        alias,
+        instanceId: this.getInstanceConfig(alias).instanceId
+      });
+
+      // Delete existing instance
+      try {
+        await this.deleteInstance(alias);
+        
+        // Wait a moment for deletion to process
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (deleteError) {
+        logger.warn('Instance deletion failed (may not exist)', {
+          alias,
+          error: deleteError.message
+        });
+      }
+
+      // Create new instance
+      const createResult = await this.createInstance(alias, instanceConfig);
+
+      // Set webhook
+      await this.setWebhook(alias);
+
+      logger.info('Evolution API instance recreated successfully', {
+        alias,
+        instanceId: this.getInstanceConfig(alias).instanceId
+      });
+
+      return createResult;
+    } catch (error) {
+      logger.error('Failed to recreate Evolution API instance', {
+        alias,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Reset instance when QR code limit is reached
+   */
+  async resetInstanceOnQRLimit(alias) {
+    try {
+      logger.info('Resetting instance due to QR code limit', {
+        alias,
+        instanceId: this.getInstanceConfig(alias).instanceId
+      });
+
+      // Recreate the instance
+      const result = await this.recreateInstance(alias);
+
+      logger.info('Instance reset completed for QR limit issue', {
+        alias,
+        instanceId: this.getInstanceConfig(alias).instanceId
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('Failed to reset instance for QR limit', {
+        alias,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Check if error is QR code limit related
+   */
+  isQRCodeLimitError(error) {
+    if (!error) return false;
+    
+    const errorMessage = error.message || '';
+    const errorResponse = error.response?.data?.message || '';
+    
+    return errorMessage.includes('QR code limit') || 
+           errorMessage.includes('qr limit') ||
+           errorResponse.includes('QR code limit') ||
+           errorResponse.includes('qr limit');
+  }
+
+  /**
+   * Check if connection is unstable (rapid cycling)
+   */
+  isConnectionUnstable(statusReason) {
+    return statusReason === 440 || statusReason === 428 || statusReason === 503;
+  }
+
+  /**
+   * Track connection failures for an instance
+   */
+  trackConnectionFailure(alias) {
+    if (!this.connectionFailures) {
+      this.connectionFailures = new Map();
+    }
+    
+    const failures = this.connectionFailures.get(alias) || { count: 0, lastFailure: null };
+    failures.count++;
+    failures.lastFailure = Date.now();
+    this.connectionFailures.set(alias, failures);
+    
+    logger.warn('Connection failure tracked', {
+      alias,
+      failureCount: failures.count,
+      lastFailure: new Date(failures.lastFailure).toISOString()
+    });
+    
+    return failures.count;
+  }
+
+  /**
+   * Reset connection failure tracking
+   */
+  resetConnectionFailures(alias) {
+    if (this.connectionFailures) {
+      this.connectionFailures.delete(alias);
+      logger.info('Connection failure tracking reset', { alias });
+    }
+  }
+
+  /**
+   * Logout instance to clear corrupted session
+   */
+  async logoutInstance(alias) {
+    try {
+      const instance = this.getInstance(alias);
+      const config = this.getInstanceConfig(alias);
+
+      logger.info('Logging out instance to clear corrupted session', {
+        alias,
+        instanceId: config.instanceId
+      });
+
+      const response = await instance.client.delete(`/instance/logout/${config.instanceId}`);
+
+      logger.info('Instance logout completed', {
+        alias,
+        instanceId: config.instanceId,
+        success: response.status < 400
+      });
+
+      // Reset failure tracking after successful logout
+      this.resetConnectionFailures(alias);
+
+      return response.data;
+    } catch (error) {
+      logger.error('Failed to logout instance', {
+        alias,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Handle connection instability with automatic recovery
+   */
+  async handleConnectionInstability(alias, statusReason) {
+    try {
+      if (!this.isConnectionUnstable(statusReason)) {
+        return false;
+      }
+
+      const failureCount = this.trackConnectionFailure(alias);
+      
+      logger.warn('Connection instability detected', {
+        alias,
+        statusReason,
+        failureCount,
+        statusMap: {
+          440: 'timeout',
+          428: 'precondition_required', 
+          503: 'service_unavailable'
+        }[statusReason] || 'unknown'
+      });
+
+      // Special handling for statusReason 428 (precondition_required)
+      if (statusReason === 428 && failureCount >= 5) {
+        const config = this.getInstanceConfig(alias);
+        logger.warn('StatusReason 428 persistent - attempting instance recreation', {
+          alias,
+          instanceId: config.instanceId,
+          failureCount,
+          action: 'recreate_instance'
+        });
+
+        try {
+          await this.recreateInstance(alias);
+          logger.info('Instance recreated due to persistent 428 errors', {
+            alias,
+            instanceId: config.instanceId
+          });
+          return true;
+        } catch (recreateError) {
+          logger.error('Failed to recreate instance for 428 error', {
+            alias,
+            error: recreateError.message
+          });
+        }
+      }
+
+      // After 3 failures in rapid succession, logout to clear session
+      if (failureCount >= 3) {
+        const config = this.getInstanceConfig(alias);
+        const failures = this.connectionFailures.get(alias);
+        
+        // Only logout if failures are within the last 30 seconds (rapid cycling)
+        const timeSinceFirstFailure = Date.now() - (failures.lastFailure - ((failureCount - 1) * 1000));
+        
+        if (timeSinceFirstFailure < 30000) {
+          logger.warn('Rapid connection cycling detected, initiating logout', {
+            alias,
+            instanceId: config.instanceId,
+            failureCount,
+            timeSinceFirstFailure: `${Math.round(timeSinceFirstFailure / 1000)}s`
+          });
+
+          await this.logoutInstance(alias);
+          return true;
+        } else {
+          // Reset if failures are spread over time (not rapid cycling)
+          this.resetConnectionFailures(alias);
+        }
+      }
+
+      return false;
+    } catch (error) {
+      logger.error('Failed to handle connection instability', {
+        alias,
+        error: error.message
+      });
+      return false;
     }
   }
 

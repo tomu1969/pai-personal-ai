@@ -102,15 +102,31 @@ app.use('/', qrAssistantRoutes);
 app.use('/', qrResponderRoutes);
 app.use('/', qrMortgageRoutes);
 
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: config.server.nodeEnv,
-    // eslint-disable-next-line global-require
-    version: require('../package.json').version,
-  });
+app.get('/health', async (req, res) => {
+  try {
+    const basicHealth = {
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: config.server.nodeEnv,
+      // eslint-disable-next-line global-require
+      version: require('../package.json').version,
+    };
+
+    // Include system health if initializer is available
+    if (req.app.locals.systemInitializer) {
+      const systemHealth = await req.app.locals.systemInitializer.healthCheck();
+      basicHealth.system = systemHealth;
+    }
+
+    res.status(200).json(basicHealth);
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 app.use((req, res) => {
@@ -135,13 +151,20 @@ const startServer = async () => {
   const realtimeService = require('./services/utils/realtime');
   realtimeService.initialize(server);
 
-  // Initialize multi-instance service
-  const evolutionMultiInstance = require('./services/whatsapp/evolutionMultiInstance');
+  // Initialize system with comprehensive startup validation
+  const SystemInitializer = require('./services/startup/systemInitializer');
+  const systemInitializer = new SystemInitializer();
+  
+  // Store initializer for health checks regardless of initialization result
+  app.locals.systemInitializer = systemInitializer;
+  
   try {
-    await evolutionMultiInstance.initialize();
-    logger.info('Multi-instance service initialized successfully');
+    await systemInitializer.initialize();
+    logger.info('System initialization completed successfully');
   } catch (error) {
-    logger.error('Failed to initialize multi-instance service', { error: error.message });
+    logger.error('System initialization failed', { error: error.message });
+    // Continue with startup even if some initialization fails
+    logger.warn('Continuing with partial initialization - system management still available...');
   }
 
   const gracefulShutdown = (signal) => {

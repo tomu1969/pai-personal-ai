@@ -26,6 +26,7 @@ const aiService = require('../ai/assistantAI');
 const newAIService = require('../ai');
 const whatsappAssistant = require('../ai/whatsapp-assistant');
 const WhatsAppService = require('./whatsapp');
+const evolutionMultiInstance = require('./evolutionMultiInstance');
 const { Message } = require('../../models');
 const logger = require('../../utils/logger');
 
@@ -50,9 +51,13 @@ class MessageProcessorService {
   /**
    * Initialize message processor with WhatsApp service and processing queue
    * @constructor
+   * @param {object} options - Configuration options
+   * @param {object} options.whatsappService - Optional WhatsApp service instance
+   * @param {string} options.instanceAlias - Evolution instance alias for routing
    */
-  constructor() {
-    this.whatsappService = new WhatsAppService();
+  constructor(options = {}) {
+    this.whatsappService = options.whatsappService || new WhatsAppService();
+    this.instanceAlias = options.instanceAlias || 'main';
     this.processingQueue = [];
     this.isProcessing = false;
   }
@@ -399,8 +404,20 @@ class MessageProcessorService {
         responseText = this.generateContextualFallback(parsedMessage, contact, analysis);
       }
 
-      // Send response via WhatsApp
-      const sendResult = await this.whatsappService.sendMessage(contact.phone, responseText);
+      // Send response via WhatsApp using the correct instance
+      let sendResult;
+      if (this.instanceAlias !== 'main') {
+        // Use multi-instance service for non-main instances
+        sendResult = await evolutionMultiInstance.sendMessage(this.instanceAlias, contact.phone, responseText);
+        logger.info('Message sent via multi-instance service', {
+          instance: this.instanceAlias,
+          phone: contact.phone,
+          responseLength: responseText.length
+        });
+      } else {
+        // Use legacy WhatsApp service for main instance
+        sendResult = await this.whatsappService.sendMessage(contact.phone, responseText);
+      }
 
       // Save assistant response to database
       const assistantMessage = await conversationService.saveAssistantMessage(

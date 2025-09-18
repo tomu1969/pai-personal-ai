@@ -10,6 +10,7 @@ const logger = require('../utils/logger');
 const groupService = require('../services/utils/groupService');
 const paiAssistantController = require('../controllers/paiAssistantController');
 const paiMortgageController = require('../controllers/paiMortgageController');
+const systemController = require('../controllers/systemController');
 
 const router = express.Router();
 
@@ -550,5 +551,11 @@ router.post('/pai-mortgage/send-test', paiMortgageController.sendTestMessage);
 router.post('/pai-mortgage/clear-conversation', paiMortgageController.clearUserConversation);
 router.get('/pai-mortgage/qualification-report', paiMortgageController.getQualificationReport);
 router.get('/pai-mortgage/rates', paiMortgageController.getCurrentRates);
+
+// System management endpoints
+router.get('/system/status', systemController.getSystemStatus);
+router.post('/system/reinitialize', systemController.reinitializeSystem);
+router.post('/system/instance/:alias/reinitialize', systemController.reinitializeInstance);
+router.get('/system/pai-mortgage/diagnostics', systemController.getPaiMortgageStatus);
 
 module.exports = router;

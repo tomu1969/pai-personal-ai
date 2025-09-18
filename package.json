@@ -20,7 +20,9 @@
     "format": "prettier --write .",
     "migrate": "sequelize-cli db:migrate",
     "migrate:undo": "sequelize-cli db:migrate:undo",
-    "seed": "sequelize-cli db:seed:all"
+    "seed": "sequelize-cli db:seed:all",
+    "init-pai-mortgage": "node scripts/initialize-pai-mortgage.js",
+    "system-status": "curl -s http://localhost:3000/api/system/status | jq ."
   },
   "keywords": [
     "personal-ai",

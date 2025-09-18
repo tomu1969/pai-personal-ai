@@ -1,5 +1,5 @@
 const evolutionMultiInstance = require('../services/whatsapp/evolutionMultiInstance');
-const messageProcessor = require('../services/whatsapp/messageProcessor');
+const MessageProcessor = require('../services/whatsapp/messageProcessor');
 const paiAssistantWhatsApp = require('../services/ai/paiAssistantWhatsApp');
 const paiMortgageWhatsApp = require('../services/ai/paiMortgageWhatsApp');
 const logger = require('../utils/logger');
@@ -293,7 +293,8 @@ async function handleMessageUpsert(data, whatsappInstance, instanceAlias) {
       });
 
       // Process through the main message processor (PAI Responder)
-      const result = await messageProcessor.processMessage(parsedMessage);
+      const mainMessageProcessor = new MessageProcessor({ instanceAlias: 'main' });
+      const result = await mainMessageProcessor.processMessage(parsedMessage);
 
       if (result.processed) {
         logger.info('Main instance message processing completed', {

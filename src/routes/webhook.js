@@ -27,15 +27,57 @@ router.post('/pai-mortgage/connection-update', webhookMultiInstance.handlePaiMor
 // Main webhook endpoint for Evolution API (backward compatibility)
 router.post('/', webhookController.handleWebhook);
 
-// Evolution API v2 specific webhook endpoints
-router.post('/messages-upsert', webhookController.handleWebhook);
-router.post('/messages-update', webhookController.handleWebhook);
+// Evolution API v2 specific webhook endpoints (main instance only)
+router.post('/messages-upsert', (req, res, next) => {
+  // Check if this is from a specific instance
+  const instance = req.body?.instance;
+  if (instance === 'pai-assistant') {
+    return webhookMultiInstance.handlePaiAssistantWebhook(req, res);
+  } else if (instance === 'pai-mortgage-fresh') {
+    return webhookMultiInstance.handlePaiMortgageWebhook(req, res);
+  }
+  // Default to main handler
+  return webhookController.handleWebhook(req, res);
+});
+router.post('/messages-update', (req, res, next) => {
+  const instance = req.body?.instance;
+  if (instance === 'pai-assistant') {
+    return webhookMultiInstance.handlePaiAssistantWebhook(req, res);
+  } else if (instance === 'pai-mortgage-fresh') {
+    return webhookMultiInstance.handlePaiMortgageWebhook(req, res);
+  }
+  return webhookController.handleWebhook(req, res);
+});
 router.post('/messages-delete', webhookController.handleWebhook);
-router.post('/chats-update', webhookController.handleWebhook);
+router.post('/chats-update', (req, res, next) => {
+  const instance = req.body?.instance;
+  if (instance === 'pai-assistant') {
+    return webhookMultiInstance.handlePaiAssistantWebhook(req, res);
+  } else if (instance === 'pai-mortgage-fresh') {
+    return webhookMultiInstance.handlePaiMortgageWebhook(req, res);
+  }
+  return webhookController.handleWebhook(req, res);
+});
 router.post('/contacts-update', webhookController.handleWebhook);
 router.post('/presence-update', webhookController.handleWebhook);
-router.post('/connection-update', webhookController.handleWebhook);
-router.post('/send-message', webhookController.handleWebhook);
+router.post('/connection-update', (req, res, next) => {
+  const instance = req.body?.instance;
+  if (instance === 'pai-assistant') {
+    return webhookMultiInstance.handlePaiAssistantWebhook(req, res);
+  } else if (instance === 'pai-mortgage-fresh') {
+    return webhookMultiInstance.handlePaiMortgageWebhook(req, res);
+  }
+  return webhookController.handleWebhook(req, res);
+});
+router.post('/send-message', (req, res, next) => {
+  const instance = req.body?.instance;
+  if (instance === 'pai-assistant') {
+    return webhookMultiInstance.handlePaiAssistantWebhook(req, res);
+  } else if (instance === 'pai-mortgage-fresh') {
+    return webhookMultiInstance.handlePaiMortgageWebhook(req, res);
+  }
+  return webhookController.handleWebhook(req, res);
+});
 router.post('/qrcode-updated', webhookController.handleWebhook);
 router.post('/messages-set', webhookController.handleWebhook);
 router.post('/chats-set', webhookController.handleWebhook);

@@ -43,6 +43,29 @@ except Exception as e:
     llm = None
 
 
+def calculate_affordability_range(down_payment: float) -> dict:
+    """
+    Calculate property price range based on down payment.
+    Minimum 25% down required, so max price = down_payment / 0.25
+    """
+    try:
+        max_price = down_payment / 0.25
+        comfortable_min = max_price * 0.6  # 60% of max
+        comfortable_max = max_price * 0.85  # 85% of max
+        
+        return {
+            "max_price": max_price,
+            "comfortable_range": (comfortable_min, comfortable_max),
+            "message": f"With ${down_payment:,.0f} down, you could afford properties from ${comfortable_min:,.0f} to ${max_price:,.0f}. Most buyers find the ${comfortable_min:,.0f}-${comfortable_max:,.0f} range most comfortable."
+        }
+    except (TypeError, ValueError, ZeroDivisionError):
+        return {
+            "max_price": 0,
+            "comfortable_range": (0, 0),
+            "message": "Let me know your down payment amount and I can help calculate your affordable range."
+        }
+
+
 def generate_conversational_response(state: GraphState) -> dict:
     """
     Unified LLM-based response system that handles any user input naturally.
@@ -128,57 +151,90 @@ def generate_conversational_response(state: GraphState) -> dict:
         print(f"  - Income Docs: {state.get('can_demonstrate_income')}")
         print(f"  - Reserves: {state.get('has_reserves')}")
         
-        # Define what we need for each question - THESE ARE THE ONLY 8 QUESTIONS
+        # Define what we need for each question - NEW ORDER: Down payment first!
+        # NEW ORDER: Q1=down payment, Q2=location, Q3=purpose, Q4=price, Q5-8=same
         question_objectives = {
-            1: "ONLY ask: What city/state for property? (If already have location, SKIP TO Q2)",
-            2: "ONLY ask: Personal home, second home, or investment? (If already have purpose, SKIP TO Q3)",  
-            3: "ONLY ask: What's the property price range? (If already have price, SKIP TO Q4)",
-            4: "ONLY ask: How much for down payment? (If already have down payment, SKIP TO Q5)",
-            5: "ONLY ask: Do you have valid passport AND visa? (If already have both, SKIP TO Q6)",
-            6: "ONLY ask: Are you currently in USA or your home country? (If already have location, SKIP TO Q7)",
-            7: "ONLY ask: Can you provide income documentation (bank statements/CPA letter)? (If already have answer, SKIP TO Q8)",
-            8: "ONLY ask: Do you have 6-12 months of reserves? (If already have answer, DONE)"
+            1: "Get down payment amount (what they have saved)",
+            2: "Get city/state where they want to buy",
+            3: "Get loan purpose (personal home, second home, or investment)",  
+            4: "Get property price range (offer to help calculate if they're unsure)",
+            5: "Get passport and visa status",
+            6: "Get current location (USA or home country)",
+            7: "Get income documentation capability",
+            8: "Get reserves status (6-12 months)"
         }
         
         current_objective = question_objectives.get(current_q, "All questions completed")
         
+        # Calculate affordability if we have down payment
+        affordability_info = ""
+        if state.get("down_payment") and current_q == 4:
+            calc = calculate_affordability_range(state.get("down_payment"))
+            affordability_info = f"\nAFFORDABILITY CONTEXT: {calc['message']}"
+        
         prompt = f"""You are a warm, professional mortgage loan officer helping a client with Foreign Nationals loan pre-approval. 
 
-🚨 CRITICAL: There are EXACTLY 8 questions to ask IN ORDER. You are currently on Question #{current_q}.
+📋 CONVERSATION STATE:
+- Currently on Question #{current_q} of 8
+- Task: {current_objective}
 
 RECENT CONVERSATION:
 {recent_messages}
 
-✅ WHAT WE ALREADY HAVE (NEVER ASK FOR THESE AGAIN):
+✅ INFORMATION ALREADY COLLECTED (NEVER ask for these again):
 {known_context}
-Already collected: {', '.join(collected_data) if collected_data else 'nothing yet'}
-
-📍 YOUR CURRENT TASK (Question #{current_q}): {current_objective}
+Already have: {', '.join(collected_data) if collected_data else 'nothing yet'}
+{affordability_info}
 
 CLIENT'S LATEST MESSAGE: "{last_user_message}"
 
-🚨 MANDATORY RULES:
-1. NEVER EVER ask for information already in the "WHAT WE ALREADY HAVE" list above
-2. ONLY ask the specific question for Question #{current_q} - DO NOT ask about other questions
-3. DO NOT ask about "annual income" - that's not one of the 8 questions
-4. If client mentions a number with "k" or "saved", that's the DOWN PAYMENT (not income)
-5. If they answer your current question, EXTRACT IT and move to next question
-6. Keep responses under 2 sentences
-7. Be warm but stay focused on the current question only
+💬 HOW TO RESPOND:
 
-EXTRACTION NOTES:
-- "1 mill", "1M", "one million" = 1000000 for property price
-- "300k saved", "i have 300k", "300 thousand" = down_payment: 300000 (numbers with "saved" or "have" are DOWN PAYMENT)
-- "miami", "coconut grove" = property_city: Miami
-- "florida", "FL" = property_state: Florida
-- "investment", "rental" = loan_purpose: Investment
-- "yes" to "passport and visa" = has_valid_passport: True, has_valid_visa: True
+IF CLIENT IS ASKING A QUESTION (like "how much can I afford?", "what does reserves mean?"):
+1. Answer their question helpfully and conversationally
+2. If asking about affordability, use the AFFORDABILITY CONTEXT above
+3. Then naturally guide back: "Now, let's continue with..."
+4. Set ADVANCE: false (stay on current question)
 
-CRITICAL EXTRACTION RULES:
-- When user says "I have $X" or "$X saved", that's DOWN PAYMENT, not income!
-- Extract city names as "property_city: [city]"
-- Extract state names as "property_state: [state]"
-- If user says "yes" to passport/visa question, extract BOTH as true
+IF CLIENT PROVIDES INFO (answering your question):
+1. Acknowledge warmly: "Perfect!", "Great!", "Excellent!"
+2. Extract the information
+3. If appropriate, provide helpful context (like affordability range)
+4. Ask the next question or move forward
+5. Set ADVANCE: true
+
+IF CLIENT SAYS "I DON'T KNOW" or "NOT SURE" (especially for Question 4 - property price):
+1. Offer to help: "Let me help you figure that out!"
+2. Use their down payment to calculate range (see AFFORDABILITY CONTEXT)
+3. Ask if that range works for them
+4. Set ADVANCE: false (until they give a range)
+
+IF CLIENT PROVIDES MULTIPLE PIECES OF INFO AT ONCE:
+1. Extract ALL of them
+2. Acknowledge what they shared
+3. Ask for the next missing piece
+
+CORE RULES:
+✓ Be conversational and helpful - answer questions when asked
+✓ Never repeat questions for info already collected
+✓ Extract any info provided, even if out of order
+✓ Keep responses natural and under 3 sentences
+✓ Use their name or details to personalize
+
+EXTRACTION GUIDE (Question #{current_q}):
+Q1 (down payment): "300k saved", "i have 300k", "$300,000" → down_payment: 300000
+Q2 (location): "miami", "coconut grove" → property_city: Miami | "florida", "FL" → property_state: Florida
+Q3 (purpose): "investment", "rental property" → loan_purpose: Investment
+Q4 (price): "1 mill", "1M", "$1,000,000" → property_price: 1000000
+Q5 (docs): "yes" → has_valid_passport: True, has_valid_visa: True
+Q6 (location): "in US", "USA" → current_location: USA | "home country", "Colombia" → current_location: Origin Country
+Q7 (income): "yes", "I can" → can_demonstrate_income: True
+Q8 (reserves): "yes", "I have reserves" → has_reserves: True
+
+CRITICAL:
+- Numbers with "k" are thousands: 300k = 300000
+- "I have X" or "saved X" = DOWN PAYMENT (not income!)
+- Extract ANY info provided, even if not the current question
 
 YOU MUST RESPOND WITH EXACTLY THIS FORMAT (all 3 lines required):
 RESPONSE: [Your natural, conversational response - DO NOT re-ask for info already collected]

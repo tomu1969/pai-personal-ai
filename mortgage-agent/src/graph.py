@@ -53,11 +53,11 @@ def process_conversation_step(state: GraphState) -> GraphState:
             no_words = ['no', 'nope', 'not', 'later', 'non', 'nein', 'niet', 'não']
             
             if any(word in user_lower for word in yes_words):
-                # User confirmed, start with first question
+                # User confirmed, start with first question (DOWN PAYMENT - what they know!)
                 state["current_question"] = 1
                 state["messages"].append({
                     "role": "assistant",
-                    "content": "Great! Let's begin. In what city or state of the U.S. are you interested in buying the property?"
+                    "content": "Great! Let's start with what you know best - your budget. How much do you have saved for a down payment?"
                 })
                 return state
             elif any(word in user_lower for word in no_words):
@@ -143,20 +143,21 @@ def process_conversation_step(state: GraphState) -> GraphState:
             print(f">>> Advancing from Q{current_q} to Q{current_q + 1} (LLM indicated)")
             state["current_question"] = current_q + 1
         # Safety check: If we have the data for current question but didn't advance, force advance
+        # NEW ORDER: Q1=down payment, Q2=location, Q3=purpose, Q4=price, Q5-8=same
         elif current_q < 8:
             should_advance = False
-            if current_q == 1 and (state.get("property_city") or state.get("property_state")):
+            if current_q == 1 and state.get("down_payment"):
                 should_advance = True
-                print(f">>> Q1 Check: Have location data - City: {state.get('property_city')}, State: {state.get('property_state')}")
-            elif current_q == 2 and state.get("loan_purpose"):
+                print(f">>> Q1 Check: Have down payment: ${state.get('down_payment'):,.0f}")
+            elif current_q == 2 and (state.get("property_city") or state.get("property_state")):
                 should_advance = True
-                print(f">>> Q2 Check: Have loan purpose: {state.get('loan_purpose')}")
-            elif current_q == 3 and state.get("property_price"):
+                print(f">>> Q2 Check: Have location data - City: {state.get('property_city')}, State: {state.get('property_state')}")
+            elif current_q == 3 and state.get("loan_purpose"):
                 should_advance = True
-                print(f">>> Q3 Check: Have property price: ${state.get('property_price'):,.0f}")
-            elif current_q == 4 and state.get("down_payment"):
+                print(f">>> Q3 Check: Have loan purpose: {state.get('loan_purpose')}")
+            elif current_q == 4 and state.get("property_price"):
                 should_advance = True
-                print(f">>> Q4 Check: Have down payment: ${state.get('down_payment'):,.0f}")
+                print(f">>> Q4 Check: Have property price: ${state.get('property_price'):,.0f}")
             elif current_q == 5 and state.get("has_valid_passport") is not None:
                 should_advance = True
                 print(f">>> Q5 Check: Have passport/visa info")

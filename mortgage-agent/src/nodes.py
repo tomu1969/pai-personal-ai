@@ -34,7 +34,7 @@ def load_openai_key():
 try:
     api_key = load_openai_key()
     if api_key and not api_key.startswith('your-api'):
-        llm = ChatOpenAI(temperature=0, model="gpt-5", openai_api_key=api_key)
+        llm = ChatOpenAI(temperature=0, model="gpt-4o-mini", openai_api_key=api_key)
         print("✅ OpenAI LLM initialized successfully")
     else:
         raise Exception("No valid OpenAI API key found")

@@ -190,24 +190,24 @@ CLIENT'S LATEST MESSAGE: "{last_user_message}"
 
 💬 HOW TO RESPOND:
 
-IF CLIENT IS ASKING A QUESTION (like "how much can I afford?", "what does reserves mean?"):
+IF CLIENT IS ASKING A QUESTION (like "how can I demonstrate income?", "what does reserves mean?"):
 1. Answer their question helpfully and conversationally
-2. If asking about affordability, use the AFFORDABILITY CONTEXT above
-3. Then naturally guide back: "Now, let's continue with..."
-4. Set ADVANCE: false (stay on current question)
+2. THEN EXPLICITLY RE-ASK THE ORIGINAL QUESTION: "So, can you [original question]?"
+3. Example: "You can demonstrate income through bank statements or CPA letter. So, can you provide these documents?"
+4. Set ADVANCE: false (MUST stay on current question until answered)
 
-IF CLIENT PROVIDES INFO (answering your question):
+IF CLIENT PROVIDES INFO (actually answering your question):
 1. Acknowledge warmly: "Perfect!", "Great!", "Excellent!"
 2. Extract the information
 3. If appropriate, provide helpful context (like affordability range)
-4. Ask the next question or move forward
+4. Move to the next question
 5. Set ADVANCE: true
 
 IF CLIENT SAYS "I DON'T KNOW" or "NOT SURE" (especially for Question 4 - property price):
-1. Offer to help: "Let me help you figure that out!"
-2. Use their down payment to calculate range (see AFFORDABILITY CONTEXT)
-3. Ask if that range works for them
-4. Set ADVANCE: false (until they give a range)
+1. Provide help: Use AFFORDABILITY CONTEXT to suggest range
+2. THEN RE-ASK: "Based on that, what price range would you like to explore?"
+3. Wait for their answer - don't move forward without it
+4. Set ADVANCE: false (until they give a specific range or "yes that works")
 
 IF CLIENT PROVIDES MULTIPLE PIECES OF INFO AT ONCE:
 1. Extract ALL of them
@@ -216,10 +216,11 @@ IF CLIENT PROVIDES MULTIPLE PIECES OF INFO AT ONCE:
 
 CORE RULES:
 ✓ Be conversational and helpful - answer questions when asked
-✓ Never repeat questions for info already collected
+✓ CRITICAL: After helping/explaining, ALWAYS re-ask the original question
+✓ Never repeat questions for info already collected  
 ✓ Extract any info provided, even if out of order
-✓ Keep responses natural and under 3 sentences
-✓ Use their name or details to personalize
+✓ Don't advance until you have the actual answer (not just a question)
+✓ Keep responses natural (2-3 sentences)
 
 EXTRACTION GUIDE (Question #{current_q}):
 Q1 (down payment): "300k saved", "i have 300k", "$300,000" → down_payment: 300000
@@ -242,13 +243,21 @@ EXTRACT: [field: value, field2: value2 - or "none" if nothing to extract]
 ADVANCE: [true if you got meaningful info for current question, false if still need info]
 
 Example correct responses:
-RESPONSE: Perfect—$500,000 down on a $1,000,000 Miami investment is very strong. Now, do you have a valid passport and visa?
-EXTRACT: down_payment: 500000
+
+WHEN THEY ANSWER YOUR QUESTION:
+RESPONSE: Perfect! $1 million in Miami for investment is excellent. Do you have a valid passport and visa?
+EXTRACT: property_price: 1000000
 ADVANCE: true
 
-RESPONSE: Coconut Grove is a beautiful choice! It has such a vibrant community. What price range are you considering?
-EXTRACT: property_city: Coconut Grove, property_state: Florida
-ADVANCE: true"""
+WHEN THEY ASK FOR HELP:
+RESPONSE: You can demonstrate income through bank statements, tax returns, or a CPA letter. So, can you provide these documents?
+EXTRACT: none
+ADVANCE: false
+
+WHEN THEY SAY "I DON'T KNOW":
+RESPONSE: Let me help! With $300k down, you could afford properties from $720k to $1.2M. What price range interests you?
+EXTRACT: none  
+ADVANCE: false"""
 
         llm_response = llm.invoke([HumanMessage(content=prompt)])
         response_text = llm_response.content

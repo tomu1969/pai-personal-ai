@@ -41,6 +41,3 @@ services:
       paths:
         - mortgage-agent/**
         - requirements.txt
-    
-    # Static files configuration
-    staticPublishPath: ./static

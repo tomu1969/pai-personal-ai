@@ -1,0 +1,46 @@
+services:
+  # Web Service for the Mortgage Pre-Approval Chatbot
+  - type: web
+    name: mortgage-agent
+    runtime: python
+    plan: free  # Can upgrade to 'starter' or 'standard' for production
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.api:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: PORT
+        value: 10000
+      - key: HOST
+        value: 0.0.0.0
+      # OpenAI configuration (set in dashboard for security)
+      - key: OPENAI_API_KEY
+        sync: false  # Must be set manually in Render dashboard
+      # Company information for letters
+      - key: COMPANY_NAME
+        value: Premier Mortgage Services
+      - key: COMPANY_PHONE
+        value: 1-800-MORTGAGE
+      - key: COMPANY_EMAIL
+        value: info@premiermortgage.com
+      - key: LOAN_OFFICER_NAME
+        value: John Smith
+      - key: NMLS_NUMBER
+        value: "123456"
+      - key: LETTER_EXPIRY_DAYS
+        value: "90"
+    
+    # Health check configuration
+    healthCheckPath: /health
+    
+    # Auto-deploy when pushing to main branch
+    autoDeploy: true
+    
+    # Build filters - only rebuild when these paths change
+    buildFilter:
+      paths:
+        - mortgage-agent/**
+        - requirements.txt
+    
+    # Static files configuration
+    staticPublishPath: ./static

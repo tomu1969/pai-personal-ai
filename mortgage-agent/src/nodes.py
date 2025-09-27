@@ -128,51 +128,57 @@ def generate_conversational_response(state: GraphState) -> dict:
         print(f"  - Income Docs: {state.get('can_demonstrate_income')}")
         print(f"  - Reserves: {state.get('has_reserves')}")
         
-        # Define what we need for each question
+        # Define what we need for each question - THESE ARE THE ONLY 8 QUESTIONS
         question_objectives = {
-            1: "Need to know the city/state where they want to buy property",
-            2: "Need to know if it's for personal home, second home, or investment",  
-            3: "Need to know the approximate property price",
-            4: "Need to know their available down payment amount",
-            5: "Need to know if they have valid passport and visa",
-            6: "Need to know if they're currently in US or home country",
-            7: "Need to know if they can provide income documentation",
-            8: "Need to know if they have 6-12 months of reserves"
+            1: "ONLY ask: What city/state for property? (If already have location, SKIP TO Q2)",
+            2: "ONLY ask: Personal home, second home, or investment? (If already have purpose, SKIP TO Q3)",  
+            3: "ONLY ask: What's the property price range? (If already have price, SKIP TO Q4)",
+            4: "ONLY ask: How much for down payment? (If already have down payment, SKIP TO Q5)",
+            5: "ONLY ask: Do you have valid passport AND visa? (If already have both, SKIP TO Q6)",
+            6: "ONLY ask: Are you currently in USA or your home country? (If already have location, SKIP TO Q7)",
+            7: "ONLY ask: Can you provide income documentation (bank statements/CPA letter)? (If already have answer, SKIP TO Q8)",
+            8: "ONLY ask: Do you have 6-12 months of reserves? (If already have answer, DONE)"
         }
         
-        current_objective = question_objectives.get(current_q, "Continue the conversation naturally")
+        current_objective = question_objectives.get(current_q, "All questions completed")
         
-        prompt = f"""You are a warm, professional mortgage loan officer helping a client with Foreign Nationals loan pre-approval. You need to collect 8 pieces of information, but you should do so conversationally and naturally.
+        prompt = f"""You are a warm, professional mortgage loan officer helping a client with Foreign Nationals loan pre-approval. 
+
+🚨 CRITICAL: There are EXACTLY 8 questions to ask IN ORDER. You are currently on Question #{current_q}.
 
 RECENT CONVERSATION:
 {recent_messages}
 
-WHAT WE ALREADY HAVE (DO NOT ASK FOR THESE AGAIN):
+✅ WHAT WE ALREADY HAVE (NEVER ASK FOR THESE AGAIN):
 {known_context}
 Already collected: {', '.join(collected_data) if collected_data else 'nothing yet'}
 
-CURRENT OBJECTIVE: {current_objective}
+📍 YOUR CURRENT TASK (Question #{current_q}): {current_objective}
 
 CLIENT'S LATEST MESSAGE: "{last_user_message}"
 
-CRITICAL INSTRUCTIONS:
-1. NEVER ask for information that's already been collected (listed above)
-2. If client gives partial info (like "1 mill" for property price), EXTRACT IT and move on
-3. If they asked a question, answer it helpfully and naturally
-4. Acknowledge information warmly when provided
-5. Be conversational, not robotic - vary your responses
-6. Use their specific details in your responses
-7. Keep responses under 3 sentences when possible
+🚨 MANDATORY RULES:
+1. NEVER EVER ask for information already in the "WHAT WE ALREADY HAVE" list above
+2. ONLY ask the specific question for Question #{current_q} - DO NOT ask about other questions
+3. DO NOT ask about "annual income" - that's not one of the 8 questions
+4. If client mentions a number with "k" or "saved", that's the DOWN PAYMENT (not income)
+5. If they answer your current question, EXTRACT IT and move to next question
+6. Keep responses under 2 sentences
+7. Be warm but stay focused on the current question only
 
 EXTRACTION NOTES:
 - "1 mill", "1M", "one million" = 1000000 for property price
-- "300k", "300 thousand" = 300000 for down payment
-- "miami", "coconut grove" = property_city: Miami (extract city names!)
-- "florida", "FL" = property_state: Florida (extract state names!)
+- "300k saved", "i have 300k", "300 thousand" = down_payment: 300000 (numbers with "saved" or "have" are DOWN PAYMENT)
+- "miami", "coconut grove" = property_city: Miami
+- "florida", "FL" = property_state: Florida
 - "investment", "rental" = loan_purpose: Investment
+- "yes" to "passport and visa" = has_valid_passport: True, has_valid_visa: True
 
-CRITICAL: When user mentions ANY city name (Miami, Coconut Grove, etc.), EXTRACT it as "property_city: [city]"
-When user mentions ANY state (Florida, FL, California, etc.), EXTRACT it as "property_state: [state]"
+CRITICAL EXTRACTION RULES:
+- When user says "I have $X" or "$X saved", that's DOWN PAYMENT, not income!
+- Extract city names as "property_city: [city]"
+- Extract state names as "property_state: [state]"
+- If user says "yes" to passport/visa question, extract BOTH as true
 
 YOU MUST RESPOND WITH EXACTLY THIS FORMAT (all 3 lines required):
 RESPONSE: [Your natural, conversational response - DO NOT re-ask for info already collected]
@@ -450,11 +456,13 @@ def extract_from_full_conversation(state: GraphState) -> None:
     # Extract down payment if not already found
     if not state.get("down_payment"):
         import re
-        # Look for down payment patterns
+        # Look for down payment patterns - including "I have X saved" and "saved X"
         dp_patterns = [
             r'down\s+payment[:\s]+\$?([\d,]+(?:\.\d+)?)\s*(?:k|thousand)?',
             r'\$?([\d,]+(?:\.\d+)?)\s*(?:k|thousand)?\s+down',
-            r'put\s+down\s+\$?([\d,]+(?:\.\d+)?)\s*(?:k|thousand)?'
+            r'put\s+down\s+\$?([\d,]+(?:\.\d+)?)\s*(?:k|thousand)?',
+            r'(?:have|saved|got)\s+\$?([\d,]+(?:\.\d+)?)\s*(?:k|thousand)?\s*(?:saved)?',  # "have 300k saved" or "saved 300k"
+            r'\$?([\d,]+(?:\.\d+)?)\s*(?:k|thousand)?\s+saved',  # "300k saved"
         ]
         
         for pattern in dp_patterns:
@@ -464,12 +472,16 @@ def extract_from_full_conversation(state: GraphState) -> None:
                     number_str = match.group(1).replace(',', '')
                     number = float(number_str)
                     
+                    # Check if it's in thousands (k or thousand mentioned)
                     if 'k' in full_conversation or 'thousand' in full_conversation:
-                        if number < 10_000:
+                        if number < 10_000:  # If less than 10k, assume it's in thousands
                             number *= 1_000
                     
-                    state["down_payment"] = number
-                    break
+                    # Sanity check: down payments are usually 25k-10M range
+                    if 25_000 <= number <= 10_000_000:
+                        state["down_payment"] = number
+                        print(f">>> Extracted down payment from pattern: ${number:,.0f}")
+                        break
                 except ValueError:
                     continue
 

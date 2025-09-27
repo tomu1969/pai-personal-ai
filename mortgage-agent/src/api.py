@@ -88,9 +88,21 @@ async def chat_endpoint(request: ChatRequest):
         print(f"  - Current question: {result.get('current_question')}")
         print(f"  - Property city: {result.get('property_city')}")
         print(f"  - Property state: {result.get('property_state')}")
+        print(f"  - Property price: {result.get('property_price')}")
+        print(f"  - Down payment: {result.get('down_payment')}")
+        print(f"  - Loan purpose: {result.get('loan_purpose')}")
+        print(f"  - Has passport: {result.get('has_valid_passport')}")
+        print(f"  - Has visa: {result.get('has_valid_visa')}")
         
-        # Update stored state
+        # Update stored state - CRITICAL: Store the result, not the original state
         conversations[conversation_id] = result
+        
+        # Verify persistence
+        print(f"\nVERIFYING STATE PERSISTENCE:")
+        print(f"  - Stored conversation has {len(conversations[conversation_id]['messages'])} messages")
+        print(f"  - Stored current_question: {conversations[conversation_id].get('current_question')}")
+        print(f"  - Stored property_city: {conversations[conversation_id].get('property_city')}")
+        print(f"  - Stored down_payment: {conversations[conversation_id].get('down_payment')}")
         
         # Get the latest assistant response
         assistant_messages = [msg for msg in result["messages"] if msg["role"] == "assistant"]

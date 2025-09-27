@@ -91,37 +91,51 @@ def process_conversation_step(state: GraphState) -> GraphState:
             # Parse the extraction string and update state directly
             extract_str = conversation_result["extract"]
             if ":" in extract_str:
-                pairs = extract_str.split(",")
+                # Split by commas but handle multiple fields
+                pairs = extract_str.split(",") if "," in extract_str else [extract_str]
                 for pair in pairs:
                     if ":" in pair:
                         key, value = pair.split(":", 1)
                         key = key.strip()
                         value = value.strip()
                         
-                        # Map field names
+                        # Expanded field mappings to catch all variations
                         field_mappings = {
                             'location_city': 'property_city',
+                            'city': 'property_city',
                             'location_state': 'property_state',
-                            'property_purpose': 'loan_purpose'
+                            'state': 'property_state',
+                            'property_purpose': 'loan_purpose',
+                            'purpose': 'loan_purpose',
+                            'loan_type': 'loan_purpose'
                         }
                         mapped_key = field_mappings.get(key, key)
+                        
+                        # Skip if value is empty or null-like
+                        if value.lower() in ['none', 'null', '', 'n/a']:
+                            continue
                         
                         # Convert values
                         if value.lower() == 'true':
                             state[mapped_key] = True
+                            print(f">>> Extracted {mapped_key}: True")
                         elif value.lower() == 'false':
                             state[mapped_key] = False
+                            print(f">>> Extracted {mapped_key}: False")
                         elif mapped_key in ['property_price', 'down_payment']:
                             try:
-                                state[mapped_key] = float(value)
+                                # Clean up the value (remove $ and commas)
+                                clean_value = value.replace('$', '').replace(',', '')
+                                state[mapped_key] = float(clean_value)
                                 print(f">>> Extracted {mapped_key}: {state[mapped_key]}")
                             except ValueError:
+                                print(f">>> Failed to parse number: {value}")
                                 pass
                         else:
                             state[mapped_key] = value
                             print(f">>> Extracted {mapped_key}: {value}")
             
-            # Also run the full extraction logic
+            # Also run the full extraction logic for more comprehensive parsing
             extract_info_node(state)
         
         # Advance to next question if the LLM indicates it's appropriate
@@ -133,30 +147,35 @@ def process_conversation_step(state: GraphState) -> GraphState:
             should_advance = False
             if current_q == 1 and (state.get("property_city") or state.get("property_state")):
                 should_advance = True
-                print(f">>> Have location data: {state.get('property_city')}, {state.get('property_state')}")
+                print(f">>> Q1 Check: Have location data - City: {state.get('property_city')}, State: {state.get('property_state')}")
             elif current_q == 2 and state.get("loan_purpose"):
                 should_advance = True
-                print(f">>> Have loan purpose: {state.get('loan_purpose')}")
+                print(f">>> Q2 Check: Have loan purpose: {state.get('loan_purpose')}")
             elif current_q == 3 and state.get("property_price"):
                 should_advance = True
-                print(f">>> Have property price: {state.get('property_price')}")
+                print(f">>> Q3 Check: Have property price: ${state.get('property_price'):,.0f}")
             elif current_q == 4 and state.get("down_payment"):
                 should_advance = True
-                print(f">>> Have down payment: {state.get('down_payment')}")
+                print(f">>> Q4 Check: Have down payment: ${state.get('down_payment'):,.0f}")
             elif current_q == 5 and state.get("has_valid_passport") is not None:
                 should_advance = True
+                print(f">>> Q5 Check: Have passport/visa info")
             elif current_q == 6 and state.get("current_location"):
                 should_advance = True
+                print(f">>> Q6 Check: Have location: {state.get('current_location')}")
             elif current_q == 7 and state.get("can_demonstrate_income") is not None:
                 should_advance = True
+                print(f">>> Q7 Check: Have income info")
             elif current_q == 8 and state.get("has_reserves") is not None:
                 should_advance = True
+                print(f">>> Q8 Check: Have reserves info")
                 
             if should_advance:
-                print(f">>> Force advancing from Q{current_q} to Q{current_q + 1} (have required data)")
+                print(f">>> ✅ ADVANCING from Q{current_q} to Q{current_q + 1} (have required data)")
                 state["current_question"] = current_q + 1
             else:
-                print(f">>> Staying at Q{current_q} (need more data)")
+                print(f">>> ⏸️  STAYING at Q{current_q} (need more data)")
+                print(f"    Current state: city={state.get('property_city')}, state={state.get('property_state')}, price={state.get('property_price')}, down={state.get('down_payment')}")
     
     # Check if we're handling post-approval letter request
     if state.get("final_decision") == "Pre-Approved" and state.get("conversation_complete"):

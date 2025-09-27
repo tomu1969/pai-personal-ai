@@ -167,17 +167,25 @@ CRITICAL INSTRUCTIONS:
 EXTRACTION NOTES:
 - "1 mill", "1M", "one million" = 1000000 for property price
 - "300k", "300 thousand" = 300000 for down payment
-- "florida", "FL" = valid location responses
-- "investment", "rental" = investment property
+- "miami", "coconut grove" = property_city: Miami (extract city names!)
+- "florida", "FL" = property_state: Florida (extract state names!)
+- "investment", "rental" = loan_purpose: Investment
+
+CRITICAL: When user mentions ANY city name (Miami, Coconut Grove, etc.), EXTRACT it as "property_city: [city]"
+When user mentions ANY state (Florida, FL, California, etc.), EXTRACT it as "property_state: [state]"
 
 YOU MUST RESPOND WITH EXACTLY THIS FORMAT (all 3 lines required):
 RESPONSE: [Your natural, conversational response - DO NOT re-ask for info already collected]
-EXTRACT: [Any information to extract, or "none"]
+EXTRACT: [field: value, field2: value2 - or "none" if nothing to extract]
 ADVANCE: [true if you got meaningful info for current question, false if still need info]
 
-Example correct response:
+Example correct responses:
 RESPONSE: Perfect—$500,000 down on a $1,000,000 Miami investment is very strong. Now, do you have a valid passport and visa?
 EXTRACT: down_payment: 500000
+ADVANCE: true
+
+RESPONSE: Coconut Grove is a beautiful choice! It has such a vibrant community. What price range are you considering?
+EXTRACT: property_city: Coconut Grove, property_state: Florida
 ADVANCE: true"""
 
         llm_response = llm.invoke([HumanMessage(content=prompt)])
@@ -381,6 +389,35 @@ def extract_from_full_conversation(state: GraphState) -> None:
     # Combine all user messages for comprehensive extraction
     user_messages = [msg["content"] for msg in state["messages"] if msg["role"] == "user"]
     full_conversation = " ".join(user_messages).lower()
+    
+    # Extract location information (city/state) if not already found
+    if not state.get("property_city"):
+        import re
+        # Common US cities
+        cities = ['miami', 'coconut grove', 'new york', 'los angeles', 'chicago', 
+                 'houston', 'phoenix', 'san francisco', 'dallas', 'boston', 
+                 'seattle', 'denver', 'atlanta', 'orlando', 'tampa']
+        for city in cities:
+            if city in full_conversation:
+                state["property_city"] = city.title()
+                print(f">>> Extracted city from conversation: {city.title()}")
+                break
+    
+    if not state.get("property_state"):
+        import re
+        # State abbreviations and names
+        states = {
+            'fl': 'Florida', 'florida': 'Florida',
+            'ca': 'California', 'california': 'California',
+            'ny': 'New York', 'new york': 'New York',
+            'tx': 'Texas', 'texas': 'Texas',
+            'il': 'Illinois', 'illinois': 'Illinois'
+        }
+        for abbr, full_name in states.items():
+            if f' {abbr} ' in f' {full_conversation} ' or f' {abbr},' in full_conversation:
+                state["property_state"] = full_name
+                print(f">>> Extracted state from conversation: {full_name}")
+                break
     
     # Extract property price if not already found
     if not state.get("property_price"):

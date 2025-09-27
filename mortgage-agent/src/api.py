@@ -58,23 +58,35 @@ async def chat_endpoint(request: ChatRequest):
         # Get or create conversation
         conversation_id = request.conversation_id or str(uuid.uuid4())
         
+        print(f"\n{'='*60}")
+        print(f"API REQUEST - Conversation: {conversation_id}")
+        print(f"User Message: {request.message}")
+        print(f"Is New Conversation: {conversation_id not in conversations}")
+        
         if conversation_id not in conversations:
             conversations[conversation_id] = create_initial_state()
+            print(f"Created new state with current_question: {conversations[conversation_id].get('current_question')}")
         
         state = conversations[conversation_id]
+        
+        print(f"State BEFORE processing:")
+        print(f"  - Messages count: {len(state['messages'])}")
+        print(f"  - Current question: {state.get('current_question')}")
+        print(f"  - Property city: {state.get('property_city')}")
+        print(f"  - Property state: {state.get('property_state')}")
         
         # Add user message to history
         state["messages"].append({"role": "user", "content": request.message})
         
         # Create and invoke the graph
         graph = create_mortgage_graph()
+        result = graph.invoke(state)
         
-        # For new conversations, start with the initial flow
-        if len(state["messages"]) == 1:  # Only user's first message
-            result = graph.invoke(state)
-        else:
-            # Continue existing conversation
-            result = graph.invoke(state)
+        print(f"\nState AFTER processing:")
+        print(f"  - Messages count: {len(result['messages'])}")
+        print(f"  - Current question: {result.get('current_question')}")
+        print(f"  - Property city: {result.get('property_city')}")
+        print(f"  - Property state: {result.get('property_state')}")
         
         # Update stored state
         conversations[conversation_id] = result
@@ -83,9 +95,13 @@ async def chat_endpoint(request: ChatRequest):
         assistant_messages = [msg for msg in result["messages"] if msg["role"] == "assistant"]
         if assistant_messages:
             latest_response = assistant_messages[-1]["content"]
+            print(f"Returning response: {latest_response[:100]}...")
         else:
             # Fallback for edge cases
             latest_response = "Hello! I'll help you with your mortgage pre-approval. Please provide your first answer."
+            print("WARNING: No assistant messages found, using fallback")
+        
+        print(f"{'='*60}\n")
         
         return ChatResponse(
             response=latest_response,
@@ -95,6 +111,9 @@ async def chat_endpoint(request: ChatRequest):
         )
         
     except Exception as e:
+        print(f"ERROR in chat_endpoint: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
 
 @app.get("/conversations/{conversation_id}")

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mortgage Pre-Approval Chatbot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-container {
+            width: 90%;
+            max-width: 800px;
+            height: 90vh;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .chat-header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .chat-header p {
+            opacity: 0.8;
+            font-size: 14px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.assistant {
+            justify-content: flex-start;
+        }
+
+        .message-bubble {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+
+        .message.user .message-bubble {
+            background: #007bff;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.assistant .message-bubble {
+            background: white;
+            color: #333;
+            border: 1px solid #e1e5e9;
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-input {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e1e5e9;
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-field {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .input-field:focus {
+            border-color: #007bff;
+        }
+
+        .send-button {
+            padding: 12px 24px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+
+        .send-button:hover:not(:disabled) {
+            background: #0056b3;
+        }
+
+        .send-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .typing-indicator {
+            display: none;
+            margin-bottom: 15px;
+        }
+
+        .typing-dots {
+            background: white;
+            border: 1px solid #e1e5e9;
+            border-radius: 18px;
+            padding: 12px 16px;
+            max-width: fit-content;
+        }
+
+        .dots {
+            display: inline-block;
+        }
+
+        .dots span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #999;
+            margin: 0 2px;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .dots span:nth-child(1) { animation-delay: -0.32s; }
+        .dots span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        .completion-status {
+            text-align: center;
+            padding: 15px;
+            background: #e8f5e8;
+            border: 1px solid #4caf50;
+            border-radius: 8px;
+            margin: 10px;
+            display: none;
+        }
+
+        .completion-status.approved {
+            background: #e8f5e8;
+            border-color: #4caf50;
+            color: #2e7d32;
+        }
+
+        .completion-status.rejected {
+            background: #ffebee;
+            border-color: #f44336;
+            color: #c62828;
+        }
+
+        .completion-status.review {
+            background: #fff3e0;
+            border-color: #ff9800;
+            color: #e65100;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>🏠 Mortgage Pre-Approval Assistant</h1>
+            <p>Foreign Nationals Loan Program - Quick Pre-Approval</p>
+        </div>
+        
+        <div class="chat-messages" id="messages">
+            <!-- Messages will be loaded by JavaScript -->
+        </div>
+
+        <div class="typing-indicator" id="typingIndicator">
+            <div class="typing-dots">
+                <div class="dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="completion-status" id="completionStatus">
+            <!-- Final decision will appear here -->
+        </div>
+        
+        <div class="chat-input">
+            <input type="text" id="messageInput" class="input-field" placeholder="Type your answer here..." autocomplete="off">
+            <button id="sendButton" class="send-button">Send</button>
+        </div>
+    </div>
+
+    <script>
+        class MortgageChatbot {
+            constructor() {
+                this.conversationId = null;
+                this.isComplete = false;
+                this.messagesContainer = document.getElementById('messages');
+                this.messageInput = document.getElementById('messageInput');
+                this.sendButton = document.getElementById('sendButton');
+                this.typingIndicator = document.getElementById('typingIndicator');
+                this.completionStatus = document.getElementById('completionStatus');
+                
+                this.setupEventListeners();
+                this.initializeConversation();
+            }
+
+            setupEventListeners() {
+                this.sendButton.addEventListener('click', () => this.sendMessage());
+                this.messageInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+            }
+
+            async initializeConversation() {
+                // Send initial message to start the conversation
+                try {
+                    this.showTyping();
+                    const response = await this.callAPI('Hello');
+                    this.hideTyping();
+                    
+                    if (response.response) {
+                        this.addMessage(response.response, 'assistant');
+                    }
+
+                    // Update conversation ID
+                    if (response.conversation_id) {
+                        this.conversationId = response.conversation_id;
+                    }
+                } catch (error) {
+                    this.hideTyping();
+                    console.error('Error initializing conversation:', error);
+                    this.addMessage('Welcome! Please type "Hello" to begin your mortgage pre-approval.', 'assistant');
+                }
+            }
+
+            async sendMessage() {
+                const message = this.messageInput.value.trim();
+                if (!message || this.isComplete) return;
+
+                // Disable input
+                this.messageInput.disabled = true;
+                this.sendButton.disabled = true;
+
+                // Add user message to chat
+                this.addMessage(message, 'user');
+                this.messageInput.value = '';
+
+                // Show typing indicator
+                this.showTyping();
+
+                try {
+                    const response = await this.callAPI(message);
+                    this.hideTyping();
+                    
+                    if (response.response) {
+                        this.addMessage(response.response, 'assistant');
+                    }
+
+                    // Update conversation ID
+                    if (response.conversation_id) {
+                        this.conversationId = response.conversation_id;
+                    }
+
+                    // Check if conversation is complete
+                    if (response.complete && response.decision) {
+                        this.handleCompletion(response.decision);
+                    }
+
+                } catch (error) {
+                    this.hideTyping();
+                    console.error('Error:', error);
+                    this.addMessage('Sorry, there was an error processing your request. Please try again.', 'assistant');
+                } finally {
+                    // Re-enable input if not complete
+                    if (!this.isComplete) {
+                        this.messageInput.disabled = false;
+                        this.sendButton.disabled = false;
+                        this.messageInput.focus();
+                    }
+                }
+            }
+
+            async callAPI(message) {
+                const payload = {
+                    message: message
+                };
+
+                if (this.conversationId) {
+                    payload.conversation_id = this.conversationId;
+                }
+
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return await response.json();
+            }
+
+            addMessage(text, sender) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${sender}`;
+                
+                const bubbleDiv = document.createElement('div');
+                bubbleDiv.className = 'message-bubble';
+                bubbleDiv.textContent = text;
+                
+                messageDiv.appendChild(bubbleDiv);
+                this.messagesContainer.appendChild(messageDiv);
+                
+                // Scroll to bottom
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+            }
+
+            showTyping() {
+                this.typingIndicator.style.display = 'block';
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+            }
+
+            hideTyping() {
+                this.typingIndicator.style.display = 'none';
+            }
+
+            handleCompletion(decision) {
+                this.isComplete = true;
+                this.messageInput.disabled = true;
+                this.sendButton.disabled = true;
+                this.messageInput.placeholder = "Pre-approval process complete";
+
+                // Show completion status
+                const statusDiv = this.completionStatus;
+                statusDiv.style.display = 'block';
+                
+                if (decision === 'Pre-Approved') {
+                    statusDiv.className = 'completion-status approved';
+                    statusDiv.innerHTML = '🎉 <strong>Pre-Approved!</strong> A loan officer will contact you soon.';
+                } else if (decision === 'Rejected') {
+                    statusDiv.className = 'completion-status rejected';
+                    statusDiv.innerHTML = '❌ <strong>Application Not Approved</strong> - Please review the requirements above.';
+                } else {
+                    statusDiv.className = 'completion-status review';
+                    statusDiv.innerHTML = '📋 <strong>Under Review</strong> - A loan officer will contact you within 24 hours.';
+                }
+            }
+        }
+
+        // Initialize chatbot when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new MortgageChatbot();
+        });
+    </script>
+</body>
+</html>

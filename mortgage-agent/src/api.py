@@ -13,9 +13,10 @@ from .graph import create_mortgage_graph
 
 app = FastAPI(title="Mortgage Pre-Approval Chatbot", version="1.0.0")
 
-# Mount static files
+# Mount static files if directory exists
 static_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
-app.mount("/static", StaticFiles(directory=static_path), name="static")
+if os.path.exists(static_path):
+    app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 # In-memory storage for conversation states (use Redis/DB in production)
 conversations: Dict[str, GraphState] = {}
@@ -137,7 +138,21 @@ async def delete_conversation(conversation_id: str):
 async def serve_index():
     """Serve the main chat interface."""
     static_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
-    return FileResponse(os.path.join(static_path, "index.html"))
+    index_path = os.path.join(static_path, "index.html")
+    
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    else:
+        return {
+            "message": "Mortgage Pre-Approval Chatbot API",
+            "version": "1.0.0",
+            "endpoints": {
+                "POST /chat": "Main chat endpoint",
+                "GET /health": "Health check",
+                "GET /conversations/{id}": "Get conversation state",
+                "DELETE /conversations/{id}": "Delete conversation"
+            }
+        }
 
 @app.get("/health")
 async def health_check():

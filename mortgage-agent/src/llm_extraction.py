@@ -151,6 +151,10 @@ def extract_with_llm(user_message: str, context: Optional[str] = None) -> Dict[s
         messages[0]["content"] += f"\n\nContext: The user was just asked about {context}."
     
     try:
+        print(f"\n>>> LLM EXTRACTION DEBUG:")
+        print(f"    User message: '{user_message}'")
+        print(f"    Context: {context}")
+        
         response = client.chat.completions.create(
             model=MODEL,
             messages=messages,
@@ -162,9 +166,11 @@ def extract_with_llm(user_message: str, context: Optional[str] = None) -> Dict[s
         # Parse function call result
         function_call = response.choices[0].message.function_call
         if not function_call:
+            print(f"    ⚠️  No function call returned by LLM")
             return {}
         
         extracted_raw = json.loads(function_call.arguments)
+        print(f"    Raw LLM response: {json.dumps(extracted_raw, indent=2)}")
         
         # Convert to our format: (value, confidence, source)
         extracted = {}
@@ -172,6 +178,7 @@ def extract_with_llm(user_message: str, context: Optional[str] = None) -> Dict[s
             if value is not None:
                 # LLM extraction always has confidence 0.95 (very high but not perfect)
                 extracted[key] = (value, 0.95, "llm")
+                print(f"    ✓ Extracted {key}: {value}")
         
         # Auto-fill state for unambiguous cities
         if "property_city" in extracted:

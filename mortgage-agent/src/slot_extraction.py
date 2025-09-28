@@ -118,17 +118,21 @@ def needs_confirmation(
     Determine if a slot needs explicit user confirmation.
     
     Rules:
-    - New slots with confidence < 0.7: confirm
+    - New slots with confidence < 0.5: confirm (very uncertain only)
     - Changed slots: always confirm
     - High confidence (>= 0.9): no confirmation needed unless changed
+    
+    Note: LLM extractions typically have 0.95 confidence, which we should trust.
     """
     if change_type == "changed":
         return True
     
-    if change_type == "new" and confidence < 0.7:
+    # Only confirm if confidence is VERY low (< 0.5)
+    # LLM gives 0.95 for good extractions, trust it
+    if change_type == "new" and confidence < 0.5:
         return True
     
-    if change_type == "confirmed" and old_confidence < 0.7 and confidence >= 0.7:
+    if change_type == "confirmed" and old_confidence < 0.5 and confidence >= 0.5:
         # Confidence increased, no need to confirm again
         return False
     
@@ -137,48 +141,77 @@ def needs_confirmation(
 
 def format_delta_confirmation(delta: Dict[str, Tuple[Any, float, str, str]]) -> str:
     """
-    Format delta for user confirmation.
+    Generate natural confirmation message using LLM.
     
-    "Captured: down_payment $200k; property_price $800k; location Miami; purpose investment. Correct?"
+    Instead of "Captured: down_payment $200k", generates natural language like
+    "Just to confirm, you're putting down $200,000?"
     """
+    import os
+    from openai import OpenAI
+    
     if not delta:
         return ""
     
-    parts = []
+    # Build description of what was captured
+    captured_items = []
     for slot_name, (value, conf, source, change_type) in delta.items():
-        # Format the value for display
-        if slot_name in ["down_payment", "property_price"]:
-            display = f"${value:,.0f}"
-        elif slot_name in ["property_city", "property_state", "current_location"]:
-            display = value
+        if slot_name == "down_payment":
+            captured_items.append(f"down payment of ${value:,.0f}")
+        elif slot_name == "property_price":
+            captured_items.append(f"property price of ${value:,.0f}")
+        elif slot_name == "property_city":
+            captured_items.append(f"property in {value}")
+        elif slot_name == "property_state":
+            captured_items.append(f"in {value} state")
         elif slot_name == "loan_purpose":
-            display = value
-        elif isinstance(value, bool):
-            display = "yes" if value else "no"
+            purpose_map = {"personal": "primary residence", "second": "second home", "investment": "investment property"}
+            captured_items.append(f"for {purpose_map.get(value, value)}")
+        elif slot_name in ["has_valid_passport", "has_valid_visa", "can_demonstrate_income", "has_reserves"]:
+            yn = "yes" if value else "no"
+            field_names = {
+                "has_valid_passport": "passport",
+                "has_valid_visa": "visa", 
+                "can_demonstrate_income": "income documentation",
+                "has_reserves": "reserves"
+            }
+            captured_items.append(f"{field_names.get(slot_name, slot_name)}: {yn}")
         else:
-            display = str(value)
-        
-        # Friendly names
-        friendly_names = {
-            "down_payment": "down payment",
-            "property_price": "property price",
-            "property_city": "city",
-            "property_state": "state",
-            "loan_purpose": "purpose",
-            "has_valid_passport": "passport",
-            "has_valid_visa": "visa",
-            "can_demonstrate_income": "income docs",
-            "has_reserves": "reserves",
-            "current_location": "location"
-        }
-        
-        friendly = friendly_names.get(slot_name, slot_name)
-        parts.append(f"{friendly} {display}")
+            captured_items.append(f"{slot_name}: {value}")
     
-    if len(parts) == 1:
-        return f"Captured: {parts[0]}. Correct?"
-    else:
-        return f"Captured: {'; '.join(parts)}. Correct?"
+    if not captured_items:
+        return "Let me confirm what I understood. Is this correct?"
+    
+    # Use LLM to generate natural confirmation
+    prompt = f"""You're a mortgage assistant who needs to confirm information with the user.
+
+You understood: {', '.join(captured_items)}
+
+Generate a brief, natural confirmation question (1 sentence).
+Examples:
+- "Just to confirm, you're putting down $400,000 on a $2 million property?"
+- "So you have $250,000 for the down payment, correct?"
+- "I have you down for a $300,000 down payment. Is that right?"
+
+Be conversational and natural. Keep it brief."""
+    
+    try:
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=60
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"LLM confirmation generation error: {e}")
+        # Fallback to natural but simpler format
+        if len(captured_items) == 1:
+            return f"I understood {captured_items[0]}. Is that correct?"
+        else:
+            return f"Let me confirm: {', '.join(captured_items)}. Is this correct?"
 
 
 def validate_ltv(property_price: float, down_payment: float) -> Tuple[bool, Optional[str]]:

@@ -261,15 +261,53 @@ Foreign National loans may take slightly longer due to international documentati
             difference = required_down - current_down_float
             
             if difference > 0:
-                answer = f"""To afford a **${price_mentioned:,.0f}** property with a {int(min_down_pct*100)}% down payment, you'll need **${required_down:,.0f}** down.
+                # Generate response with LLM for natural variation
+                prompt = f"""You're a helpful mortgage advisor. The user asked about affording a ${price_mentioned:,.0f} property.
 
-You currently have ${current_down_float:,.0f}, so you would need an additional **${difference:,.0f}**.
+Current situation:
+- They have ${current_down_float:,.0f} saved for down payment
+- They need ${required_down:,.0f} ({int(min_down_pct*100)}% minimum)
+- Gap: ${difference:,.0f} more needed
+- With their current amount, they can afford up to ${current_down_float/min_down_pct:,.0f}
 
-Alternatively, with your current ${current_down_float:,.0f} down payment, you can afford properties up to **${current_down_float/min_down_pct:,.0f}**."""
+Generate a natural, helpful response that explains the situation and presents their options.
+Be conversational, warm but professional. Don't use markdown formatting like ** or #."""
+
+                try:
+                    response = client.chat.completions.create(
+                        model=MODEL,
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.7,
+                        max_tokens=150
+                    )
+                    answer = response.choices[0].message.content.strip()
+                except:
+                    # Fallback if LLM fails
+                    answer = f"To afford a ${price_mentioned:,.0f} property with a {int(min_down_pct*100)}% down payment, you'll need ${required_down:,.0f}. You currently have ${current_down_float:,.0f}, so you would need an additional ${difference:,.0f}. Alternatively, with your current down payment, you can afford properties up to ${current_down_float/min_down_pct:,.0f}."
             else:
-                answer = f"""Great news! With your **${current_down_float:,.0f}** down payment, you can definitely afford a **${price_mentioned:,.0f}** property.
+                # Generate positive response with LLM
+                prompt = f"""You're a helpful mortgage advisor. The user asked about affording a ${price_mentioned:,.0f} property.
 
-That's a {(current_down_float/price_mentioned)*100:.1f}% down payment, which exceeds the {int(min_down_pct*100)}% minimum and may qualify you for better rates!"""
+Good news:
+- They have ${current_down_float:,.0f} saved
+- That's {(current_down_float/price_mentioned)*100:.1f}% down payment
+- This exceeds the {int(min_down_pct*100)}% minimum requirement
+- They may qualify for better interest rates
+
+Generate a positive, encouraging response. 
+Be conversational and warm. Don't use markdown formatting like ** or #."""
+
+                try:
+                    response = client.chat.completions.create(
+                        model=MODEL,
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.7,
+                        max_tokens=120
+                    )
+                    answer = response.choices[0].message.content.strip()
+                except:
+                    # Fallback if LLM fails
+                    answer = f"Great news! With your ${current_down_float:,.0f} down payment, you can definitely afford a ${price_mentioned:,.0f} property. That's a {(current_down_float/price_mentioned)*100:.1f}% down payment, which exceeds the {int(min_down_pct*100)}% minimum and may qualify you for better rates!"
         
         elif current_down:
             # Generic down payment info with user's context

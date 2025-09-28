@@ -151,10 +151,10 @@ def parse_location(text: str) -> Dict[str, Optional[str]]:
         result["state"] = match.group(2).strip()
         return result
     
-    # Pattern 3: 2-letter state code
-    state_match = re.search(r'\b([A-Z]{2})\b', text)
+    # Pattern 3: 2-letter state code (case-insensitive)
+    state_match = re.search(r'\b([A-Za-z]{2})\b', text, re.IGNORECASE)
     if state_match:
-        result["state"] = state_match.group(1)
+        result["state"] = state_match.group(1).upper()  # Normalize to uppercase
     
     return result
 

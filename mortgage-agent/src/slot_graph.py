@@ -29,6 +29,7 @@ from .business_rules import (
     format_rejection_message,
     can_make_decision
 )
+from .question_generator import generate_question
 
 
 def process_slot_turn(state: SlotFillingState) -> SlotFillingState:
@@ -119,7 +120,36 @@ def process_slot_turn(state: SlotFillingState) -> SlotFillingState:
             return state
     
     # =========================================================================
-    # STEP 4: EXTRACT ALL ENTITIES
+    # STEP 4: HANDLE CLARIFICATION QUESTIONS
+    # =========================================================================
+    # Check if user is asking for clarification (e.g., "how much would that be")
+    clarification_keywords = ["how much", "what amount", "how many", "tell me", "calculate"]
+    if any(kw in last_user_msg.lower() for kw in clarification_keywords):
+        last_asked = state.get("last_slot_asked")
+        
+        if last_asked == "has_reserves":
+            # User is asking how much reserves they need
+            property_price = get_slot_value(state, "property_price")
+            down_payment = get_slot_value(state, "down_payment")
+            
+            if property_price and down_payment:
+                # Calculate reserves needed
+                loan_amount = property_price - down_payment
+                monthly_rate = 0.07 / 12
+                n_payments = 360
+                monthly_payment = loan_amount * (monthly_rate * (1 + monthly_rate)**n_payments) / ((1 + monthly_rate)**n_payments - 1)
+                monthly_payment *= 1.3  # Add taxes, insurance
+                
+                min_reserves = monthly_payment * 6
+                max_reserves = monthly_payment * 12
+                
+                response = f"Your monthly mortgage payment will be approximately ${monthly_payment:,.0f}. You'll need between ${min_reserves:,.0f} and ${max_reserves:,.0f} in reserves. Do you have this amount saved?"
+                
+                state["messages"].append({"role": "assistant", "content": response})
+                return state
+    
+    # =========================================================================
+    # STEP 5: EXTRACT ALL ENTITIES
     # =========================================================================
     print(f"\n>>> Extracting all entities from message...")
     extracted = extract_all_slots(last_user_msg, state=state)
@@ -251,8 +281,8 @@ def process_slot_turn(state: SlotFillingState) -> SlotFillingState:
     
     print(f"\n>>> Next slot to ask: {next_slot}")
     
-    # Build question for next slot
-    question = build_slot_question(next_slot, state)
+    # Generate dynamic question with context
+    question = generate_question(next_slot, state, last_user_msg)
     
     # Check for duplicate
     question_hash = sha256(question.encode()).hexdigest()[:16]
@@ -276,44 +306,4 @@ def process_slot_turn(state: SlotFillingState) -> SlotFillingState:
     return state
 
 
-def build_slot_question(slot_name: str, state: SlotFillingState) -> str:
-    """
-    Build a context-aware question for a missing slot.
-    
-    For property_price, calculate affordability range based on down payment.
-    """
-    
-    # Special handling for property_price with affordability calculation
-    if slot_name == "property_price":
-        down_payment = get_slot_value(state, "down_payment")
-        loan_purpose = get_slot_value(state, "loan_purpose")
-        
-        if down_payment:
-            # Calculate affordability range based on LTV requirements
-            if loan_purpose == "investment":
-                # 25% minimum down for investment properties
-                max_price = down_payment * 4.0  # 25% down
-                comfortable_price = down_payment * 3.33  # 30% down
-            else:
-                # 20-25% down for primary residence or second home
-                max_price = down_payment * 5.0  # 20% down
-                comfortable_price = down_payment * 4.0  # 25% down
-            
-            return f"Based on your ${down_payment:,.0f} down payment, you can afford properties between ${comfortable_price:,.0f} and ${max_price:,.0f}. What price range are you considering?"
-        else:
-            return "What's your target property price?"
-    
-    # Standard questions for other slots
-    questions = {
-        "down_payment": "Great! Let's start with how much you have saved for a down payment.",
-        "loan_purpose": "What will you use the property for? (primary residence, second home, or investment)",
-        "property_city": "Which city is the property in?",
-        "property_state": "Which state?",
-        "has_valid_passport": "Do you have a valid passport?",
-        "has_valid_visa": "Do you have a valid U.S. visa?",
-        "current_location": "Are you currently in the USA or your home country?",
-        "can_demonstrate_income": "Can you provide income documentation? (international bank statements, CPA letter, etc.)",
-        "has_reserves": "Do you have 6-12 months of mortgage payments saved as reserves?"
-    }
-    
-    return questions.get(slot_name, f"What is your {slot_name}?")
+# Note: Question generation moved to question_generator.py for dynamic, context-aware questions

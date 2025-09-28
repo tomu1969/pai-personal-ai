@@ -253,18 +253,11 @@
             }
 
             async initializeConversation() {
-                // Check if we have an existing conversation in localStorage
-                const savedConversationId = localStorage.getItem('mortgage_conversation_id');
+                // Always start fresh - no per-user memory yet
+                // Clear any old conversation IDs
+                localStorage.removeItem('mortgage_conversation_id');
                 
-                if (savedConversationId) {
-                    // Resume existing conversation
-                    this.conversationId = savedConversationId;
-                    console.log('Resuming conversation:', savedConversationId);
-                    this.addMessage('Welcome back! You can continue from where you left off or type "start over" to begin a new pre-approval.', 'assistant');
-                    return;
-                }
-                
-                // Only send initial greeting for NEW conversations
+                // Send initial greeting for NEW conversation
                 try {
                     this.showTyping();
                     const response = await this.callAPI('Hello');
@@ -274,29 +267,21 @@
                         this.addMessage(response.response, 'assistant');
                     }
 
-                    // Save conversation ID to localStorage
+                    // Save conversation ID for this session only
                     if (response.conversation_id) {
                         this.conversationId = response.conversation_id;
-                        localStorage.setItem('mortgage_conversation_id', response.conversation_id);
                         console.log('Started new conversation:', response.conversation_id);
                     }
                 } catch (error) {
                     this.hideTyping();
                     console.error('Error initializing conversation:', error);
-                    this.addMessage('Welcome! Please type "Hello" to begin your mortgage pre-approval.', 'assistant');
+                    this.addMessage('Hi, I can help you pre-qualify for a mortgage with just eight questions. Would you like to begin?', 'assistant');
                 }
             }
 
             async sendMessage() {
                 const message = this.messageInput.value.trim();
                 if (!message || this.isComplete) return;
-
-                // Handle "start over" command
-                if (message.toLowerCase() === 'start over' || message.toLowerCase() === 'restart') {
-                    localStorage.removeItem('mortgage_conversation_id');
-                    location.reload();
-                    return;
-                }
 
                 // Disable input
                 this.messageInput.disabled = true;

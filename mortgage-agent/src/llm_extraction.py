@@ -17,44 +17,110 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 
-# Unambiguous major cities that don't need state clarification
-CITY_TO_STATE = {
-    "miami": "FL",
-    "orlando": "FL",
-    "tampa": "FL",
-    "jacksonville": "FL",
-    "dallas": "TX",
-    "houston": "TX",
-    "austin": "TX",
-    "san antonio": "TX",
-    "seattle": "WA",
-    "boston": "MA",
-    "denver": "CO",
-    "atlanta": "GA",
-    "phoenix": "AZ",
-    "las vegas": "NV",
-    "portland": "OR",
-    "detroit": "MI",
-    "minneapolis": "MN",
-    "nashville": "TN",
-    "memphis": "TN",
-    "milwaukee": "WI",
-    "albuquerque": "NM",
-    "tucson": "AZ",
-    "baltimore": "MD",
-    "philadelphia": "PA",
-    "pittsburgh": "PA",
-    "indianapolis": "IN",
-    "charlotte": "NC",
-    "raleigh": "NC",
-    "chicago": "IL",
-    "new york": "NY",
-    "los angeles": "CA",
-    "san francisco": "CA",
-    "san diego": "CA",
-    "san jose": "CA",
-    "sacramento": "CA"
-}
+def normalize_location_with_llm(text: str) -> Dict[str, Any]:
+    """
+    Use LLM to normalize geographic information without hardcoded maps.
+    
+    Args:
+        text: Location text from user (e.g., "Brickell", "South Florida", "33131")
+    
+    Returns:
+        Dict with: {neighborhood, city, state, country_iso, confidence, ambiguous, candidates}
+    """
+    prompt = f"""You are a geographic normalization expert. Given location text, return a JSON object with geographic information.
+
+TEXT TO NORMALIZE: "{text}"
+
+EXAMPLES:
+Input: "Brickell"
+Output: {{"neighborhood": "Brickell", "city": "Miami", "state": "FL", "country_iso": "US", "confidence": 0.95, "ambiguous": false}}
+
+Input: "South Florida"  
+Output: {{"neighborhood": null, "city": null, "state": "FL", "country_iso": "US", "confidence": 0.9, "ambiguous": true, "candidates": ["Miami", "Fort Lauderdale", "West Palm Beach"]}}
+
+Input: "Mexico"
+Output: {{"neighborhood": null, "city": null, "state": null, "country_iso": "MX", "confidence": 1.0, "ambiguous": false}}
+
+Input: "33131"
+Output: {{"neighborhood": "Brickell", "city": "Miami", "state": "FL", "country_iso": "US", "confidence": 0.95, "ambiguous": false}}
+
+Input: "Coral Gables"
+Output: {{"neighborhood": "Coral Gables", "city": "Miami", "state": "FL", "country_iso": "US", "confidence": 0.95, "ambiguous": false}}
+
+RULES:
+- Return only JSON, no explanation
+- confidence: 0.0-1.0 based on how certain the mapping is
+- ambiguous: true if multiple cities/areas possible
+- candidates: list of possible cities if ambiguous
+- Use null for unknown fields
+- Common Miami neighborhoods: Brickell, Coral Gables, Coconut Grove, Wynwood, South Beach
+- Regional terms: "South Florida" covers Miami-Dade, Broward, Palm Beach counties
+
+Return JSON for: "{text}"
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=200
+        )
+        
+        result_text = response.choices[0].message.content.strip()
+        
+        # Parse JSON response
+        try:
+            result = json.loads(result_text)
+            
+            # Validate required fields
+            required_fields = ["confidence", "ambiguous", "country_iso"]
+            for field in required_fields:
+                if field not in result:
+                    result[field] = None
+            
+            # Ensure confidence is valid
+            if result["confidence"] is None or not isinstance(result["confidence"], (int, float)):
+                result["confidence"] = 0.7
+            
+            print(f">>> Geographic normalization: '{text}' → {result}")
+            return result
+            
+        except json.JSONDecodeError:
+            print(f">>> Geographic normalization failed to parse JSON: {result_text}")
+            return _fallback_geo_result(text)
+    
+    except Exception as e:
+        print(f">>> Geographic normalization error: {e}")
+        return _fallback_geo_result(text)
+
+
+def _fallback_geo_result(text: str) -> Dict[str, Any]:
+    """Fallback geographic result when LLM fails"""
+    # Simple fallback logic
+    text_lower = text.lower()
+    
+    if any(country in text_lower for country in ["mexico", "canada", "colombia", "venezuela", "brazil"]):
+        return {
+            "neighborhood": None,
+            "city": None, 
+            "state": None,
+            "country_iso": "OTHER",
+            "confidence": 0.8,
+            "ambiguous": False
+        }
+    
+    # Default to US location with low confidence
+    return {
+        "neighborhood": None,
+        "city": text,
+        "state": None,
+        "country_iso": "US", 
+        "confidence": 0.5,
+        "ambiguous": True,
+        "candidates": []
+    }
+
 
 
 # Valid US state codes
@@ -192,16 +258,6 @@ Extract only information explicitly stated by the user."""
                 # LLM extraction always has confidence 0.95 (very high but not perfect)
                 extracted[key] = (value, 0.95, "llm")
                 print(f"    ✓ Extracted {key}: {value}")
-        
-        # Auto-fill state for unambiguous cities
-        if "property_city" in extracted:
-            city = extracted["property_city"][0]
-            city_lower = city.lower()
-            
-            if city_lower in CITY_TO_STATE and "property_state" not in extracted:
-                state = CITY_TO_STATE[city_lower]
-                extracted["property_state"] = (state, 1.0, "llm")
-                print(f">>> Auto-filled state {state} for unambiguous city {city}")
         
         return extracted
     

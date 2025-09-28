@@ -165,13 +165,20 @@ def process_slot_turn(state: SlotFillingState) -> SlotFillingState:
         print(f"  • {slot_name}: {change_type}")
     
     # =========================================================================
-    # STEP 6: UPDATE SLOTS (with validation)
+    # STEP 6: UPDATE SLOTS (with confidence-based protection)
     # =========================================================================
     for slot_name, (value, conf, source) in extracted.items():
         old_conf = get_slot_confidence(state, slot_name)
         old_value = get_slot_value(state, slot_name)
         
-        # Validation: Prevent invalid values from overwriting good ones
+        # CONFIDENCE-BASED STATE PROTECTION
+        # Only overwrite if significantly more confident or slot is empty
+        if old_value is not None:
+            if conf <= old_conf + 0.05:
+                print(f">>> ⚠️  BLOCKED: New confidence {conf:.2f} not enough to overwrite {old_conf:.2f} for {slot_name}")
+                continue
+        
+        # Prevent invalid numeric downgrades
         if slot_name in ["property_price", "down_payment"]:
             if value <= 0:
                 print(f">>> ⚠️  BLOCKED: Attempted to set {slot_name} to invalid value {value}")
@@ -180,8 +187,19 @@ def process_slot_turn(state: SlotFillingState) -> SlotFillingState:
                 print(f">>> ⚠️  BLOCKED: Attempted to overwrite valid {slot_name} ${old_value} with $0")
                 continue
         
+        # Prevent boolean downgrades (True → False requires high confidence)
+        if slot_name in ["has_valid_passport", "has_valid_visa", "can_demonstrate_income", "has_reserves"]:
+            if old_value is True and value is False:
+                if conf < 0.9:  # High confidence required to override positive boolean
+                    print(f">>> ⚠️  BLOCKED: Need high confidence (≥0.9) to change {slot_name} from True to False. Have {conf:.2f}")
+                    continue
+            if old_value is not None and value is None:
+                print(f">>> ⚠️  BLOCKED: Cannot set {slot_name} to None when existing value is {old_value}")
+                continue
+        
+        # All protection checks passed - update the slot
         set_slot(state, slot_name, value, conf, source)
-        print(f">>> Set slot {slot_name} = {value} (conf {old_conf:.2f} → {conf:.2f})")
+        print(f">>> ✅ Set slot {slot_name} = {value} (conf {old_conf:.2f} → {conf:.2f})")
     
     # =========================================================================
     # STEP 7: VALIDATE BUSINESS RULES
@@ -231,54 +249,66 @@ def process_slot_turn(state: SlotFillingState) -> SlotFillingState:
         # All required slots filled - trigger verification
         print(f">>> All slots filled, triggering verification")
         
-        # Show summary
+        # Build concise summary with business rule validation
         summary_parts = []
-        for slot_name in state["priority_order"]:
-            value = get_slot_value(state, slot_name)
-            if value is not None:
-                if slot_name in ["down_payment", "property_price"]:
-                    display = f"${value:,.0f}"
-                elif isinstance(value, bool):
-                    display = "yes" if value else "no"
-                else:
-                    display = str(value)
-                
-                friendly_names = {
-                    "down_payment": "Down payment",
-                    "property_price": "Property price",
-                    "property_city": "City",
-                    "property_state": "State",
-                    "loan_purpose": "Purpose",
-                    "has_valid_passport": "Passport",
-                    "has_valid_visa": "Visa",
-                    "can_demonstrate_income": "Income documentation",
-                    "has_reserves": "Reserves",
-                    "current_location": "Current location"
-                }
-                
-                friendly = friendly_names.get(slot_name, slot_name)
-                summary_parts.append(f"• {friendly}: {display}")
+        
+        # Core financial info
+        price = get_slot_value(state, "property_price")
+        down = get_slot_value(state, "down_payment")
+        purpose = get_slot_value(state, "loan_purpose")
+        
+        if price and down:
+            ltv = (price - down) / price
+            down_pct = down / price
+            summary_parts.append(f"• Property: ${price:,.0f}")
+            summary_parts.append(f"• Down payment: ${down:,.0f} ({down_pct*100:.1f}%)")
+        
+        # Location
+        city = get_slot_value(state, "property_city")
+        if city:
+            summary_parts.append(f"• Location: {city}")
+        
+        # Purpose with friendly labels
+        if purpose:
+            purpose_map = {"personal": "primary residence", "second": "second home", "investment": "investment"}
+            summary_parts.append(f"• Purpose: {purpose_map.get(purpose, purpose)}")
+        
+        # Documentation status
+        passport = get_slot_value(state, "has_valid_passport")
+        visa = get_slot_value(state, "has_valid_visa")
+        income = get_slot_value(state, "can_demonstrate_income")
+        reserves = get_slot_value(state, "has_reserves")
+        
+        doc_status = []
+        if passport is True: doc_status.append("passport")
+        if visa is True: doc_status.append("visa")
+        if income is True: doc_status.append("income docs")
+        if reserves is True: doc_status.append("reserves")
+        
+        if doc_status:
+            summary_parts.append(f"• Documentation: {', '.join(doc_status)}")
         
         summary = "\n".join(summary_parts)
         
         state["awaiting_verification"] = True
         state["messages"].append({
             "role": "assistant",
-            "content": f"Let me verify the information:\n\n{summary}\n\nIs this correct?"
+            "content": f"Summary:\n\n{summary}\n\nCorrect?"
         })
         return state
     
     # =========================================================================
-    # STEP 10: ASK NEXT MISSING SLOT
+    # STEP 10: ASK NEXT MISSING SLOT (using smart agenda selection)
     # =========================================================================
-    next_slot = get_next_slot_to_ask(state)
+    next_slot = get_next_slot_to_ask(state, last_user_msg, extracted)
     
     if next_slot is None:
-        # All slots asked 2+ times but still missing - force ask first missing
+        # All slots are filled or scored negatively - try fallback
         from .slot_state import get_missing_slots
         missing_slots = get_missing_slots(state, min_confidence=0.6)
         if missing_slots:
             next_slot = missing_slots[0]
+            print(f">>> Fallback: Using first missing slot {next_slot}")
         else:
             # Should not reach here
             state["messages"].append({

@@ -9,7 +9,106 @@ Extracts ALL entities from a single message with confidence scores.
 
 import re
 from typing import Dict, Any, Tuple, List, Optional
-from .llm_extraction import extract_with_llm
+from .llm_extraction import extract_with_llm, normalize_location_with_llm
+from .business_rules import BOOLEAN_SLOTS
+
+
+def handle_contextual_boolean(text: str, last_asked: Optional[str]) -> Optional[Tuple[bool, float, str]]:
+    """
+    Map bare yes/no to boolean slot if just asked about boolean field.
+    
+    Args:
+        text: User message text
+        last_asked: The slot that was just asked about
+    
+    Returns:
+        (value, confidence, source) tuple if contextual yes/no detected, None otherwise
+    """
+    if not last_asked or last_asked not in BOOLEAN_SLOTS:
+        return None
+    
+    text_clean = text.lower().strip()
+    
+    # Remove common filler words
+    text_clean = re.sub(r'\b(yes|yeah|yep|yup|si|sí)\b.*', 'yes', text_clean)
+    text_clean = re.sub(r'\b(no|nope|nah|not?)\b.*', 'no', text_clean)
+    
+    if text_clean in ['yes', 'yeah', 'yep', 'yup', 'si', 'sí']:
+        print(f">>> Contextual yes/no: '{text}' → {last_asked} = True")
+        return (True, 0.95, "contextual_yes_no")
+    elif text_clean in ['no', 'nope', 'nah', 'not']:
+        print(f">>> Contextual yes/no: '{text}' → {last_asked} = False")
+        return (False, 0.95, "contextual_yes_no")
+    
+    return None
+
+
+def extract_deterministic_values(text: str) -> Dict[str, Tuple[Any, float, str]]:
+    """
+    Extract values using deterministic parsers (money, numbers).
+    
+    Returns:
+        Dict[slot_name, (value, confidence, source)]
+    """
+    extracted = {}
+    
+    # Extract money values
+    money_values = extract_all_money(text)
+    if len(money_values) == 1:
+        # Single money value - could be down payment or property price
+        value = money_values[0]
+        # Use context clues to determine which
+        text_lower = text.lower()
+        if any(word in text_lower for word in ['down', 'deposit']):
+            extracted["down_payment"] = (value, 0.9, "deterministic")
+        elif any(word in text_lower for word in ['price', 'cost', 'worth', 'value']):
+            extracted["property_price"] = (value, 0.9, "deterministic")
+        # If ambiguous, let LLM decide later
+        
+    elif len(money_values) >= 2:
+        # Multiple money values - likely down payment and property price
+        text_lower = text.lower()
+        
+        # Try to identify which is which based on order and keywords
+        down_indicators = ['down', 'deposit', 'put', 'pay']
+        price_indicators = ['price', 'cost', 'worth', 'value', 'property', 'home', 'condo']
+        
+        # Simple heuristic: smaller amount is usually down payment
+        money_values.sort()
+        extracted["down_payment"] = (money_values[0], 0.85, "deterministic")
+        extracted["property_price"] = (money_values[-1], 0.85, "deterministic")
+    
+    return extracted
+
+
+def handle_location_extraction(text: str) -> Dict[str, Tuple[Any, float, str]]:
+    """
+    Extract location information using LLM geographic normalization.
+    
+    Returns:
+        Dict[slot_name, (value, confidence, source)]
+    """
+    extracted = {}
+    
+    # Look for location keywords
+    text_lower = text.lower()
+    location_indicators = ['in', 'at', 'from', 'located', 'city', 'neighborhood', 'area']
+    
+    if any(indicator in text_lower for indicator in location_indicators):
+        # Use LLM to normalize the entire text
+        geo_result = normalize_location_with_llm(text)
+        
+        if geo_result.get("city"):
+            extracted["property_city"] = (geo_result["city"], geo_result["confidence"], "geo_llm")
+        
+        if geo_result.get("state"):
+            extracted["property_state"] = (geo_result["state"], geo_result["confidence"], "geo_llm")
+            
+        if geo_result.get("country_iso") and geo_result["country_iso"] != "US":
+            # Foreign country - set current_location
+            extracted["current_location"] = ("Origin Country", geo_result["confidence"], "geo_llm")
+    
+    return extracted
 
 
 def extract_all_slots(text: str, llm_available: bool = True, state: Optional[Dict[str, Any]] = None) -> Dict[str, Tuple[Any, float, str]]:
@@ -39,12 +138,38 @@ def extract_all_slots(text: str, llm_available: bool = True, state: Optional[Dic
     # Get context about what was just asked
     last_asked = state.get("last_slot_asked") if state else None
     
-    # Use LLM extraction for all fields
-    extracted = extract_with_llm(text, context=last_asked)
+    print(f">>> Starting multi-stage extraction for: '{text}'")
     
-    print(f">>> LLM extracted {len(extracted)} slots from: '{text}'")
+    # Stage 1: Check for contextual yes/no first (highest confidence)
+    extracted = {}
+    contextual_bool = handle_contextual_boolean(text, last_asked)
+    if contextual_bool and last_asked:
+        extracted[last_asked] = contextual_bool
+        print(f">>> Contextual boolean extracted: {last_asked} = {contextual_bool[0]}")
+    
+    # Stage 2: Deterministic extraction (money, numbers)
+    deterministic = extract_deterministic_values(text)
+    for key, value_tuple in deterministic.items():
+        if key not in extracted:  # Don't overwrite contextual booleans
+            extracted[key] = value_tuple
+    
+    # Stage 3: Geographic normalization
+    location_data = handle_location_extraction(text)
+    for key, value_tuple in location_data.items():
+        if key not in extracted:
+            extracted[key] = value_tuple
+    
+    # Stage 4: General LLM extraction for remaining fields
+    llm_extracted = extract_with_llm(text, context=last_asked)
+    for key, value_tuple in llm_extracted.items():
+        if key not in extracted:
+            # Reduce LLM confidence slightly since other methods had first chance
+            value, conf, source = value_tuple
+            extracted[key] = (value, conf * 0.9, source)
+    
+    print(f">>> Total extracted {len(extracted)} slots:")
     for key, (val, conf, source) in extracted.items():
-        print(f"    {key} = {val} (confidence={conf})")
+        print(f"    {key} = {val} (confidence={conf:.2f}, source={source})")
     
     return extracted
 
@@ -115,26 +240,33 @@ def needs_confirmation(
     old_confidence: float = 0.0
 ) -> bool:
     """
-    Determine if a slot needs explicit user confirmation.
+    Determine if a slot needs explicit user confirmation - DELTA-ONLY approach.
     
     Rules:
-    - New slots with confidence < 0.5: confirm (very uncertain only)
-    - Changed slots: always confirm
-    - High confidence (>= 0.9): no confirmation needed unless changed
+    - Changed slots: always confirm (significant delta)
+    - New slots: only confirm if confidence < 0.4 (very uncertain)
+    - Confirmed slots: never confirm again (no delta)
+    - Trust high-confidence LLM extractions (0.95 typical)
     
-    Note: LLM extractions typically have 0.95 confidence, which we should trust.
+    This implements delta-only confirmations to reduce conversation friction.
     """
     if change_type == "changed":
+        # Always confirm changes - this is a significant delta
         return True
     
-    # Only confirm if confidence is VERY low (< 0.5)
-    # LLM gives 0.95 for good extractions, trust it
-    if change_type == "new" and confidence < 0.5:
-        return True
-    
-    if change_type == "confirmed" and old_confidence < 0.5 and confidence >= 0.5:
-        # Confidence increased, no need to confirm again
+    if change_type == "confirmed":
+        # Same value seen again - no delta, no confirmation needed
         return False
+    
+    if change_type == "new":
+        # New slot - only confirm if we're very uncertain
+        # Lower threshold from 0.5 to 0.4 to trust LLM more
+        if confidence < 0.4:
+            return True
+        
+        # For critical financial fields, be slightly more cautious
+        if slot_name in ["property_price", "down_payment"] and confidence < 0.7:
+            return True
     
     return False
 
@@ -148,6 +280,7 @@ def format_delta_confirmation(delta: Dict[str, Tuple[Any, float, str, str]]) -> 
     """
     import os
     from openai import OpenAI
+    from .question_generator import apply_tone_guard
     
     if not delta:
         return ""
@@ -204,7 +337,8 @@ Be conversational and natural. Keep it brief."""
             temperature=0.7,
             max_tokens=60
         )
-        return response.choices[0].message.content.strip()
+        raw_response = response.choices[0].message.content.strip()
+        return apply_tone_guard(raw_response)
     except Exception as e:
         print(f"LLM confirmation generation error: {e}")
         # Fallback to natural but simpler format

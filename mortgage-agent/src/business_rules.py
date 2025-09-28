@@ -13,8 +13,31 @@ Strictly enforces lending guidelines:
 - 6-12 months reserves required
 """
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Set
 from .slot_state import SlotFillingState, get_slot_value
+
+# =============================================================================
+# BUSINESS RULE CONSTANTS - SINGLE SOURCE OF TRUTH
+# =============================================================================
+
+# Down payment and LTV requirements
+MIN_DOWN_PCT = 0.25  # 25% minimum down payment for Foreign National loans
+MAX_LTV = 0.75       # 75% maximum loan-to-value ratio
+
+# Reserves requirements (months of mortgage payments)
+MIN_RESERVES_MONTHS = 6   # Minimum 6 months of reserves
+MAX_RESERVES_MONTHS = 12  # Recommended 12 months of reserves
+
+# Allowed loan purposes (no refinance for Foreign National)
+PURPOSE_ALLOWED: Set[str] = {"personal", "second", "investment"}
+
+# Boolean slots that accept yes/no responses
+BOOLEAN_SLOTS: Set[str] = {
+    "has_valid_passport", 
+    "has_valid_visa", 
+    "can_demonstrate_income", 
+    "has_reserves"
+}
 
 
 class ValidationError:
@@ -70,17 +93,17 @@ def validate_all_rules(state: SlotFillingState) -> List[ValidationError]:
             ltv = (price - down) / price
             down_pct = down / price
             
-            if down_pct < 0.25:
+            if down_pct < MIN_DOWN_PCT:
                 errors.append(ValidationError(
                     "min_down_payment",
-                    f"Down payment must be ≥25% of property price. You have {down_pct*100:.1f}% (${down:,.0f} on ${price:,.0f})",
+                    f"Down payment must be ≥{MIN_DOWN_PCT*100:.0f}% of property price. You have {down_pct*100:.1f}% (${down:,.0f} on ${price:,.0f})",
                     "error"
                 ))
             
-            if ltv > 0.75:
+            if ltv > MAX_LTV:
                 errors.append(ValidationError(
                     "max_ltv",
-                    f"LTV must be ≤75%. Your LTV is {ltv*100:.1f}%",
+                    f"LTV must be ≤{MAX_LTV*100:.0f}%. Your LTV is {ltv*100:.1f}%",
                     "error"
                 ))
     

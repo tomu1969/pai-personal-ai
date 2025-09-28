@@ -237,28 +237,140 @@ def get_missing_slots(state: SlotFillingState, min_confidence: float = 0.6) -> L
     ]
 
 
-def get_next_slot_to_ask(state: SlotFillingState) -> Optional[str]:
+def score_slot_priority(slot_name: str, state: SlotFillingState, recent_mentions: List[str]) -> float:
     """
-    Get the next slot to ask about based on priority queue.
+    Score slot priority based on multiple factors.
     
-    Rules:
-    - Skip slots with confidence >= 0.6
-    - Skip slots asked >= 2 times unless critical
-    - Skip last_slot_asked to avoid immediate repeat
+    Args:
+        slot_name: Slot to score
+        state: Current conversation state
+        recent_mentions: Slots mentioned in last turn
+    
+    Returns:
+        Priority score (higher = more important to ask)
+    """
+    score = 0.0
+    
+    # Factor 1: Missingness (highest priority)
+    confidence = get_slot_confidence(state, slot_name)
+    if confidence < 0.6:
+        score += 10.0
+    elif confidence < 0.8:
+        score += 5.0  # Partially filled, but could be improved
+    
+    # Factor 2: Dependencies (need certain info before others)
+    if slot_name == "has_reserves":
+        # Need property price to calculate reserves amount
+        if get_slot_value(state, "property_price") and get_slot_value(state, "down_payment"):
+            score += 8.0  # Can give precise answer
+        else:
+            score -= 2.0  # Better to wait until we have price info
+    
+    if slot_name == "property_price":
+        # Need down payment to suggest affordable range
+        if get_slot_value(state, "down_payment"):
+            score += 6.0  # Can suggest affordable range
+    
+    if slot_name in ["has_valid_passport", "has_valid_visa"]:
+        # Documentation slots are important for Foreign National loans
+        score += 4.0
+    
+    # Factor 3: Recency boost (mentioned in recent turn)
+    if slot_name in recent_mentions:
+        score += 7.0
+        print(f">>> Recency boost for {slot_name}")
+    
+    # Factor 4: Penalize repeated asks
+    ask_count = state["slot_ask_counts"].get(slot_name, 0)
+    score -= ask_count * 3.0
+    
+    # Factor 5: Avoid immediate repeat of last asked
+    if slot_name == state.get("last_slot_asked"):
+        score -= 15.0  # Strong penalty
+    
+    return score
+
+
+def extract_recent_mentions(last_user_message: str, extracted_slots: Dict[str, Any]) -> List[str]:
+    """
+    Extract which slots were recently mentioned by user or extracted.
+    
+    Args:
+        last_user_message: User's last message
+        extracted_slots: Slots extracted from last message
+    
+    Returns:
+        List of slot names that were recently mentioned
+    """
+    mentions = []
+    
+    # Add any slots that were extracted from last message
+    mentions.extend(extracted_slots.keys())
+    
+    # Look for explicit mentions in message text
+    text_lower = last_user_message.lower()
+    
+    if any(word in text_lower for word in ['down', 'deposit']):
+        mentions.append("down_payment")
+    
+    if any(word in text_lower for word in ['price', 'cost', 'worth', 'afford']):
+        mentions.append("property_price")
+    
+    if any(word in text_lower for word in ['city', 'location', 'where', 'neighborhood']):
+        mentions.extend(["property_city", "property_state"])
+    
+    if any(word in text_lower for word in ['passport']):
+        mentions.append("has_valid_passport")
+    
+    if any(word in text_lower for word in ['visa']):
+        mentions.append("has_valid_visa")
+    
+    if any(word in text_lower for word in ['reserves', 'savings']):
+        mentions.append("has_reserves")
+    
+    if any(word in text_lower for word in ['income', 'documents', 'documentation']):
+        mentions.append("can_demonstrate_income")
+    
+    return list(set(mentions))  # Remove duplicates
+
+
+def get_next_slot_to_ask(state: SlotFillingState, last_user_message: str = "", extracted_slots: Dict[str, Any] = None) -> Optional[str]:
+    """
+    Get the next slot to ask about using smart scoring system.
+    
+    Args:
+        state: Current conversation state
+        last_user_message: User's last message for context
+        extracted_slots: Recently extracted slots
+    
+    Returns:
+        Next slot to ask about, or None if all filled
     """
     missing = get_missing_slots(state)
+    if not missing:
+        return None
     
+    # Extract what was recently mentioned
+    extracted_slots = extracted_slots or {}
+    recent_mentions = extract_recent_mentions(last_user_message, extracted_slots)
+    
+    # Score all missing slots
+    scored_slots = []
     for slot in missing:
-        # Skip if just asked
-        if slot == state.get("last_slot_asked"):
-            continue
-        
-        # Skip if asked too many times (unless critical)
-        ask_count = state["slot_ask_counts"].get(slot, 0)
-        if ask_count >= 2:
-            continue
-        
-        return slot
+        score = score_slot_priority(slot, state, recent_mentions)
+        scored_slots.append((slot, score))
     
-    # If all slots asked 2+ times, return first missing
+    # Sort by score (highest first)
+    scored_slots.sort(key=lambda x: x[1], reverse=True)
+    
+    print(f">>> Slot scoring:")
+    for slot, score in scored_slots[:5]:  # Show top 5
+        ask_count = state["slot_ask_counts"].get(slot, 0)
+        print(f"    {slot}: {score:.1f} (asked {ask_count} times)")
+    
+    # Return highest scoring slot
+    if scored_slots and scored_slots[0][1] > 0:
+        return scored_slots[0][0]
+    
+    # Fallback: return first missing if all scores are negative
     return missing[0] if missing else None

@@ -251,10 +251,8 @@ Foreign National loans may take slightly longer due to international documentati
         
         if price_mentioned and current_down:
             # Calculate how much more down payment is needed
-            if loan_purpose == "investment" or loan_purpose == "second":
-                min_down_pct = 0.25  # 25%
-            else:
-                min_down_pct = 0.20  # 20%
+            # Foreign National loans require 25% minimum down for ALL purposes
+            min_down_pct = 0.25  # 25% minimum for all Foreign National loans
             
             required_down = price_mentioned * min_down_pct
             current_down_float = float(current_down)
@@ -313,12 +311,9 @@ Be conversational and warm. Don't use markdown formatting like ** or #."""
             # Generic down payment info with user's context
             loan_purpose = get_slot_value(state, "loan_purpose") or "personal"
             
-            if loan_purpose == "investment" or loan_purpose == "second":
-                min_pct = 25
-                max_affordable = float(current_down) * 4
-            else:
-                min_pct = 20
-                max_affordable = float(current_down) * 5
+            # Foreign National loans require 25% minimum down for ALL purposes
+            min_pct = 25
+            max_affordable = float(current_down) * 4  # 25% down = 4x affordability
             
             answer = f"""With your **${float(current_down):,.0f}** down payment:
 
@@ -330,9 +325,9 @@ Higher down payments (30%+) may qualify for better rates and easier approval."""
         
         else:
             # No context, provide general info
-            answer = """Minimum down payment requirements:
+            answer = """Minimum down payment requirements for Foreign National loans:
 
-• **Primary residence**: 20% minimum
+• **Primary residence**: 25% minimum
 • **Second home**: 25% minimum
 • **Investment property**: 25% minimum
 

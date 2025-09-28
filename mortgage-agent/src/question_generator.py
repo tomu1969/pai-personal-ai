@@ -65,11 +65,11 @@ Context: User has provided {context_str}
 Your task: Ask about "{slot_name}" in a natural, conversational way.
 
 Guidelines:
-- Be brief (1-2 sentences)
-- Acknowledge their previous answer if there was one
-- Don't be overly enthusiastic or use excessive praise
-- Be professional but warm
-- If they just answered something, briefly acknowledge it before asking next question
+- Be brief (1-2 sentences maximum)
+- Be neutral and concise. No praise or encouragement.
+- Avoid phrases like 'great', 'excellent', 'sounds good', 'that's wonderful'
+- Be professional and direct
+- Simple acknowledgment only: "Thanks" or brief restatement, then move to next question
 
 User's last message: "{last_user_message or 'none'}"
 
@@ -99,13 +99,9 @@ def generate_property_price_question(filled_slots: Dict[str, Any], last_user_mes
     loan_purpose = filled_slots.get("loan_purpose", "personal")
     
     if down_payment > 0:
-        # Calculate affordability
-        if loan_purpose == "investment":
-            max_price = down_payment * 4.0  # 25% down
-            comfortable_price = down_payment * 3.33  # 30% down
-        else:
-            max_price = down_payment * 5.0  # 20% down  
-            comfortable_price = down_payment * 4.0  # 25% down
+        # Calculate affordability - Foreign National loans require 25% minimum
+        max_price = down_payment * 4.0  # 25% down minimum
+        comfortable_price = down_payment * 3.33  # 30% down (more comfortable)
         
         prompt = f"""You are a mortgage assistant. The user has ${down_payment:,.0f} for down payment and wants an {loan_purpose} property.
 
@@ -187,7 +183,7 @@ def get_fallback_question(slot_name: str, filled_slots: Dict[str, Any]) -> str:
     Fallback static questions if LLM fails.
     """
     questions = {
-        "down_payment": "Great! Let's start with how much you have saved for a down payment.",
+        "down_payment": "How much do you have saved for a down payment?",
         "loan_purpose": "What will you use the property for? (primary residence, second home, or investment)",
         "property_city": "Which city is the property in?",
         "property_state": "Which state?",

@@ -165,10 +165,21 @@ def process_slot_turn(state: SlotFillingState) -> SlotFillingState:
         print(f"  • {slot_name}: {change_type}")
     
     # =========================================================================
-    # STEP 6: UPDATE SLOTS
+    # STEP 6: UPDATE SLOTS (with validation)
     # =========================================================================
     for slot_name, (value, conf, source) in extracted.items():
         old_conf = get_slot_confidence(state, slot_name)
+        old_value = get_slot_value(state, slot_name)
+        
+        # Validation: Prevent invalid values from overwriting good ones
+        if slot_name in ["property_price", "down_payment"]:
+            if value <= 0:
+                print(f">>> ⚠️  BLOCKED: Attempted to set {slot_name} to invalid value {value}")
+                continue
+            if old_value and old_value > 0 and value == 0:
+                print(f">>> ⚠️  BLOCKED: Attempted to overwrite valid {slot_name} ${old_value} with $0")
+                continue
+        
         set_slot(state, slot_name, value, conf, source)
         print(f">>> Set slot {slot_name} = {value} (conf {old_conf:.2f} → {conf:.2f})")
     

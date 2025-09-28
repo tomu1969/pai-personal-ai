@@ -139,7 +139,20 @@ def extract_with_llm(user_message: str, context: Optional[str] = None) -> Dict[s
     messages = [
         {
             "role": "system",
-            "content": "You are a mortgage data extraction assistant. Extract only information explicitly stated by the user. Do not infer or assume values."
+            "content": """You are a mortgage data extraction assistant for Foreign National loans. Extract information from user messages.
+
+CRITICAL: Map loan purpose correctly:
+- "new home", "purchase", "buy", "primary residence" → "personal"
+- "vacation home", "second home" → "second"  
+- "rental", "investment", "income property" → "investment"
+- "refinance", "refi" → DO NOT EXTRACT (Foreign National loans are purchase-only)
+
+For locations, handle regional descriptions:
+- "South Florida" → extract likely city (Miami) + state (FL)
+- "North Florida" → extract likely city (Jacksonville) + state (FL)
+- "Central Florida" → extract likely city (Orlando) + state (FL)
+
+Extract only information explicitly stated by the user."""
         },
         {
             "role": "user",

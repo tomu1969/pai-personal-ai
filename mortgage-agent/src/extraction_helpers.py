@@ -129,42 +129,32 @@ def parse_location(text: str) -> Dict[str, Optional[str]]:
     if not text:
         return result
     
-    # Pattern 1: "City, State" or "City, ST"
+    text_lower = text.lower()
+    
+    # Pattern 1: Known major cities (check first to avoid false matches)
+    known_cities = ["miami", "dallas", "austin", "houston", "seattle", 
+                    "portland", "phoenix", "atlanta", "boston", "denver",
+                    "chicago", "new york", "los angeles", "san francisco",
+                    "tampa", "orlando", "jacksonville", "nashville", "memphis",
+                    "charlotte", "raleigh", "detroit", "milwaukee", "minneapolis"]
+    
+    for city in known_cities:
+        if city in text_lower:
+            result["city"] = city.title()
+            break
+    
+    # Pattern 2: "City, State" or "City, ST"
     match = re.search(r'([A-Z][a-z\s]+),\s*([A-Z][a-z\s]+|[A-Z]{2})', text)
     if match:
-        result["city"] = match.group(1).strip()
+        if not result["city"]:  # Only override if not found by known cities
+            result["city"] = match.group(1).strip()
         result["state"] = match.group(2).strip()
         return result
     
-    # Pattern 2: Split on commas and extract parts
-    parts = [p.strip() for p in re.split(r'[,;/]|\sin\s|\sen\s', text) if p.strip()]
-    
-    if len(parts) >= 2:
-        # Last part might be state
-        if re.fullmatch(r'[A-Z]{2}', parts[-1]):
-            result["state"] = parts[-1]
-            result["city"] = parts[-2] if len(parts) > 1 else None
-        else:
-            result["city"] = parts[0]
-            result["state"] = parts[-1]
-    elif len(parts) == 1:
-        # Check if it's a 2-letter state code
-        if re.fullmatch(r'[A-Z]{2}', parts[0]):
-            result["state"] = parts[0]
-        else:
-            # Assume it's a city
-            result["city"] = parts[0]
-    
-    # Pattern 3: Known major cities
-    known_cities = ["miami", "dallas", "austin", "houston", "seattle", 
-                    "portland", "phoenix", "atlanta", "boston", "denver",
-                    "chicago", "new york", "los angeles", "san francisco"]
-    
-    text_lower = text.lower()
-    for city in known_cities:
-        if city in text_lower and not result["city"]:
-            result["city"] = city.title()
-            break
+    # Pattern 3: 2-letter state code
+    state_match = re.search(r'\b([A-Z]{2})\b', text)
+    if state_match:
+        result["state"] = state_match.group(1)
     
     return result
 

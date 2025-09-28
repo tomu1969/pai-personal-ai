@@ -59,7 +59,7 @@ def process_slot_turn(state: SlotFillingState) -> SlotFillingState:
     if len(state["messages"]) == 0:
         state["messages"].append({
             "role": "assistant",
-            "content": "I'll help you with your mortgage pre-qualification. What type of property are you looking to purchase?"
+            "content": "Hi, I can help you pre-qualify for a mortgage with just eight questions. Would you like to begin?"
         })
         return state
     
@@ -278,16 +278,37 @@ def process_slot_turn(state: SlotFillingState) -> SlotFillingState:
 
 def build_slot_question(slot_name: str, state: SlotFillingState) -> str:
     """
-    Build a concise, neutral question for a missing slot.
+    Build a context-aware question for a missing slot.
     
-    Style: Succinct, technical, no praise or filler.
+    For property_price, calculate affordability range based on down payment.
     """
+    
+    # Special handling for property_price with affordability calculation
+    if slot_name == "property_price":
+        down_payment = get_slot_value(state, "down_payment")
+        loan_purpose = get_slot_value(state, "loan_purpose")
+        
+        if down_payment:
+            # Calculate affordability range based on LTV requirements
+            if loan_purpose == "investment":
+                # 25% minimum down for investment properties
+                max_price = down_payment * 4.0  # 25% down
+                comfortable_price = down_payment * 3.33  # 30% down
+            else:
+                # 20-25% down for primary residence or second home
+                max_price = down_payment * 5.0  # 20% down
+                comfortable_price = down_payment * 4.0  # 25% down
+            
+            return f"Based on your ${down_payment:,.0f} down payment, you can afford properties between ${comfortable_price:,.0f} and ${max_price:,.0f}. What price range are you considering?"
+        else:
+            return "What's your target property price?"
+    
+    # Standard questions for other slots
     questions = {
+        "down_payment": "Great! Let's start with how much you have saved for a down payment.",
         "loan_purpose": "What will you use the property for? (primary residence, second home, or investment)",
         "property_city": "Which city is the property in?",
         "property_state": "Which state?",
-        "property_price": "What's the property price?",
-        "down_payment": "How much is your down payment?",
         "has_valid_passport": "Do you have a valid passport?",
         "has_valid_visa": "Do you have a valid U.S. visa?",
         "current_location": "Are you currently in the USA or your home country?",

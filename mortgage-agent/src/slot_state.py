@@ -161,16 +161,16 @@ def create_slot_state() -> SlotFillingState:
         
         # Priority queue
         "priority_order": [
-            "loan_purpose",
-            "property_city",
-            "property_state", 
-            "property_price",
-            "down_payment",
-            "has_valid_passport",
-            "has_valid_visa",
-            "current_location",
-            "can_demonstrate_income",
-            "has_reserves"
+            "down_payment",         # FIRST - determines affordability
+            "loan_purpose",         # Affects LTV requirements
+            "property_city",        # Location
+            "property_state",       # Only if needed
+            "property_price",       # Based on affordability range
+            "has_valid_passport",   # Documentation
+            "has_valid_visa",       # Documentation
+            "current_location",     # Processing
+            "can_demonstrate_income",  # Approval
+            "has_reserves"          # Approval
         ],
         "last_slot_asked": None,
         "slot_ask_counts": {},

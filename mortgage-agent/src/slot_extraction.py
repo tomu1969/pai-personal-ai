@@ -3,27 +3,22 @@
 SLOT_EXTRACTION.PY - MULTI-ENTITY EXTRACTION WITH CONFIDENCE
 ================================================================================
 
-Hybrid extraction: deterministic + LLM.
+LLM-based extraction for accuracy and context awareness.
 Extracts ALL entities from a single message with confidence scores.
 """
 
 import re
 from typing import Dict, Any, Tuple, List, Optional
-from .extraction_helpers import (
-    parse_money,
-    parse_boolean,
-    normalize_loan_purpose,
-    parse_location
-)
+from .llm_extraction import extract_with_llm
 
 
 def extract_all_slots(text: str, llm_available: bool = True, state: Optional[Dict[str, Any]] = None) -> Dict[str, Tuple[Any, float, str]]:
     """
-    Extract ALL possible slots from text with confidence scores.
+    Extract ALL possible slots from text using LLM.
     
     Args:
-        text: User message to extract from
-        llm_available: Whether LLM extraction is available (unused for now)
+        text: User message to extract from (ONLY the user's latest message)
+        llm_available: Whether LLM extraction is available
         state: Optional conversation state for context-aware extraction
     
     Returns:
@@ -33,104 +28,23 @@ def extract_all_slots(text: str, llm_available: bool = True, state: Optional[Dic
         "$200k down on $800k Miami condo, investment"
         →
         {
-            "down_payment": (200000.0, 1.0, "deterministic"),
-            "property_price": (800000.0, 1.0, "deterministic"),
-            "property_city": ("Miami", 1.0, "deterministic"),
-            "loan_purpose": ("investment", 1.0, "deterministic")
+            "down_payment": (200000.0, 0.95, "llm"),
+            "property_price": (800000.0, 0.95, "llm"),
+            "property_city": ("Miami", 0.95, "llm"),
+            "property_state": ("FL", 1.0, "llm"),  # Auto-filled
+            "loan_purpose": ("investment", 0.95, "llm")
         }
     """
-    extracted = {}
     
-    # =========================================================================
-    # DETERMINISTIC EXTRACTION (confidence = 1.0)
-    # =========================================================================
-    
-    # Money values (multiple possible)
-    money_values = extract_all_money(text)
-    t_lower = text.lower()
-    
-    # =========================================================================
-    # CONTEXT-AWARE EXTRACTION (for single money values)
-    # =========================================================================
+    # Get context about what was just asked
     last_asked = state.get("last_slot_asked") if state else None
     
-    if last_asked and len(money_values) == 1:
-        val = money_values[0]
-        
-        # If we just asked about down_payment, assign there
-        if last_asked == "down_payment" and 10000 <= val <= 5000000:
-            extracted["down_payment"] = (val, 1.0, "deterministic")
-            money_values = []  # Mark as consumed
-        
-        # If we just asked about property_price, assign there  
-        elif last_asked == "property_price" and 100000 <= val <= 50000000:
-            extracted["property_price"] = (val, 1.0, "deterministic")
-            money_values = []  # Mark as consumed
+    # Use LLM extraction for all fields
+    extracted = extract_with_llm(text, context=last_asked)
     
-    # Check for both price and down keywords
-    has_down_kw = any(kw in t_lower for kw in ["down payment", "down", "deposit", "upfront"])
-    has_price_kw = any(kw in t_lower for kw in ["property", "house", "home", "condo", "price", "cost"])
-    
-    # If we have 2+ money values, extract smartly
-    if len(money_values) >= 2:
-        # Sort by value (largest first)
-        sorted_values = sorted(money_values, reverse=True)
-        
-        # Assume larger = price, smaller = down payment
-        if sorted_values[0] >= 100000:
-            extracted["property_price"] = (sorted_values[0], 1.0, "deterministic")
-        if sorted_values[1] >= 10000:
-            extracted["down_payment"] = (sorted_values[1], 1.0, "deterministic")
-    
-    elif len(money_values) == 1:
-        # Single money value - guess based on magnitude
-        val = money_values[0]
-        if val >= 100000:
-            # Could be price or large down payment
-            if "down" in text.lower():
-                extracted["down_payment"] = (val, 1.0, "deterministic")
-            else:
-                extracted["property_price"] = (val, 0.8, "deterministic")
-        elif val >= 10000:
-            extracted["down_payment"] = (val, 0.8, "deterministic")
-    
-    # Location
-    location = parse_location(text)
-    if location["city"]:
-        extracted["property_city"] = (location["city"], 1.0, "deterministic")
-    if location["state"]:
-        extracted["property_state"] = (location["state"], 1.0, "deterministic")
-    
-    # Loan purpose
-    purpose = normalize_loan_purpose(text)
-    if purpose:
-        extracted["loan_purpose"] = (purpose, 1.0, "deterministic")
-    
-    # Booleans (passport/visa/income/reserves)
-    bool_val = parse_boolean(text)
-    if bool_val is not None:
-        # Try to determine which field based on keywords
-        t = text.lower()
-        if "passport" in t:
-            extracted["has_valid_passport"] = (bool_val, 1.0, "deterministic")
-        if "visa" in t:
-            extracted["has_valid_visa"] = (bool_val, 1.0, "deterministic")
-        if any(kw in t for kw in ["income", "bank statement", "tax return", "cpa letter"]):
-            extracted["can_demonstrate_income"] = (bool_val, 1.0, "deterministic")
-        if any(kw in t for kw in ["reserve", "saving", "emergency fund", "month"]):
-            extracted["has_reserves"] = (bool_val, 1.0, "deterministic")
-    
-    # Current location
-    t = text.lower()
-    if any(kw in t for kw in ["usa", "united states", "america", "u.s.", "states"]):
-        extracted["current_location"] = ("USA", 1.0, "deterministic")
-    elif any(kw in t for kw in ["mexico", "colombia", "brazil", "canada", "country", "home", "origin"]):
-        extracted["current_location"] = ("Origin Country", 0.9, "deterministic")
-    
-    # =========================================================================
-    # LLM EXTRACTION (for fuzzy cases) - TODO if needed
-    # =========================================================================
-    # This could be added later for more complex narratives
+    print(f">>> LLM extracted {len(extracted)} slots from: '{text}'")
+    for key, (val, conf, source) in extracted.items():
+        print(f"    {key} = {val} (confidence={conf})")
     
     return extracted
 

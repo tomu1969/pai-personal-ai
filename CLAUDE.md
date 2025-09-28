@@ -469,37 +469,94 @@ PAI_MORTGAGE_WEBHOOK_URL=http://localhost:3000/webhook/pai-mortgage
 - Webhook signature validation (Evolution API)
 - Database access controls
 
+## PAI Mortgage System Management
+
+### Primary Management Scripts
+
+```bash
+# Interactive system manager - check status and optionally start
+./scripts/pai-mortgage-manager.sh
+npm run pai
+
+# Quick status check with comprehensive health dashboard
+./scripts/pai-mortgage-manager.sh --status
+npm run pai:status
+
+# Start system without prompting (includes full health checks)
+./scripts/pai-mortgage-manager.sh --start
+npm run pai:start
+
+# Run end-to-end test (sends test mortgage inquiry)
+./scripts/pai-mortgage-manager.sh --test
+npm run pai:test
+
+# Complete system startup with health verification
+./scripts/start-pai-mortgage-system.sh
+
+# Clean system shutdown
+./scripts/stop-pai-mortgage-system.sh
+npm run pai:stop
+
+# Safe restart (stop + start with health checks)
+./scripts/restart-pai-mortgage-system.sh
+npm run pai:restart
+```
+
+### Health Dashboard Output
+
+The manager script provides comprehensive health monitoring:
+
+```
+🏥 PAI Mortgage System Health Dashboard
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Docker Services:
+✅ Evolution API: Running
+✅ PostgreSQL: Active
+⚠️  Redis: Not responding (may not be required)
+
+PAI Mortgage Instance:
+✅ PAI Mortgage: Connected (+57 318 260 1111)
+
+OpenAI Configuration:
+✅ OpenAI API: Key configured correctly
+
+Backend Service:
+✅ Backend Service: Running on port 3000
+
+Message Routing:
+✅ Message Routing: PAI Mortgage handler active
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎉 System Fully Operational! Ready for WhatsApp messages.
+```
+
+### End-to-End Testing
+
+The test command sends a realistic mortgage inquiry to verify complete functionality:
+
+```bash
+npm run pai:test
+# Sends: "I'm interested in getting a mortgage for a $300,000 house. What rates do you offer?"
+# Verifies: Message routing to PAI Mortgage handler
+# Reports: ✅ End-to-End Test: PASSED
+```
+
 ## Quick Commands
 
 ```bash
-# Check logs
-tail -f logs/combined.log
+# System management (recommended)
+npm run pai:status    # Check health dashboard
+npm run pai:start     # Start if not running
+npm run pai:test      # Verify end-to-end functionality
 
-# Restart services
-docker-compose restart evolution-api
+# Legacy commands for debugging
+tail -f logs/combined.log                                    # Check logs
+docker-compose restart evolution-api                         # Restart services
+curl http://localhost:8080/instance/connectionState/pai-mortgage-fresh  # Check PAI Mortgage connection
 
-# Check database connection
-npm run db:test
-
-# Build for production
-npm run build && cd client && npm run build
-
-# Check instance status (PAI Responder)
-curl http://localhost:8080/instance/connectionState/aipbx
-
-# Check instance status (PAI Assistant) 
-curl http://localhost:8080/instance/connectionState/pai-assistant
-
-# Check instance status (PAI Mortgage)
-curl http://localhost:8080/instance/connectionState/pai-mortgage
-
-# Test webhook routing
-curl -X POST http://localhost:3000/webhook -d '{"test": "responder"}'
-curl -X POST http://localhost:3000/webhook/pai-assistant -d '{"test": "assistant"}'
-curl -X POST http://localhost:3000/webhook/pai-mortgage -d '{"test": "mortgage"}'
-
-# Reset PAI Mortgage instance (if QR code limit reached)
-node scripts/reset-instance.js pai-mortgage
+# Manual webhook testing
+curl -X POST http://localhost:3000/webhook/messages-upsert \
+  -H "Content-Type: application/json" \
+  -d '{"event":"messages.upsert","instance":"pai-mortgage-fresh","data":{"message":{"conversation":"test"}}}'
 ```
 
 ## Deployment

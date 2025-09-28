@@ -2,11 +2,52 @@
 
 Complete step-by-step guide for connecting WhatsApp to PAI's triple assistant system and understanding how messages flow through the system.
 
+## 🏠 PAI Mortgage System Quick Start
+
+### **Recommended: Use PAI Mortgage Manager**
+
+For PAI Mortgage system specifically, use the dedicated management script:
+
+```bash
+# Interactive system check and startup
+./scripts/pai-mortgage-manager.sh
+
+# Quick status check with health dashboard
+npm run pai:status
+
+# Start system if not running
+npm run pai:start
+
+# Test end-to-end functionality
+npm run pai:test
+```
+
+**Health Dashboard Example:**
+```
+🏥 PAI Mortgage System Health Dashboard
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Docker Services: Evolution API + PostgreSQL
+✅ PAI Mortgage: Connected (+57 318 260 1111)
+✅ OpenAI API: Valid API key
+✅ Backend Service: Running on port 3000
+✅ Message Routing: PAI Mortgage handler active
+🎉 System Fully Operational!
+```
+
 ## 🔧 Step-by-Step WhatsApp Connection Process
 
 ### **Phase 1: System Startup (Unified Launch)**
 
-1. **One-Command Launch**
+1. **PAI Mortgage System Launch (Recommended)**
+   ```bash
+   # Interactive management
+   npm run pai
+   
+   # Or force start
+   npm run pai:start
+   ```
+
+2. **Legacy One-Command Launch**
    ```bash
    # Set your OpenAI API key
    export OPENAI_API_KEY='sk-proj-your-key-here'

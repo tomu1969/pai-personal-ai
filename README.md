@@ -128,6 +128,70 @@ PORT=3000
 WEBHOOK_URL=http://localhost:3000/webhook
 ```
 
+## 🏠 PAI Mortgage System Management
+
+### Interactive System Manager
+
+The PAI Mortgage system includes a comprehensive management script for daily operations:
+
+```bash
+# Interactive mode - check status and optionally start
+./scripts/pai-mortgage-manager.sh
+
+# Quick status check with health dashboard
+./scripts/pai-mortgage-manager.sh --status
+npm run pai:status
+
+# Start system without prompting
+./scripts/pai-mortgage-manager.sh --start
+npm run pai:start
+
+# Run end-to-end test
+./scripts/pai-mortgage-manager.sh --test
+npm run pai:test
+```
+
+### System Management Commands
+
+```bash
+# Complete management
+npm run pai          # Interactive management
+npm run pai:status   # Health dashboard
+npm run pai:start    # Force start system
+npm run pai:test     # End-to-end test
+npm run pai:stop     # Clean shutdown
+npm run pai:restart  # Safe restart
+```
+
+### Health Dashboard
+
+The status command shows comprehensive system health:
+
+- ✅ **Docker Services**: Evolution API + PostgreSQL + Redis
+- ✅ **PAI Mortgage**: WhatsApp connection (+57 318 260 1111)
+- ✅ **OpenAI API**: Valid API key configuration
+- ✅ **Backend Service**: Running on port 3000
+- ✅ **Message Routing**: PAI Mortgage handler active
+
+### Daily Operation
+
+**Check system health:**
+```bash
+npm run pai:status
+```
+
+**Start system if stopped:**
+```bash
+npm run pai
+# Will prompt if you want to start when system is down
+```
+
+**Test end-to-end functionality:**
+```bash
+npm run pai:test
+# Sends test mortgage inquiry and verifies response routing
+```
+
 ## 🤖 AI Capabilities
 
 ### Natural Language Examples

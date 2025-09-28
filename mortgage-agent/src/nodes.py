@@ -166,6 +166,53 @@ def generate_conversational_response(state: GraphState) -> dict:
         
         current_objective = question_objectives.get(current_q, "All questions completed")
         
+        # Track completed vs pending questions explicitly
+        completed_questions = []
+        pending_questions = []
+        
+        if state.get("down_payment"):
+            completed_questions.append("Q1 (down payment)")
+        else:
+            pending_questions.append("Q1 (down payment)")
+            
+        if state.get("property_city") or state.get("property_state"):
+            completed_questions.append("Q2 (location)")
+        else:
+            pending_questions.append("Q2 (location)")
+            
+        if state.get("loan_purpose"):
+            completed_questions.append("Q3 (loan purpose)")
+        else:
+            pending_questions.append("Q3 (loan purpose)")
+            
+        if state.get("property_price"):
+            completed_questions.append("Q4 (property price)")
+        else:
+            pending_questions.append("Q4 (property price)")
+            
+        if state.get("has_valid_passport") is not None and state.get("has_valid_visa") is not None:
+            completed_questions.append("Q5 (passport/visa)")
+        else:
+            pending_questions.append("Q5 (passport/visa)")
+            
+        if state.get("current_location"):
+            completed_questions.append("Q6 (current location)")
+        else:
+            pending_questions.append("Q6 (current location)")
+            
+        if state.get("can_demonstrate_income") is not None:
+            completed_questions.append("Q7 (income docs)")
+        else:
+            pending_questions.append("Q7 (income docs)")
+            
+        if state.get("has_reserves") is not None:
+            completed_questions.append("Q8 (reserves)")
+        else:
+            pending_questions.append("Q8 (reserves)")
+        
+        completed_str = ", ".join(completed_questions) if completed_questions else "None yet"
+        pending_str = ", ".join(pending_questions) if pending_questions else "None"
+        
         # Calculate affordability if we have down payment
         affordability_info = ""
         if state.get("down_payment") and current_q == 4:
@@ -178,19 +225,19 @@ def generate_conversational_response(state: GraphState) -> dict:
 - Currently on Question #{current_q} of 8
 - Task: {current_objective}
 
+✅ COMPLETED QUESTIONS (NEVER ASK AGAIN): {completed_str}
+⏳ CURRENT QUESTION: Q{current_q} - {current_objective}
+⏸️ PENDING QUESTIONS: {pending_str}
+
 RECENT CONVERSATION:
 {recent_messages}
 
-✅ INFORMATION ALREADY COLLECTED (NEVER ask for these again):
+📝 INFORMATION ALREADY COLLECTED:
 {known_context}
-Already have: {', '.join(collected_data) if collected_data else 'nothing yet'}
 {affordability_info}
 
-🚫 CRITICAL - DO NOT RE-ASK IF WE HAVE:
-{' - Income documentation: YES' if state.get('can_demonstrate_income') is not None else ''}
-{' - Reserves: YES' if state.get('has_reserves') is not None else ''}
-{' - Passport/Visa: YES' if state.get('has_valid_passport') is not None else ''}
-{' - Current location: ' + str(state.get('current_location')) if state.get('current_location') else ''}
+🚫 CRITICAL RULE - NEVER RE-ASK COMPLETED QUESTIONS!
+Before asking ANY question, check if it's in the COMPLETED list above. If yes, skip it!
 
 CLIENT'S LATEST MESSAGE: "{last_user_message}"
 
@@ -203,10 +250,10 @@ IF CLIENT IS ASKING A QUESTION (like "how can I demonstrate income?", "what does
 4. Set ADVANCE: false (MUST stay on current question until answered)
 
 IF CLIENT PROVIDES INFO (actually answering your question):
-1. Acknowledge warmly - VARY YOUR RESPONSES (don't say "Great!" every time):
-   - "Perfect!", "Excellent!", "Wonderful!", "Sounds good!", "That works well!"
-   - "I see!", "Understood!", "Got it!", "Thanks!", "Noted!"
-   - "Fantastic!", "Terrific!", "That's helpful!", "Makes sense!"
+1. Acknowledge naturally - KEEP IT SHORT AND VARIED:
+   - Sometimes just move to next question without acknowledgment
+   - When acknowledging, use: "Got it!", "Thanks!", "Noted!", "I see!", "Makes sense!"
+   - Avoid overusing: "Great!", "Perfect!", "Excellent!", "Wonderful!", "Fantastic!"
 2. Extract the information
 3. If appropriate, provide helpful context (like affordability range)
 4. Move to the next question
@@ -221,25 +268,29 @@ IF CLIENT SAYS "I DON'T KNOW" or "NOT SURE" (especially for Question 4 - propert
 IF CLIENT PROVIDES MULTIPLE PIECES OF INFO AT ONCE:
 1. Extract ALL of them
 2. Acknowledge what they shared
-3. Ask for the next missing piece
+3. Return to the CURRENT QUESTION (Q{current_q})
 
 CORE RULES:
 ✓ Be conversational and helpful - answer questions when asked
-✓ CRITICAL: After helping/explaining, ALWAYS re-ask the original question
-✓ Never repeat questions for info already collected  
-✓ Extract any info provided, even if out of order
-✓ Don't advance until you have the actual answer (not just a question)
+✓ CRITICAL: After helping/explaining, ALWAYS return to Q{current_q}: {current_objective}
+✓ NEVER SKIP AHEAD - Questions MUST be asked in strict order: Q1 → Q2 → Q3 → Q4 → Q5 → Q6 → Q7 → Q8
+✓ NEVER ask about COMPLETED questions - check the list above!
+✓ Extract any info provided, even if out of order (but don't ask for it)
+✓ Only set ADVANCE: true when you've received the actual answer for the CURRENT question Q{current_q}
+✓ If user provides info for Q5 while on Q3, extract it but STAY on Q3 and ask Q4 next
 ✓ Keep responses natural (2-3 sentences)
 
 EXTRACTION GUIDE (Question #{current_q}):
 Q1 (down payment): "300k saved", "i have 300k", "$300,000" → down_payment: 300000
-Q2 (location): "miami", "coconut grove" → property_city: Miami | "florida", "FL" → property_state: Florida
-Q3 (purpose): "investment", "rental property" → loan_purpose: Investment
-Q4 (price): "1 mill", "1M", "$1,000,000" → property_price: 1000000
-Q5 (docs): "yes" → has_valid_passport: True, has_valid_visa: True
-Q6 (location): "in US", "USA", "United States" → current_location: USA | "home country", "mexico", "colombia", "brazil" (any non-US country) → current_location: Origin Country
-Q7 (income): "yes", "I can" → can_demonstrate_income: True
-Q8 (reserves): "yes", "I have reserves" → has_reserves: True
+Q2 (location): "miami", "coconut grove" → property_city: Miami | "florida", "FL" → property_state: Florida  
+Q3 (purpose): "investment", "rental" → loan_purpose: investment | "primary residence", "personal home", "live in" → loan_purpose: personal | "second home", "vacation" → loan_purpose: second
+Q4 (price): "1 mill", "1M", "$1,000,000" → property_price: 1000000 | "900k" → property_price: 900000
+Q5 (docs): "yes" → has_valid_passport: True, has_valid_visa: True | "yes passport and visa" → has_valid_passport: True, has_valid_visa: True | "I have both" → has_valid_passport: True, has_valid_visa: True
+Q6 (location): "in US", "USA", "United States", "I'm in the USA" → current_location: USA | "mexico", "colombia", "brazil", "canada", "home country" → current_location: Origin Country
+Q7 (income): "yes", "I can", "bank statements", "tax returns" → can_demonstrate_income: True | "no" → can_demonstrate_income: False
+Q8 (reserves): "yes", "I have reserves", "6 months", "3 months worth" → has_reserves: True | "no" → has_reserves: False
+
+CRITICAL: Use standard values for loan_purpose: "personal", "second", or "investment" (not "primary residence"!)
 
 CRITICAL:
 - Numbers with "k" are thousands: 300k = 300000
@@ -254,7 +305,7 @@ ADVANCE: [true if you got meaningful info for current question, false if still n
 Example correct responses:
 
 WHEN THEY ANSWER YOUR QUESTION:
-RESPONSE: Perfect! $1 million in Miami for investment is excellent. Do you have a valid passport and visa?
+RESPONSE: $1 million in Miami for investment. Do you have a valid passport and visa?
 EXTRACT: property_price: 1000000
 ADVANCE: true
 
@@ -454,6 +505,8 @@ Only include values that are clearly mentioned or implied in their message."""
                         extracted[mapped_key] = float(value)
                     except ValueError:
                         continue
+                elif mapped_key == 'loan_purpose':
+                    extracted[mapped_key] = value.lower()
                 else:
                     extracted[mapped_key] = value
         
@@ -497,6 +550,19 @@ def extract_from_full_conversation(state: GraphState) -> None:
             if f' {abbr} ' in f' {full_conversation} ' or f' {abbr},' in full_conversation:
                 state["property_state"] = full_name
                 print(f">>> Extracted state from conversation: {full_name}")
+                break
+    
+    # Extract loan purpose (Q3) if not already found
+    if not state.get("loan_purpose"):
+        purpose_keywords = {
+            'personal': ['personal', 'primary', 'main home', 'live in', 'primary residence'],
+            'second': ['second', 'vacation', 'weekend', 'getaway', 'holiday home'],
+            'investment': ['investment', 'rental', 'rent out', 'tenant', 'income property', 'airbnb']
+        }
+        for purpose, keywords in purpose_keywords.items():
+            if any(keyword in full_conversation for keyword in keywords):
+                state["loan_purpose"] = purpose
+                print(f">>> Extracted loan purpose from conversation: {purpose}")
                 break
     
     # Extract current location (Q6 - are they in USA or origin country?)
@@ -701,6 +767,36 @@ def handle_letter_request(state: GraphState) -> GraphState:
                         "content": "I couldn't quite catch that. Could you please provide your email address and full name? For example: 'John Smith, john.smith@email.com'"
                     })
     
+    return state
+
+
+def verification_node(state: GraphState) -> GraphState:
+    """Ask user to verify all collected information before final decision."""
+    
+    # Format all collected info for verification
+    summary = f"""Perfect! I've collected all the information I need. Before I process your pre-approval, let me confirm everything is correct:
+
+📍 **Property Details:**
+• Location: {state.get('property_city', 'Not specified')}, {state.get('property_state', 'Not specified')}
+• Purpose: {state.get('loan_purpose', 'Not specified').title()} property
+• Purchase Price: ${state.get('property_price', 0):,.0f}
+• Down Payment: ${state.get('down_payment', 0):,.0f}
+
+📄 **Your Documentation:**
+• Valid Passport: {'Yes' if state.get('has_valid_passport') else 'No'}
+• Valid Visa: {'Yes' if state.get('has_valid_visa') else 'No'}
+• Currently in: {state.get('current_location', 'Not specified')}
+• Income Documentation: {'Yes' if state.get('can_demonstrate_income') else 'No'}
+• Reserves (6-12 months): {'Yes' if state.get('has_reserves') else 'No'}
+
+Is all this information correct? (Reply "yes" to proceed or "no" to make corrections)"""
+    
+    state["messages"].append({
+        "role": "assistant",
+        "content": summary
+    })
+    state["awaiting_verification"] = True
+    print(">>> Entered verification mode - awaiting user confirmation")
     return state
 
 

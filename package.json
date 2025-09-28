@@ -22,7 +22,13 @@
     "migrate:undo": "sequelize-cli db:migrate:undo",
     "seed": "sequelize-cli db:seed:all",
     "init-pai-mortgage": "node scripts/initialize-pai-mortgage.js",
-    "system-status": "curl -s http://localhost:3000/api/system/status | jq ."
+    "system-status": "curl -s http://localhost:3000/api/system/status | jq .",
+    "pai": "./scripts/pai-mortgage-manager.sh",
+    "pai:status": "./scripts/pai-mortgage-manager.sh --status",
+    "pai:start": "./scripts/pai-mortgage-manager.sh --start",
+    "pai:test": "./scripts/pai-mortgage-manager.sh --test",
+    "pai:stop": "./scripts/stop-pai-mortgage-system.sh",
+    "pai:restart": "./scripts/restart-pai-mortgage-system.sh"
   },
   "keywords": [
     "personal-ai",

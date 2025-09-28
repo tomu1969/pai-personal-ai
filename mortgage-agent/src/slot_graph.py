@@ -30,6 +30,7 @@ from .business_rules import (
     can_make_decision
 )
 from .question_generator import generate_question
+from .question_handler import is_user_asking_question, handle_user_question
 
 
 def process_slot_turn(state: SlotFillingState) -> SlotFillingState:
@@ -75,7 +76,28 @@ def process_slot_turn(state: SlotFillingState) -> SlotFillingState:
     print(f"User: {last_user_msg[:100]}...")
     
     # =========================================================================
-    # STEP 3: HANDLE VERIFICATION RESPONSE
+    # STEP 3: DETECT AND HANDLE USER QUESTIONS
+    # =========================================================================
+    # Check if user is asking a question (at any point in conversation)
+    # This runs BEFORE verification/extraction, so questions are handled even
+    # during verification phase or when waiting for slot answers
+    if is_user_asking_question(last_user_msg):
+        print(f">>> Detected user question")
+        
+        answer = handle_user_question(last_user_msg, state)
+        
+        if answer:
+            print(f">>> Answered question, guiding back to pending slot")
+            state["messages"].append({"role": "assistant", "content": answer})
+            
+            # Don't change last_slot_asked - preserve context
+            # Don't increment ask counts - this wasn't a slot question
+            # User will answer the original question in next turn
+            
+            return state
+    
+    # =========================================================================
+    # STEP 4: HANDLE VERIFICATION RESPONSE
     # =========================================================================
     if state.get("awaiting_verification"):
         response_lower = last_user_msg.lower().strip()
@@ -120,33 +142,8 @@ def process_slot_turn(state: SlotFillingState) -> SlotFillingState:
             return state
     
     # =========================================================================
-    # STEP 4: HANDLE CLARIFICATION QUESTIONS
+    # NOTE: Old clarification handling removed - now handled by question_handler.py
     # =========================================================================
-    # Check if user is asking for clarification (e.g., "how much would that be")
-    clarification_keywords = ["how much", "what amount", "how many", "tell me", "calculate"]
-    if any(kw in last_user_msg.lower() for kw in clarification_keywords):
-        last_asked = state.get("last_slot_asked")
-        
-        if last_asked == "has_reserves":
-            # User is asking how much reserves they need
-            property_price = get_slot_value(state, "property_price")
-            down_payment = get_slot_value(state, "down_payment")
-            
-            if property_price and down_payment:
-                # Calculate reserves needed
-                loan_amount = property_price - down_payment
-                monthly_rate = 0.07 / 12
-                n_payments = 360
-                monthly_payment = loan_amount * (monthly_rate * (1 + monthly_rate)**n_payments) / ((1 + monthly_rate)**n_payments - 1)
-                monthly_payment *= 1.3  # Add taxes, insurance
-                
-                min_reserves = monthly_payment * 6
-                max_reserves = monthly_payment * 12
-                
-                response = f"Your monthly mortgage payment will be approximately ${monthly_payment:,.0f}. You'll need between ${min_reserves:,.0f} and ${max_reserves:,.0f} in reserves. Do you have this amount saved?"
-                
-                state["messages"].append({"role": "assistant", "content": response})
-                return state
     
     # =========================================================================
     # STEP 5: EXTRACT ALL ENTITIES

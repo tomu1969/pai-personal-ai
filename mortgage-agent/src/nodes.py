@@ -186,6 +186,12 @@ RECENT CONVERSATION:
 Already have: {', '.join(collected_data) if collected_data else 'nothing yet'}
 {affordability_info}
 
+🚫 CRITICAL - DO NOT RE-ASK IF WE HAVE:
+{' - Income documentation: YES' if state.get('can_demonstrate_income') is not None else ''}
+{' - Reserves: YES' if state.get('has_reserves') is not None else ''}
+{' - Passport/Visa: YES' if state.get('has_valid_passport') is not None else ''}
+{' - Current location: ' + str(state.get('current_location')) if state.get('current_location') else ''}
+
 CLIENT'S LATEST MESSAGE: "{last_user_message}"
 
 💬 HOW TO RESPOND:
@@ -197,7 +203,10 @@ IF CLIENT IS ASKING A QUESTION (like "how can I demonstrate income?", "what does
 4. Set ADVANCE: false (MUST stay on current question until answered)
 
 IF CLIENT PROVIDES INFO (actually answering your question):
-1. Acknowledge warmly: "Perfect!", "Great!", "Excellent!"
+1. Acknowledge warmly - VARY YOUR RESPONSES (don't say "Great!" every time):
+   - "Perfect!", "Excellent!", "Wonderful!", "Sounds good!", "That works well!"
+   - "I see!", "Understood!", "Got it!", "Thanks!", "Noted!"
+   - "Fantastic!", "Terrific!", "That's helpful!", "Makes sense!"
 2. Extract the information
 3. If appropriate, provide helpful context (like affordability range)
 4. Move to the next question
@@ -228,7 +237,7 @@ Q2 (location): "miami", "coconut grove" → property_city: Miami | "florida", "F
 Q3 (purpose): "investment", "rental property" → loan_purpose: Investment
 Q4 (price): "1 mill", "1M", "$1,000,000" → property_price: 1000000
 Q5 (docs): "yes" → has_valid_passport: True, has_valid_visa: True
-Q6 (location): "in US", "USA" → current_location: USA | "home country", "Colombia" → current_location: Origin Country
+Q6 (location): "in US", "USA", "United States" → current_location: USA | "home country", "mexico", "colombia", "brazil" (any non-US country) → current_location: Origin Country
 Q7 (income): "yes", "I can" → can_demonstrate_income: True
 Q8 (reserves): "yes", "I have reserves" → has_reserves: True
 
@@ -490,6 +499,24 @@ def extract_from_full_conversation(state: GraphState) -> None:
                 print(f">>> Extracted state from conversation: {full_name}")
                 break
     
+    # Extract current location (Q6 - are they in USA or origin country?)
+    if not state.get("current_location"):
+        # Check if they're in USA
+        usa_keywords = ['usa', 'united states', 'in us', 'in the us', 'in america', 'stateside']
+        if any(keyword in full_conversation for keyword in usa_keywords):
+            state["current_location"] = "USA"
+            print(f">>> Extracted current location: USA")
+        else:
+            # Check for specific country names (indicates they're in origin country)
+            countries = ['mexico', 'colombia', 'brazil', 'argentina', 'chile', 'peru', 'venezuela',
+                        'canada', 'india', 'china', 'japan', 'korea', 'philippines', 'vietnam',
+                        'home country', 'my country', 'origin country']
+            for country in countries:
+                if country in full_conversation:
+                    state["current_location"] = "Origin Country"
+                    print(f">>> Extracted current location: Origin Country (mentioned {country})")
+                    break
+    
     # Extract property price if not already found
     if not state.get("property_price"):
         import re
@@ -743,13 +770,37 @@ Would you like me to send you a formal pre-qualification letter? This official d
 You're closer than you think! These are common hurdles that many successful borrowers overcome."""
 
     else:  # Needs Review
+        # Build diagnostic info about what's missing
+        missing_info = []
+        if not state.get("property_price"):
+            missing_info.append("property price")
+        if not state.get("down_payment"):
+            missing_info.append("down payment amount")
+        if not state.get("property_city") and not state.get("property_state"):
+            missing_info.append("property location")
+        if not state.get("loan_purpose"):
+            missing_info.append("loan purpose")
+        if state.get("has_valid_passport") is None or state.get("has_valid_visa") is None:
+            missing_info.append("passport/visa confirmation")
+        if not state.get("current_location"):
+            missing_info.append("current location (USA or home country)")
+        if state.get("can_demonstrate_income") is None:
+            missing_info.append("income documentation confirmation")
+        if state.get("has_reserves") is None:
+            missing_info.append("reserves confirmation")
+        
+        if missing_info:
+            missing_text = "\n\nWe're missing some information to complete the automated review:\n• " + "\n• ".join(missing_info)
+        else:
+            missing_text = ""
+        
         message = f"""Thank you for your application. Your request requires manual review.
 
 Application summary:
 • Property Price: ${details.get('property_price', 'N/A')}
-• Down Payment: ${details.get('down_payment', 'N/A')}
+• Down Payment: ${details.get('down_payment', 'N/A')}{missing_text}
 
-A loan officer will contact you within 24 hours to discuss your options."""
+A loan officer will contact you within 24 hours to discuss your options and gather any additional details needed."""
     
     state["messages"].append({
         "role": "assistant",

@@ -17,9 +17,14 @@ from .extraction_helpers import (
 )
 
 
-def extract_all_slots(text: str, llm_available: bool = True) -> Dict[str, Tuple[Any, float, str]]:
+def extract_all_slots(text: str, llm_available: bool = True, state: Optional[Dict[str, Any]] = None) -> Dict[str, Tuple[Any, float, str]]:
     """
     Extract ALL possible slots from text with confidence scores.
+    
+    Args:
+        text: User message to extract from
+        llm_available: Whether LLM extraction is available (unused for now)
+        state: Optional conversation state for context-aware extraction
     
     Returns:
         Dict[slot_name, (value, confidence, source)]
@@ -43,6 +48,24 @@ def extract_all_slots(text: str, llm_available: bool = True) -> Dict[str, Tuple[
     # Money values (multiple possible)
     money_values = extract_all_money(text)
     t_lower = text.lower()
+    
+    # =========================================================================
+    # CONTEXT-AWARE EXTRACTION (for single money values)
+    # =========================================================================
+    last_asked = state.get("last_slot_asked") if state else None
+    
+    if last_asked and len(money_values) == 1:
+        val = money_values[0]
+        
+        # If we just asked about down_payment, assign there
+        if last_asked == "down_payment" and 10000 <= val <= 5000000:
+            extracted["down_payment"] = (val, 1.0, "deterministic")
+            money_values = []  # Mark as consumed
+        
+        # If we just asked about property_price, assign there  
+        elif last_asked == "property_price" and 100000 <= val <= 50000000:
+            extracted["property_price"] = (val, 1.0, "deterministic")
+            money_values = []  # Mark as consumed
     
     # Check for both price and down keywords
     has_down_kw = any(kw in t_lower for kw in ["down payment", "down", "deposit", "upfront"])
@@ -122,8 +145,8 @@ def extract_all_money(text: str) -> List[float]:
     t = text.lower()
     
     # Normalize verbal magnitudes first
-    t = re.sub(r'\b(\d+(?:\.\d+)?)\s*(?:thousand|k)\b', lambda m: str(float(m.group(1)) * 1000), t)
-    t = re.sub(r'\b(\d+(?:\.\d+)?)\s*(?:million|mill?|mm)\b', lambda m: str(float(m.group(1)) * 1000000), t)
+    t = re.sub(r'\b(\d+(?:\.\d+)?)\s*(?:thousand|k)\b', lambda m: str(float(m.group(1)) * 1000), t, flags=re.IGNORECASE)
+    t = re.sub(r'\b(\d+(?:\.\d+)?)\s*(?:m|mm|mil|million)\b', lambda m: str(float(m.group(1)) * 1000000), t, flags=re.IGNORECASE)
     
     # Find all numbers with optional currency
     pattern = r'(?:(?:usd|us\$|\$)\s*)?([0-9]{1,}(?:[.,][0-9]{3})*(?:[.,][0-9]{1,2})?)'

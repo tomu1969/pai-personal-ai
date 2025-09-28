@@ -122,7 +122,7 @@ def process_slot_turn(state: SlotFillingState) -> SlotFillingState:
     # STEP 4: EXTRACT ALL ENTITIES
     # =========================================================================
     print(f"\n>>> Extracting all entities from message...")
-    extracted = extract_all_slots(last_user_msg)
+    extracted = extract_all_slots(last_user_msg, state=state)
     
     print(f">>> Extracted {len(extracted)} slots:")
     for slot_name, (value, conf, source) in extracted.items():

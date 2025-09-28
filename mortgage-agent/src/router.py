@@ -4,35 +4,55 @@ Classifies user input as "answer" or "question" to enable clarifications.
 """
 import time
 import random
-from typing import Literal
+from typing import Literal, Optional, Dict, Any
 from .state import GraphState
 
 
-def classify_input(user_message: str) -> Literal["answer", "question"]:
+def classify_input(user_message: str, extracted: Optional[Dict[str, Any]] = None) -> Literal["answer", "question"]:
     """
     Classify user input as either an answer to our question or a question from the user.
     
-    This is a simple rule-based classifier for now.
-    In a full implementation, this would use an LLM.
-    """
+    Args:
+        user_message: The text to classify
+        extracted: Dict of extracted data (if present, likely an answer)
     
-    # Simple heuristics for classification
-    question_indicators = [
-        "?", "why", "how", "what", "when", "where", "who", "which",
-        "can you", "could you", "would you", "will you", "do you",
-        "explain", "tell me", "help me", "i don't understand",
-        "what does", "what is", "what are", "how much", "how many"
-    ]
+    This is an improved rule-based classifier that avoids false positives.
+    """
+    import re
     
     user_lower = user_message.lower().strip()
     
-    # Check for question indicators
-    for indicator in question_indicators:
-        if indicator in user_lower:
-            return "question"
-    
-    # If it ends with a question mark, it's likely a question
+    # If ends with ?, it's a question
     if user_message.strip().endswith("?"):
+        return "question"
+    
+    # If we extracted data, it's an answer
+    if extracted and any(extracted.values()):
+        return "answer"
+    
+    # If contains substantive data (numbers, currency, locations), it's an answer
+    if re.search(r'\d', user_message) or re.search(r'\$|usd|dollar', user_lower):
+        return "answer"
+    
+    if re.search(r'\b[A-Z]{2}\b', user_message):  # State code
+        return "answer"
+    
+    if re.search(r'[A-Z][a-z]+,\s*[A-Z]', user_message):  # City, State
+        return "answer"
+    
+    # Check if question word is at the START (after stripping)
+    question_leads = {
+        "why", "how", "what", "when", "where", "who", "which",
+        "can", "could", "would", "will", "do", "does", "did"
+    }
+    
+    first_word = user_lower.split()[0] if user_lower.split() else ""
+    
+    if first_word in question_leads:
+        # But if it also contains numbers/money, treat as answer
+        # E.g., "How much? $200k" should be an answer
+        if re.search(r'\d|\$', user_message):
+            return "answer"
         return "question"
     
     # Otherwise, assume it's an answer

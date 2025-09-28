@@ -33,9 +33,88 @@ User Message → API (api.py) → Graph (this file) → LLM (nodes.py) → Respo
                           Final decision (approve/reject)
 """
 from langgraph.graph import StateGraph, END
+from hashlib import sha256
 from .state import GraphState
 from .nodes import extract_info_node, final_decision_node, handle_letter_request, verification_node
 from .router import route_input, clarification_node
+from .extraction_helpers import (
+    extract_from_message,
+    is_correction_intent,
+    contains_data
+)
+
+
+# ============================================================================
+# IDEMPOTENCY AND ATTEMPT TRACKING HELPERS
+# ============================================================================
+
+def _already_have_data(q: int, state: GraphState) -> bool:
+    """Check if we already have valid data for this question."""
+    required_by_q = {
+        1: ["down_payment"],
+        2: ["property_city", "property_state"],  # Either is fine
+        3: ["loan_purpose"],
+        4: ["property_price"],
+        5: ["has_valid_passport", "has_valid_visa"],  # Either is fine
+        6: ["current_location"],
+        7: ["can_demonstrate_income"],
+        8: ["has_reserves"],
+    }
+    
+    req = required_by_q.get(q, [])
+    
+    # Special case: Q2 and Q5 accept either field
+    if q == 2:
+        return bool(state.get("property_city") or state.get("property_state"))
+    elif q == 5:
+        return (state.get("has_valid_passport") is not None or 
+                state.get("has_valid_visa") is not None)
+    
+    # For others, check all required fields
+    return all(state.get(k) not in (None, "", []) for k in req)
+
+
+def _force_progression_allowed(state: GraphState, q: int) -> bool:
+    """
+    Allow force progression if:
+    - Asked 2+ times
+    - AND we have at least some valid data for this question
+    """
+    attempts = state.get("asked_counts", {}).get(q, 0)
+    return attempts >= 2 and _already_have_data(q, state)
+
+
+def _should_emit_prompt(state: GraphState, q: int, prompt_text: str) -> bool:
+    """
+    Check if we should emit this prompt or if it's a duplicate.
+    
+    Returns True if we should emit, False if it's a duplicate.
+    """
+    prompt_hash = sha256(prompt_text.encode()).hexdigest()[:16]
+    
+    # Check if same question and same hash as last time
+    if (state.get("last_asked_q") == q and 
+        state.get("last_prompt_hash") == prompt_hash):
+        return False
+    
+    # Update tracking
+    state["last_asked_q"] = q
+    state["last_prompt_hash"] = prompt_hash
+    
+    return True
+
+
+def _increment_attempt(state: GraphState, q: int):
+    """Increment the ask counter for a question."""
+    if "asked_counts" not in state:
+        state["asked_counts"] = {}
+    state["asked_counts"][q] = state["asked_counts"].get(q, 0) + 1
+
+
+def _reset_attempt(state: GraphState, q: int):
+    """Reset the ask counter when successfully advancing."""
+    if "asked_counts" in state:
+        state["asked_counts"][q] = 0
 
 
 # ============================================================================
@@ -213,6 +292,47 @@ def process_conversation_step(state: GraphState) -> GraphState:
             # Reset correction mode and return to verification
             state["correction_mode"] = False
             return verification_node(state)
+        
+        # =====================================================================
+        # DETERMINISTIC EXTRACTION (runs FIRST, before LLM)
+        # =====================================================================
+        print(f">>> Running deterministic extraction on: '{last_user_message[:100]}'")
+        deterministic_extracted = extract_from_message(last_user_message, current_q, state)
+        
+        print(f">>> DETERMINISTIC EXTRACTION: {deterministic_extracted}")
+        
+        # Apply extracted fields to state
+        for key, value in deterministic_extracted.items():
+            if value is not None:
+                state[key] = value
+                print(f">>> ✅ DETERMINISTIC extracted {key}: {value}")
+        
+        # Check if deterministic extraction satisfied the requirement
+        if deterministic_extracted and _already_have_data(current_q, state):
+            print(f">>> ✅ DETERMINISTIC extraction satisfied Q{current_q}")
+        
+        # =====================================================================
+        # IDEMPOTENCY CHECK: Skip if we already have data
+        # =====================================================================
+        if _already_have_data(current_q, state):
+            print(f">>> ⏭️  Q{current_q} already satisfied, advancing")
+            # Mark for advancement (will be processed later)
+            # Don't generate a new response, just advance
+            state["messages"].append({
+                "role": "assistant",
+                "content": ""  # Will be filled by LLM if needed
+            })
+            # Set flag to advance
+            should_advance_early = True
+        else:
+            should_advance_early = False
+        
+        # =====================================================================
+        # CORRECTION DETECTION
+        # =====================================================================
+        if is_correction_intent(last_user_message):
+            print(f">>> 🔧 CORRECTION detected")
+            # Don't increment asked_counts for corrections
         
         # ---------------------------------------------------------------------
         # STEP 3: GENERATE AI RESPONSE
@@ -572,18 +692,29 @@ def process_conversation_step(state: GraphState) -> GraphState:
                 should_advance = False
         
         # ---------------------------------------------------------------------
-        # STEP 6: STUCK DETECTION (Anti-Loop Protection)
+        # STEP 6: FORCE PROGRESSION CHECK (Anti-Loop Protection)
         # ---------------------------------------------------------------------
-        # Track how many times we've asked the same question
-        # If stuck after 2 attempts but have data, force advance
-        # This prevents infinite loops where user is confused
+        # Use new helper function to check force progression
+        if not should_advance and _force_progression_allowed(state, current_q):
+            print(f">>> 🚨 FORCE ADVANCING Q{current_q} after {state['asked_counts'].get(current_q, 0)} attempts")
+            should_advance = True
+        
+        # Increment or reset attempt counter
+        if not should_advance:
+            _increment_attempt(state, current_q)
+            print(f">>> Question Q{current_q} attempt count: {state['asked_counts'].get(current_q, 0)}")
+        else:
+            _reset_attempt(state, current_q)
+        
+        # ---------------------------------------------------------------------
+        # LEGACY STUCK DETECTION (kept for backup)
+        # ---------------------------------------------------------------------
         repeated_question_key = f"repeated_q{current_q}_count"
         if not should_advance:
             # Increment stuck counter
             state[repeated_question_key] = state.get(repeated_question_key, 0) + 1
-            print(f">>> Question Q{current_q} repeated {state[repeated_question_key]} times")
             
-            # Force advance after 2 attempts (reduced from 3) if we have ANY data
+            # Force advance after 2 attempts (backup to new system)
             if state.get(repeated_question_key, 0) >= 2:
                 force_advance = False
                 # Check if we have data for this question

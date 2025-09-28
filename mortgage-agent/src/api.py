@@ -124,6 +124,12 @@ def create_initial_state() -> GraphState:
         # Conversation tracking
         "messages": [],  # Full chat history
         "current_question": 1,  # Which question (1-8) we're currently on
+        
+        # Attempt tracking (prevents infinite loops)
+        "asked_counts": {},  # Track asks per question: {1: 2, 2: 1}
+        "last_asked_q": None,  # Last question number emitted
+        "last_prompt_hash": None,  # Duplicate prompt detection
+        
         "conversation_complete": False,
         "final_decision": None,  # "Pre-Approved", "Rejected", or "Needs Review"
         

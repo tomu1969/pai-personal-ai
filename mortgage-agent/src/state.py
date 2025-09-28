@@ -34,7 +34,7 @@ USAGE EXAMPLE:
         "current_question": 2          # We're on Q2 (location)
     }
 """
-from typing import TypedDict, List, Optional
+from typing import TypedDict, List, Optional, Dict
 
 
 class GraphState(TypedDict):
@@ -222,6 +222,26 @@ class GraphState(TypedDict):
     - api.py: Tracks progress through conversation
     
     CRITICAL: This is how we maintain sequential flow across API calls!
+    """
+    
+    asked_counts: Dict[int, int]
+    """
+    Track how many times we've asked each question.
+    
+    Format: {question_number: attempt_count}
+    Example: {1: 2, 2: 1, 3: 3}
+    
+    Used for force progression after 2 attempts with valid data.
+    Prevents infinite loops on the same question.
+    """
+    
+    last_asked_q: Optional[int]
+    """Last question number that was emitted to user."""
+    
+    last_prompt_hash: Optional[str]
+    """
+    Hash of the last prompt sent to avoid duplicate emissions.
+    Prevents asking the exact same question twice in a row.
     """
     
     conversation_complete: bool

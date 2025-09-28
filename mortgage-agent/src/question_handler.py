@@ -212,19 +212,93 @@ Foreign National loans may take slightly longer due to international documentati
         return answer
     
     # =========================================================================
-    # DOWN PAYMENT REQUIREMENTS
+    # DOWN PAYMENT CALCULATION
     # =========================================================================
-    if "down payment" in msg_lower and any(q in msg_lower for q in ["minimum", "how much", "required"]):
-        answer = """Minimum down payment requirements:
+    if "down payment" in msg_lower or "afford" in msg_lower:
+        from .slot_state import get_slot_value
+        import re
+        
+        # Check if user is asking about a specific property price
+        # Extract price from message like "$1.5 million" or "1.5m"
+        price_mentioned = None
+        
+        # Try to extract price from message
+        # Check for millions first (most specific)
+        million_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:million|mill?|mm|m)\b', msg_lower)
+        if million_match:
+            num = float(million_match.group(1))
+            price_mentioned = num * 1000000
+        else:
+            # Check for thousands
+            thousand_match = re.search(r'(\d+(?:\.\d+)?)\s*k\b', msg_lower)
+            if thousand_match:
+                num = float(thousand_match.group(1))
+                price_mentioned = num * 1000
+            else:
+                # Check for dollar amounts
+                dollar_match = re.search(r'\$\s*(\d+(?:,\d{3})*(?:\.\d+)?)', msg_lower)
+                if dollar_match:
+                    num_str = dollar_match.group(1).replace(',', '')
+                    price_mentioned = float(num_str)
+                else:
+                    # Check for bare numbers (6+ digits)
+                    bare_match = re.search(r'\b(\d{6,})\b', msg_lower)
+                    if bare_match:
+                        price_mentioned = float(bare_match.group(1))
+        
+        current_down = get_slot_value(state, "down_payment")
+        loan_purpose = get_slot_value(state, "loan_purpose") or "personal"
+        
+        if price_mentioned and current_down:
+            # Calculate how much more down payment is needed
+            if loan_purpose == "investment" or loan_purpose == "second":
+                min_down_pct = 0.25  # 25%
+            else:
+                min_down_pct = 0.20  # 20%
+            
+            required_down = price_mentioned * min_down_pct
+            current_down_float = float(current_down)
+            difference = required_down - current_down_float
+            
+            if difference > 0:
+                answer = f"""To afford a **${price_mentioned:,.0f}** property with a {int(min_down_pct*100)}% down payment, you'll need **${required_down:,.0f}** down.
 
-• **Investment property**: 25% minimum
-• **Primary residence**: 20% minimum  
+You currently have ${current_down_float:,.0f}, so you would need an additional **${difference:,.0f}**.
+
+Alternatively, with your current ${current_down_float:,.0f} down payment, you can afford properties up to **${current_down_float/min_down_pct:,.0f}**."""
+            else:
+                answer = f"""Great news! With your **${current_down_float:,.0f}** down payment, you can definitely afford a **${price_mentioned:,.0f}** property.
+
+That's a {(current_down_float/price_mentioned)*100:.1f}% down payment, which exceeds the {int(min_down_pct*100)}% minimum and may qualify you for better rates!"""
+        
+        elif current_down:
+            # Generic down payment info with user's context
+            loan_purpose = get_slot_value(state, "loan_purpose") or "personal"
+            
+            if loan_purpose == "investment" or loan_purpose == "second":
+                min_pct = 25
+                max_affordable = float(current_down) * 4
+            else:
+                min_pct = 20
+                max_affordable = float(current_down) * 5
+            
+            answer = f"""With your **${float(current_down):,.0f}** down payment:
+
+• Minimum required: **{min_pct}%** for {loan_purpose} property
+• Maximum affordable: **${max_affordable:,.0f}** property
+• Comfortable range: ${max_affordable*0.8:,.0f} - ${max_affordable:,.0f}
+
+Higher down payments (30%+) may qualify for better rates and easier approval."""
+        
+        else:
+            # No context, provide general info
+            answer = """Minimum down payment requirements:
+
+• **Primary residence**: 20% minimum
 • **Second home**: 25% minimum
+• **Investment property**: 25% minimum
 
-Higher down payments (30%+) may qualify for:
-• Better interest rates
-• Easier approval
-• Lower monthly payments"""
+Higher down payments (30%+) may qualify for better interest rates and easier approval."""
         
         reminder = get_pending_question_reminder(state)
         if reminder:

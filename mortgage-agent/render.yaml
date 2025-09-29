@@ -1,11 +1,11 @@
 services:
-  # Web Service for the Mortgage Pre-Approval Chatbot (Slot-Filling System)
+  # Web Service for the Mortgage Pre-Approval Chatbot (Simplified System)
   - type: web
     name: mortgage-agent
     runtime: python
     plan: free  # Can upgrade to 'starter' or 'standard' for production
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn src.slot_api:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn src.simple_api:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0

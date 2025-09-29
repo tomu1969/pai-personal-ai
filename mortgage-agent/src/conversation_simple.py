@@ -136,35 +136,52 @@ def extract_entities(messages: List[Dict[str, str]]) -> Dict[str, Any]:
     return {}
 
 
-def determine_next_question(filled_entities: Dict[str, Any]) -> Optional[str]:
+def get_missing_information_context(filled_entities: Dict[str, Any]) -> str:
     """
-    Determine which question to ask next based on filled entities.
+    Generate context about what information is still needed.
     
     Args:
         filled_entities: Currently filled information
     
     Returns:
-        Next question to ask, or None if all complete
+        String describing missing information for the assistant
     """
     
-    # Priority order for questions
-    question_order = [
-        ("down_payment", "How much can you put down for the down payment?"),
-        ("property_price", "What's the price of the property you're interested in?"),
-        ("loan_purpose", "Will this be your primary residence, second home, or investment property?"),
-        ("property_city", "What city is the property in?"),
-        ("property_state", "What state is that in?"),
-        ("has_valid_passport", "Do you have a valid passport?"),
-        ("has_valid_visa", "Do you have a valid U.S. visa?"),
-        ("can_demonstrate_income", "Can you provide income documentation?"),
-        ("has_reserves", "Do you have 6-12 months of mortgage payments saved in reserves?")
+    # All required information in priority order
+    required_fields = [
+        ("down_payment", "Down payment amount"),
+        ("property_price", "Property price"),
+        ("loan_purpose", "Property purpose (primary residence, second home, or investment)"),
+        ("property_city", "Property city"),
+        ("property_state", "Property state"),
+        ("has_valid_passport", "Valid passport status"),
+        ("has_valid_visa", "Valid U.S. visa status"),
+        ("can_demonstrate_income", "Income documentation capability"),
+        ("has_reserves", "6-12 months reserves saved")
     ]
     
-    for field, question in question_order:
-        if field not in filled_entities or filled_entities[field] is None:
-            return question
+    collected = []
+    missing = []
     
-    return None  # All questions answered
+    for field, description in required_fields:
+        if field in filled_entities and filled_entities[field] is not None:
+            value = filled_entities[field]
+            if isinstance(value, bool):
+                value = "Yes" if value else "No"
+            elif isinstance(value, (int, float)):
+                value = f"${value:,.0f}" if field in ["down_payment", "property_price"] else str(value)
+            collected.append(f"✓ {description}: {value}")
+        else:
+            missing.append(f"• {description}")
+    
+    context = ""
+    if collected:
+        context += "Information collected:\n" + "\n".join(collected) + "\n\n"
+    
+    if missing:
+        context += "Still needed:\n" + "\n".join(missing)
+    
+    return context
 
 
 def calculate_qualification(entities: Dict[str, Any]) -> Dict[str, Any]:
@@ -262,9 +279,13 @@ def process_conversation_turn(messages: List[Dict[str, str]]) -> str:
     print(f">>> Extracted entities: {all_entities}")
     
     # Check if all information is collected
-    next_question = determine_next_question(all_entities)
+    missing_info_context = get_missing_information_context(all_entities)
     
-    if next_question is None:
+    # Check if we have all required information
+    required_fields = ["down_payment", "property_price", "loan_purpose", "property_city", "has_valid_passport", "has_valid_visa", "can_demonstrate_income", "has_reserves"]
+    all_complete = all(field in all_entities and all_entities[field] is not None for field in required_fields)
+    
+    if all_complete:
         # All info collected - provide qualification decision
         qualification = calculate_qualification(all_entities)
         
@@ -279,42 +300,30 @@ A loan officer will contact you within 2 business days to proceed."""
         else:
             return f"Unfortunately, you don't qualify at this time. {qualification['reason']}"
     
-    # Use OpenAI to generate natural response + next question
-    conversation_context = "\n".join([f"{m['role']}: {m['content']}" for m in messages[-4:]])  # Last 4 messages for context
+    # Use unified prompt with full context
+    conversation_context = "\n".join([f"{m['role']}: {m['content']}" for m in messages[-6:]])  # More context for better decisions
     
-    # Check if user is asking about loan amounts or affordability
-    user_messages = [m for m in messages if m["role"] == "user"]
-    latest_user_msg = user_messages[-1]["content"].lower() if user_messages else ""
-    
-    is_asking_loan_question = any(phrase in latest_user_msg for phrase in [
-        "how much can you lend", "loan amount", "how much loan", "can i borrow",
-        "what can i afford", "depends on the loan", "how much mortgage"
-    ])
-    
-    # Add affordability context if down payment is known
-    affordability_context = ""
-    if "down_payment" in all_entities and is_asking_loan_question:
-        down_payment = all_entities["down_payment"]
-        max_property_price = down_payment / 0.25
-        max_loan = max_property_price - down_payment
-        affordability_context = f"\nAFfordability calculation: With ${down_payment:,.0f} down payment, max property price is ${max_property_price:,.0f} (max loan ${max_loan:,.0f})."
-    
-    if is_asking_loan_question and affordability_context:
-        prompt = f"""Based on this conversation:
+    prompt = f"""You are helping a user pre-qualify for a foreign national mortgage. You need to collect specific information while being helpful and conversational.
+
+CURRENT CONVERSATION:
 {conversation_context}
 
-The user is asking about loan amounts or affordability.{affordability_context}
+INFORMATION STATUS:
+{missing_info_context}
 
-Provide a helpful answer with the specific calculations, then ask: "{next_question}"
+LOAN CALCULATION RULES:
+- Foreign nationals need 25% minimum down payment (75% max LTV)
+- Max property price = down payment ÷ 0.25
+- Max loan amount = max property price - down payment
 
-Be direct and helpful. Calculate and state the exact numbers, then ask the question."""
-    else:
-        prompt = f"""Based on this conversation:
-{conversation_context}
+YOUR TASK:
+1. Answer any question the user asked (be helpful and specific)
+2. If they ask about loan amounts, provide calculations using the rules above
+3. Based on the conversation context, ask the most logical next question to collect missing information
+4. Be natural and contextually aware - don't ask for information they just mentioned
+5. Keep responses concise and always end with a question
 
-The user just provided information. Acknowledge what they said briefly (1 sentence max), then ask: "{next_question}"
-
-Be natural and conversational but direct. Always end with the exact question provided."""
+Generate a natural response that answers their question (if any) and asks for the next most relevant missing information."""
     
     try:
         response = client.chat.completions.create(

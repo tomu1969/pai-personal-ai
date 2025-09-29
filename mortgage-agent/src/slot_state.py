@@ -271,9 +271,16 @@ def score_slot_priority(slot_name: str, state: SlotFillingState, recent_mentions
         if get_slot_value(state, "down_payment"):
             score += 6.0  # Can suggest affordable range
     
-    if slot_name in ["has_valid_passport", "has_valid_visa"]:
-        # Documentation slots are important for Foreign National loans
-        score += 4.0
+    # Factor 2b: Financial information priority boost
+    if slot_name in ["down_payment", "loan_purpose"]:
+        # Financial basics should be asked first
+        score += 6.0
+    elif slot_name in ["property_city", "property_price"]:
+        # Location and price are secondary priorities
+        score += 3.0
+    elif slot_name in ["has_valid_passport", "has_valid_visa"]:
+        # Documentation slots come after financial basics
+        score += 1.0
     
     # Factor 3: Recency boost (mentioned in recent turn)
     if slot_name in recent_mentions:

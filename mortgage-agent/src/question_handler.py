@@ -10,6 +10,7 @@ Provides helpful answers then guides back to pending question.
 import os
 from typing import Optional, Dict, Any
 from openai import OpenAI
+from .question_generator import apply_tone_guard
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -52,21 +53,29 @@ def is_user_asking_question(message: str) -> bool:
     return False
 
 
-def get_pending_question_reminder(state: Dict[str, Any]) -> str:
+def get_smart_transition(answer: str, state: Dict[str, Any]) -> str:
     """
-    Get a friendly reminder about the pending question.
+    Add a smart transition back to pending question if appropriate.
     
-    Returns empty string if no pending question.
+    Returns the answer with or without transition based on context.
     """
     
     last_asked = state.get("last_slot_asked")
     if not last_asked:
-        return ""
+        return answer
     
-    # Simple reminders for each slot
+    # Don't add transition if answer is very long (already comprehensive)
+    if len(answer) > 200:
+        return answer
+    
+    # Don't add transition if answer already ends with a question
+    if answer.strip().endswith('?'):
+        return answer
+    
+    # Simple reminders for each slot with transition
     reminders = {
         "down_payment": "How much do you have saved for a down payment?",
-        "loan_purpose": "What will you use the property for?",
+        "loan_purpose": "What will you use the property for?", 
         "property_city": "Which city is the property in?",
         "property_state": "Which state is that in?",
         "property_price": "What price range are you considering?",
@@ -77,7 +86,10 @@ def get_pending_question_reminder(state: Dict[str, Any]) -> str:
         "has_reserves": "Do you have the required reserves saved?"
     }
     
-    return reminders.get(last_asked, f"Could you answer about {last_asked}?")
+    reminder = reminders.get(last_asked, f"Could you answer about {last_asked}?")
+    
+    # Use softer transition
+    return f"{answer}\n\nBy the way, {reminder}"
 
 
 def handle_user_question(user_msg: str, state: Dict[str, Any]) -> Optional[str]:
@@ -105,12 +117,8 @@ def handle_user_question(user_msg: str, state: Dict[str, Any]) -> Optional[str]:
 
 Most lenders require proof of 2 years of stable income."""
             
-            # Add pending question reminder
-            reminder = get_pending_question_reminder(state)
-            if reminder:
-                answer += f"\n\nNow, back to where we were: {reminder}"
-            
-            return answer
+            # Add smart transition back to pending question
+            return get_smart_transition(answer, state)
     
     # =========================================================================
     # RESERVES CALCULATION
@@ -140,11 +148,7 @@ For reserves, you'll need **6-12 months** of mortgage payments saved:
 
 This ensures you can cover payments if income is interrupted."""
             
-            reminder = get_pending_question_reminder(state)
-            if reminder:
-                answer += f"\n\n{reminder}"
-            
-            return answer
+            return get_smart_transition(answer, state)
     
     # =========================================================================
     # CLOSING COSTS
@@ -162,11 +166,7 @@ This ensures you can cover payments if income is interrupted."""
 
 Example: On a $700k loan, expect $14k-$35k in closing costs."""
         
-        reminder = get_pending_question_reminder(state)
-        if reminder:
-            answer += f"\n\nNow, {reminder}"
-        
-        return answer
+        return get_smart_transition(answer, state)
     
     # =========================================================================
     # INTEREST RATES
@@ -184,11 +184,7 @@ Rates depend on:
 • Property type and location
 • Loan amount"""
         
-        reminder = get_pending_question_reminder(state)
-        if reminder:
-            answer += f"\n\n{reminder}"
-        
-        return answer
+        return get_smart_transition(answer, state)
     
     # =========================================================================
     # PROCESS TIMELINE
@@ -205,11 +201,7 @@ Rates depend on:
 
 Foreign National loans may take slightly longer due to international documentation."""
         
-        reminder = get_pending_question_reminder(state)
-        if reminder:
-            answer += f"\n\nLet's continue: {reminder}"
-        
-        return answer
+        return get_smart_transition(answer, state)
     
     # =========================================================================
     # DOWN PAYMENT CALCULATION
@@ -259,50 +251,50 @@ Foreign National loans may take slightly longer due to international documentati
             difference = required_down - current_down_float
             
             if difference > 0:
-                # Generate response with LLM for natural variation
-                prompt = f"""You're a helpful mortgage advisor. The user asked about affording a ${price_mentioned:,.0f} property.
+                # Generate direct response about the gap
+                prompt = f"""You are a mortgage advisor. The user asked about affording a ${price_mentioned:,.0f} property.
 
-Current situation:
-- They have ${current_down_float:,.0f} saved for down payment
-- They need ${required_down:,.0f} ({int(min_down_pct*100)}% minimum)
+Facts to state:
+- They need ${required_down:,.0f} for ${price_mentioned:,.0f} ({int(min_down_pct*100)}% minimum)
+- They have ${current_down_float:,.0f}
 - Gap: ${difference:,.0f} more needed
-- With their current amount, they can afford up to ${current_down_float/min_down_pct:,.0f}
+- With current amount, they can afford up to ${current_down_float/min_down_pct:,.0f}
 
-Generate a natural, helpful response that explains the situation and presents their options.
-Be conversational, warm but professional. Don't use markdown formatting like ** or #."""
+State these facts in 1-2 sentences. Be direct. No greetings or options lists."""
 
                 try:
                     response = client.chat.completions.create(
                         model=MODEL,
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.7,
-                        max_tokens=150
+                        max_tokens=80
                     )
-                    answer = response.choices[0].message.content.strip()
+                    raw_answer = response.choices[0].message.content.strip()
+                    answer = apply_tone_guard(raw_answer)
                 except:
                     # Fallback if LLM fails
                     answer = f"To afford a ${price_mentioned:,.0f} property with a {int(min_down_pct*100)}% down payment, you'll need ${required_down:,.0f}. You currently have ${current_down_float:,.0f}, so you would need an additional ${difference:,.0f}. Alternatively, with your current down payment, you can afford properties up to ${current_down_float/min_down_pct:,.0f}."
             else:
                 # Generate positive response with LLM
-                prompt = f"""You're a helpful mortgage advisor. The user asked about affording a ${price_mentioned:,.0f} property.
+                prompt = f"""You are a mortgage advisor. The user asked about affording a ${price_mentioned:,.0f} property.
 
-Good news:
+Facts to state:
 - They have ${current_down_float:,.0f} saved
 - That's {(current_down_float/price_mentioned)*100:.1f}% down payment
 - This exceeds the {int(min_down_pct*100)}% minimum requirement
-- They may qualify for better interest rates
+- They may qualify for better rates
 
-Generate a positive, encouraging response. 
-Be conversational and warm. Don't use markdown formatting like ** or #."""
+State these facts in 1-2 sentences. Be direct and professional."""
 
                 try:
                     response = client.chat.completions.create(
                         model=MODEL,
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.7,
-                        max_tokens=120
+                        max_tokens=80
                     )
-                    answer = response.choices[0].message.content.strip()
+                    raw_answer = response.choices[0].message.content.strip()
+                    answer = apply_tone_guard(raw_answer)
                 except:
                     # Fallback if LLM fails
                     answer = f"Great news! With your ${current_down_float:,.0f} down payment, you can definitely afford a ${price_mentioned:,.0f} property. That's a {(current_down_float/price_mentioned)*100:.1f}% down payment, which exceeds the {int(min_down_pct*100)}% minimum and may qualify you for better rates!"
@@ -333,11 +325,7 @@ Higher down payments (30%+) may qualify for better rates and easier approval."""
 
 Higher down payments (30%+) may qualify for better interest rates and easier approval."""
         
-        reminder = get_pending_question_reminder(state)
-        if reminder:
-            answer += f"\n\n{reminder}"
-        
-        return answer
+        return get_smart_transition(answer, state)
     
     # =========================================================================
     # USE LLM FOR OTHER QUESTIONS
@@ -380,14 +368,11 @@ Be professional but friendly. Don't make promises about approval."""
             max_tokens=200
         )
         
-        answer = response.choices[0].message.content.strip()
+        raw_answer = response.choices[0].message.content.strip()
+        answer = apply_tone_guard(raw_answer)
         
-        # Add pending question reminder
-        reminder = get_pending_question_reminder(state)
-        if reminder:
-            answer += f"\n\n{reminder}"
-        
-        return answer
+        # Add smart transition back to pending question
+        return get_smart_transition(answer, state)
     
     except Exception as e:
         print(f"LLM answer generation error: {e}")
@@ -395,8 +380,4 @@ Be professional but friendly. Don't make promises about approval."""
         # Fallback response
         answer = "I understand you have a question. Let me help you complete the pre-qualification first, then I can address that in detail."
         
-        reminder = get_pending_question_reminder(state)
-        if reminder:
-            answer += f" {reminder}"
-        
-        return answer
+        return get_smart_transition(answer, state)

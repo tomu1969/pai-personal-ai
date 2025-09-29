@@ -36,6 +36,8 @@ def apply_tone_guard(text: str) -> str:
         r'\b(sounds? good|that\'?s good|very good|good choice|nice|lovely)\b',
         r'\b(congratulations|well done|good job|nicely done)\b',
         r'\b(I\'?m excited|excited to|thrilled|delighted|pleased)\b',
+        r'\b(I\'?m glad|glad you|happy to|pleased to)\b',
+        r'\b(explore your options|break down|let me help|let\'s work)\b',
     ]
     
     cleaned = text
@@ -156,12 +158,12 @@ Based on their down payment, they can afford properties between ${comfortable_pr
 
 Their last message: "{last_user_message or 'none'}"
 
-Generate a natural question that:
-1. Briefly acknowledges their previous answer if relevant
-2. Mentions the affordability range
-3. Asks what price range they're considering
+Generate a response with TWO parts:
+1. One sentence stating their affordability range (${comfortable_price:,.0f} to ${max_price:,.0f})
+2. One question asking what price range they want
+MUST end with: "What price range are you considering?"
 
-Keep it brief and conversational (2-3 sentences max):"""
+Be direct and concise (maximum 2 sentences):"""
 
         try:
             response = client.chat.completions.create(
@@ -171,7 +173,15 @@ Keep it brief and conversational (2-3 sentences max):"""
                 max_tokens=100
             )
             raw_response = response.choices[0].message.content.strip()
-            return apply_tone_guard(raw_response)
+            cleaned_response = apply_tone_guard(raw_response)
+            
+            # Ensure response contains a question - if not, append fallback
+            if not cleaned_response.endswith('?'):
+                if not cleaned_response.endswith('.'):
+                    cleaned_response += '.'
+                cleaned_response += " What price range are you considering?"
+            
+            return cleaned_response
         except:
             return f"Based on your ${down_payment:,.0f} down payment, you can afford properties between ${comfortable_price:,.0f} and ${max_price:,.0f}. What price range are you considering?"
     

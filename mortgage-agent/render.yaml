@@ -5,7 +5,7 @@ services:
     runtime: python
     plan: free  # Can upgrade to 'starter' or 'standard' for production
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn src.simple_api:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn src.simple_api:app --host 0.0.0.0 --port $PORT --reload
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -29,6 +29,9 @@ services:
         value: "123456"
       - key: LETTER_EXPIRY_DAYS
         value: "90"
+      # Force rebuild - simplified system deployment
+      - key: FORCE_SIMPLIFIED_SYSTEM
+        value: "true"
     
     # Health check configuration
     healthCheckPath: /health

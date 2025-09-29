@@ -58,7 +58,8 @@ def process_slot_turn(state: SlotFillingState) -> SlotFillingState:
     # =========================================================================
     # STEP 1: HANDLE FIRST MESSAGE (GREETING)
     # =========================================================================
-    if len(state["messages"]) == 0:
+    assistant_messages = [m for m in state["messages"] if m["role"] == "assistant"]
+    if len(assistant_messages) == 0:
         state["messages"].append({
             "role": "assistant",
             "content": "Hi, I can help you pre-qualify for a mortgage with just eight questions. Would you like to begin?"

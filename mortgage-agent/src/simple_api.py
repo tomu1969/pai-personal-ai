@@ -1,0 +1,159 @@
+"""
+================================================================================
+SIMPLE_API.PY - SIMPLIFIED MORTGAGE ASSISTANT API
+================================================================================
+
+Clean API endpoint using the simplified conversation system.
+Single endpoint with natural conversation flow.
+"""
+
+from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+from typing import Optional, Dict, Any, List
+import uuid
+import os
+
+from .conversation_simple import process_conversation_turn
+
+# Initialize app
+app = FastAPI(title="Mortgage Pre-Qualification - Simplified", version="3.0.0")
+
+# Static files
+static_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+if os.path.exists(static_path):
+    app.mount("/static", StaticFiles(directory=static_path), name="static")
+
+# ============================================================================
+# IN-MEMORY CONVERSATION STORAGE
+# ============================================================================
+conversations: Dict[str, List[Dict[str, str]]] = {}
+
+# ============================================================================
+# REQUEST/RESPONSE MODELS
+# ============================================================================
+
+class ChatRequest(BaseModel):
+    message: str
+    conversation_id: Optional[str] = None
+
+
+class ChatResponse(BaseModel):
+    response: str
+    conversation_id: str
+    complete: bool = False
+
+
+# ============================================================================
+# MAIN CHAT ENDPOINT
+# ============================================================================
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat_endpoint(request: ChatRequest):
+    """
+    Simplified chat endpoint using single-prompt architecture.
+    
+    Natural conversation flow with coherent responses.
+    """
+    try:
+        # Get or create conversation
+        conversation_id = request.conversation_id or str(uuid.uuid4())
+        
+        print(f"\n{'='*80}")
+        print(f"SIMPLE API REQUEST - Conversation: {conversation_id}")
+        print(f"User Message: {request.message}")
+        print(f"{'='*80}")
+        
+        if conversation_id not in conversations:
+            conversations[conversation_id] = []
+            print(f"Created new conversation")
+        
+        messages = conversations[conversation_id]
+        
+        # Add user message
+        messages.append({"role": "user", "content": request.message})
+        
+        # Process turn with simplified system
+        response = process_conversation_turn(messages)
+        
+        # Add assistant response
+        messages.append({"role": "assistant", "content": response})
+        
+        # Save updated conversation
+        conversations[conversation_id] = messages
+        
+        # Check if conversation is complete
+        is_complete = ("pre-qualified" in response.lower() or 
+                      "don't qualify" in response.lower() or
+                      "Unfortunately" in response)
+        
+        print(f"Assistant Response: {response}")
+        print(f"Complete: {is_complete}")
+        
+        return ChatResponse(
+            response=response,
+            conversation_id=conversation_id,
+            complete=is_complete
+        )
+        
+    except Exception as e:
+        print(f"ERROR in simple chat_endpoint: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+
+
+# ============================================================================
+# DEBUG ENDPOINTS
+# ============================================================================
+
+@app.get("/conversations/{conversation_id}")
+async def get_conversation(conversation_id: str):
+    """Get full conversation for debugging."""
+    if conversation_id not in conversations:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    return {"messages": conversations[conversation_id]}
+
+
+@app.delete("/conversations/{conversation_id}")
+async def delete_conversation(conversation_id: str):
+    """Delete a conversation."""
+    if conversation_id in conversations:
+        del conversations[conversation_id]
+        return {"message": "Conversation deleted"}
+    else:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "service": "mortgage-simple", "version": "3.0.0"}
+
+
+@app.get("/")
+async def serve_index():
+    """Serve the chat interface."""
+    static_path_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+    index_path = os.path.join(static_path_dir, "index.html")
+    
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    else:
+        return {
+            "message": "Mortgage Pre-Qualification - Simplified API",
+            "version": "3.0.0",
+            "endpoints": {
+                "POST /chat": "Main chat endpoint (simplified)",
+                "GET /health": "Health check",
+                "GET /conversations/{id}": "Debug conversation",
+                "DELETE /conversations/{id}": "Delete conversation"
+            }
+        }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8002)

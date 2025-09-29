@@ -103,7 +103,7 @@ class PaiResponderService extends BaseAssistant {
         model: 'gpt-4o-mini',
         messages: conversationHistory,
         temperature: 0.8,
-        max_tokens: 300,
+        max_completion_tokens: 300,
       });
 
       const responseText = completion.choices[0].message.content;

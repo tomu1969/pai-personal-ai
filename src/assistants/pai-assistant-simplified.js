@@ -116,7 +116,7 @@ class SimplifiedPaiAssistant {
         functions: [this.getFunctionDefinition()],
         function_call: 'auto', // Let AI decide when to call function
         temperature: 0.3,
-        max_tokens: 800,
+        max_completion_tokens: 800,
       });
 
       const choice = response.choices[0];
@@ -207,7 +207,7 @@ class SimplifiedPaiAssistant {
             model: this.model,
             messages: this.conversationHistory,
             temperature: 0.3,
-            max_tokens: 600,
+            max_completion_tokens: 600,
           });
 
           const finalMessage = finalResponse.choices[0].message.content;

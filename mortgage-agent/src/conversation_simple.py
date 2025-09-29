@@ -11,9 +11,46 @@ import os
 import json
 from typing import Dict, List, Any, Optional
 from openai import OpenAI
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
+# Check if GPT-5 is available, fallback to GPT-4o
+def get_working_model():
+    try:
+        # Test if the configured model works
+        test_response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": "Hello"}],
+            max_completion_tokens=5
+        )
+        if test_response.choices[0].message.content:
+            return MODEL
+    except Exception as e:
+        print(f"Model {MODEL} not working: {e}")
+    
+    # Try GPT-4o as fallback
+    try:
+        test_response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": "Hello"}],
+            max_completion_tokens=5
+        )
+        if test_response.choices[0].message.content:
+            print(f"Falling back to GPT-4o")
+            return "gpt-4o"
+    except Exception as e:
+        print(f"GPT-4o fallback failed: {e}")
+    
+    # Final fallback
+    return "gpt-4o-mini"
+
+WORKING_MODEL = get_working_model()
+print(f"Using model: {WORKING_MODEL}")
 
 # Master system prompt for natural conversation flow
 MASTER_SYSTEM_PROMPT = """You are a mortgage pre-qualification assistant specializing in foreign national loans.
@@ -116,7 +153,7 @@ def extract_entities(messages: List[Dict[str, str]]) -> Dict[str, Any]:
     
     try:
         response = client.chat.completions.create(
-            model=MODEL,
+            model=WORKING_MODEL,
             messages=[
                 {"role": "system", "content": """Extract mortgage information from the user's message. Apply intelligent inference:
 - When a well-known US city is mentioned, automatically include the state (e.g., Miami→FL, NYC→NY, Los Angeles→CA, Chicago→IL, Houston→TX, Phoenix→AZ, Philadelphia→PA, San Antonio→TX, San Diego→CA, Dallas→TX, San Jose→CA, Austin→TX, Jacksonville→FL, San Francisco→CA, Columbus→OH, Indianapolis→IN, Charlotte→NC, Seattle→WA, Denver→CO, Boston→MA, Detroit→MI, Nashville→TN, Portland→OR, Las Vegas→NV, Memphis→TN, Baltimore→MD, Milwaukee→WI, Albuquerque→NM, Tucson→AZ, Fresno→CA, Sacramento→CA, Kansas City→MO, Atlanta→GA, Miami Beach→FL, Orlando→FL, Tampa→FL)
@@ -124,14 +161,14 @@ def extract_entities(messages: List[Dict[str, str]]) -> Dict[str, Any]:
 - Use common knowledge for geographic relationships"""},
                 {"role": "user", "content": f"Extract entities from: '{latest_message}'"}
             ],
-            functions=[extraction_function],
-            function_call={"name": "extract_mortgage_entities"},
-            temperature=0.1
+            tools=[{"type": "function", "function": extraction_function}],
+            tool_choice={"type": "function", "function": {"name": "extract_mortgage_entities"}},
+            temperature=1
         )
         
-        function_call = response.choices[0].message.function_call
-        if function_call and function_call.arguments:
-            return json.loads(function_call.arguments)
+        tool_calls = response.choices[0].message.tool_calls
+        if tool_calls and tool_calls[0].function.arguments:
+            return json.loads(tool_calls[0].function.arguments)
     
     except Exception as e:
         print(f"Entity extraction error: {e}")
@@ -303,47 +340,42 @@ A loan officer will contact you within 2 business days to proceed."""
         else:
             return f"Unfortunately, you don't qualify at this time. {qualification['reason']}"
     
-    # Use unified prompt with full context
-    conversation_context = "\n".join([f"{m['role']}: {m['content']}" for m in messages[-6:]])  # More context for better decisions
+    # Simplified prompt for GPT-5
+    conversation_context = "\n".join([f"{m['role']}: {m['content']}" for m in messages[-4:]])
     
-    prompt = f"""You are helping a user pre-qualify for a foreign national mortgage. You need to collect specific information while being helpful and conversational.
+    prompt = f"""You are a mortgage pre-qualification assistant. Respond naturally and ask for the next missing information.
 
-CURRENT CONVERSATION:
+CONVERSATION:
 {conversation_context}
 
-INFORMATION STATUS:
+COLLECTED INFO:
 {missing_info_context}
 
-LOAN CALCULATION RULES:
-- Foreign nationals need 25% minimum down payment (75% max LTV)
-- Max property price = down payment ÷ 0.25
-- Max loan amount = max property price - down payment
-
-YOUR TASK:
-1. First, be helpful - answer any question the user asked with specific information
-2. If the user seems confused or is exploring options, engage helpfully to clarify their needs
-3. Assess whether to continue the dialogue or transition to pre-qualification questions
-4. Always find a natural way to guide back to collecting missing information
-5. Be conversational and supportive while maintaining focus on pre-qualification goal
-6. Keep responses concise and always end with a question that moves the conversation forward
-
-IMPORTANT: Balance being helpful with making progress. If user needs clarification, provide it, then smoothly transition back to pre-qualification.
-
-Generate a natural response that answers their question (if any) and asks for the next most relevant missing information."""
+Next, ask for one missing piece of information in a conversational way. Keep responses under 20 words."""
     
     try:
+        print(f">>> Sending to OpenAI - Model: {WORKING_MODEL}")
+        print(f">>> Prompt length: {len(prompt)}")
+        
         response = client.chat.completions.create(
-            model=MODEL,
+            model=WORKING_MODEL,
             messages=[
                 {"role": "system", "content": MASTER_SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.7,
-            max_tokens=100
+            temperature=1,
+            max_completion_tokens=100
         )
         
-        return response.choices[0].message.content.strip()
+        result = response.choices[0].message.content
+        print(f">>> OpenAI raw response: '{result}'")
+        
+        if not result or not result.strip():
+            print(">>> WARNING: OpenAI returned empty response!")
+            return "I understand. What's the property price you're considering?"
+        
+        return result.strip()
     
     except Exception as e:
         print(f"Response generation error: {e}")
-        return f"Thank you. {next_question}"
+        return "Sorry, I'm having trouble processing your response. Could you please try again?"

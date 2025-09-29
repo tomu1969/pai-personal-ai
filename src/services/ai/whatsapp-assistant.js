@@ -122,7 +122,7 @@ class WhatsAppAssistant {
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: history,
         temperature: 0.7,
-        max_tokens: 500
+        max_completion_tokens: 500
       });
 
       const aiResponse = response.choices[0].message.content;

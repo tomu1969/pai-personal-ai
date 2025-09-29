@@ -149,7 +149,7 @@ IMPORTANT TIMEFRAME EXAMPLES:
           { role: 'user', content: userMessage },
         ],
         temperature: 0.1,
-        max_tokens: 200,
+        max_completion_tokens: 200,
         response_format: { type: 'json_object' },
       });
 
@@ -361,7 +361,7 @@ Rules:
                 { role: 'user', content: `Please analyze these messages and provide a conversation summary following the exact format specified: ${JSON.stringify(messageData)}` },
               ],
               temperature: 0.3,
-              max_tokens: 800,
+              max_completion_tokens: 800,
             });
 
             responseMessage = completion.choices[0].message.content;
@@ -393,7 +393,7 @@ Rules:
                 { role: 'user', content: `Analyze this contact data: ${JSON.stringify(contactData)}` },
               ],
               temperature: 0.3,
-              max_tokens: 400,
+              max_completion_tokens: 400,
             });
 
             responseMessage = completion.choices[0].message.content;
@@ -408,7 +408,7 @@ Rules:
                 { role: 'user', content: userMessage },
               ],
               temperature: 0.7,
-              max_tokens: 300,
+              max_completion_tokens: 300,
             });
 
             responseMessage = completion.choices[0].message.content;
@@ -450,7 +450,7 @@ Rules:
                 { role: 'user', content: `Analyze this contact data: ${JSON.stringify(contactData)}` },
               ],
               temperature: 0.3,
-              max_tokens: 400,
+              max_completion_tokens: 400,
             });
 
             responseMessage = completion.choices[0].message.content;
@@ -465,7 +465,7 @@ Rules:
                 { role: 'user', content: userMessage },
               ],
               temperature: 0.7,
-              max_tokens: 300,
+              max_completion_tokens: 300,
             });
 
             responseMessage = completion.choices[0].message.content;
@@ -521,7 +521,7 @@ I can help you find and analyze your messages using natural language. Here's wha
               { role: 'user', content: userMessage },
             ],
             temperature: 0.7,
-            max_tokens: 300,
+            max_completion_tokens: 300,
           });
 
           responseMessage = completion.choices[0].message.content;

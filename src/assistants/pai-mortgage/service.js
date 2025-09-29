@@ -187,7 +187,7 @@ Respond with JSON format:
         model: this.model,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
-        max_tokens: 500
+        max_completion_tokens: 500
       });
 
       // Clean the response content to extract JSON
@@ -485,7 +485,7 @@ Provide a comprehensive but concise answer focusing on mortgage qualification, r
       model: this.model,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
-      max_tokens: 800
+      max_completion_tokens: 800
     });
 
     return response.choices[0].message.content;

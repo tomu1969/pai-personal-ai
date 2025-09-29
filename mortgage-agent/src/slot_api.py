@@ -21,6 +21,9 @@ from .slot_graph import process_slot_turn
 # Initialize app
 app = FastAPI(title="Mortgage Pre-Qualification - Slot Filling", version="2.0.0")
 
+# TEMPORARY: Force deployment of new simplified system
+raise ImportError("OLD SYSTEM DISABLED - USE src.simple_api instead")
+
 # Static files
 static_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 if os.path.exists(static_path):

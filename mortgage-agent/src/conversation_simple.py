@@ -81,7 +81,7 @@ CRITICAL: DOWN PAYMENT VALIDATION RULES:
 - If insufficient, ask user to adjust EITHER down payment up OR property price down
 
 CONFIRMATION PROTOCOL (CRITICAL):
-- After answering ANY calculation or exploratory question, ask for confirmation
+- After answering ANY question from the user, ask for confirmation
 - NEVER move to the next qualification topic without confirming the user's choice
 - When multiple options are discussed, explicitly ask which one to proceed with
 - Pattern: Answer → Confirm → Proceed
@@ -89,6 +89,7 @@ CONFIRMATION PROTOCOL (CRITICAL):
 Response Examples:
 - User asks "how much for 2M?" → Calculate, then ask "Would you like to proceed with $2M and $500k down?"
 - User says "what if I put 300k?" → Calculate, then ask "Should I update your down payment to $300k?"
+- User asks "what visas are admissible?" → List visas, then ask "Do you have one of these visas?"
 - User explores multiple options → Present options, ask "Which option works best for you?"
 
 NEVER combine confirmation with next question. Keep them separate:
@@ -96,9 +97,13 @@ NEVER combine confirmation with next question. Keep them separate:
 ❌ Wrong: "Is this correct? Next, what's the location?"
 ❌ Wrong: "Would you like to proceed with this? If so, what's the property purpose?"
 ❌ Wrong: "With $200k down, you can afford $800k maximum. What's the purpose of the property?"
+❌ Wrong: "Admissible visas include B1/B2, E-2, H-1B. Do you have income documentation?"
 ✅ Right: "Would you like to proceed with $2M and $500k down?"
 [Wait for answer]
 ✅ Then: "Great! What's the property purpose?"
+✅ Right: "Admissible visas include B1/B2, E-2, H-1B. Do you have one of these visas?"
+[Wait for answer]
+✅ Then: "Great! Can you demonstrate income with bank statements or tax returns?"
 
 CONFIRMATION MODE RULES (STRICTLY ENFORCED):
 - When asking for confirmation after exploratory questions, ask ONLY the confirmation question
@@ -830,16 +835,9 @@ A loan officer will contact you within 2 business days to proceed."""
                                any(phrase in last_assistant_msg.lower() for phrase in 
                                    ["would you like", "should i", "proceed with", "confirm", "is that correct", "which option"]))
     
-    # If user asked a question, prioritize answering it
+    # If user asked a question, prioritize answering it and enforce confirmation protocol
     if user_question:
-        # Check if this is an exploratory/calculation question
-        exploratory_phrases = ['how much', 'what if', 'calculate', 'what about', 'suppose i', 'can you', 'would i need', 'can i afford']
-        is_exploratory = any(phrase in user_question.lower() for phrase in exploratory_phrases)
-        
-        if is_exploratory:
-            prompt_parts.append(f"CRITICAL: USER ASKED EXPLORATORY QUESTION: '{user_question}' - Answer the calculation first, then ask ONLY ONE confirmation question. YOU MUST NOT ask about property purpose, location, passport, visa, income, or reserves until they confirm their choice. STOP after the confirmation question.")
-        else:
-            prompt_parts.append(f"USER ASKED: '{user_question}' - Answer this question directly first, then ask for any needed confirmations.")
+        prompt_parts.append(f"CRITICAL: USER ASKED QUESTION: '{user_question}' - Answer the question first, then ask ONLY ONE confirmation question related to that topic. YOU MUST NOT ask about property purpose, location, passport, visa, income, or reserves until they confirm their choice. STOP after the confirmation question.")
     
     # If we're waiting for confirmation, handle the user's response
     elif waiting_for_confirmation:

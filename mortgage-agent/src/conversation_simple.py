@@ -37,6 +37,13 @@ Guidelines:
 - Don't use phrases like "great", "excellent", "wonderful"
 - Keep responses under 2 sentences plus the question
 
+IMPORTANT - When users ask about loan amounts or affordability:
+- Foreign nationals need 25% minimum down payment (75% max LTV)
+- Calculate: Max property price = down payment ÷ 0.25
+- Calculate: Max loan amount = max property price - down payment
+- Provide these calculations when asked, then ask for their property price preference
+- Example: "With $200k down, you can buy up to $800k (max loan $600k). What price are you considering?"
+
 When you have all 8 pieces of information, provide a qualification decision."""
 
 
@@ -275,7 +282,34 @@ A loan officer will contact you within 2 business days to proceed."""
     # Use OpenAI to generate natural response + next question
     conversation_context = "\n".join([f"{m['role']}: {m['content']}" for m in messages[-4:]])  # Last 4 messages for context
     
-    prompt = f"""Based on this conversation:
+    # Check if user is asking about loan amounts or affordability
+    user_messages = [m for m in messages if m["role"] == "user"]
+    latest_user_msg = user_messages[-1]["content"].lower() if user_messages else ""
+    
+    is_asking_loan_question = any(phrase in latest_user_msg for phrase in [
+        "how much can you lend", "loan amount", "how much loan", "can i borrow",
+        "what can i afford", "depends on the loan", "how much mortgage"
+    ])
+    
+    # Add affordability context if down payment is known
+    affordability_context = ""
+    if "down_payment" in all_entities and is_asking_loan_question:
+        down_payment = all_entities["down_payment"]
+        max_property_price = down_payment / 0.25
+        max_loan = max_property_price - down_payment
+        affordability_context = f"\nAFfordability calculation: With ${down_payment:,.0f} down payment, max property price is ${max_property_price:,.0f} (max loan ${max_loan:,.0f})."
+    
+    if is_asking_loan_question and affordability_context:
+        prompt = f"""Based on this conversation:
+{conversation_context}
+
+The user is asking about loan amounts or affordability.{affordability_context}
+
+Provide a helpful answer with the specific calculations, then ask: "{next_question}"
+
+Be direct and helpful. Calculate and state the exact numbers, then ask the question."""
+    else:
+        prompt = f"""Based on this conversation:
 {conversation_context}
 
 The user just provided information. Acknowledge what they said briefly (1 sentence max), then ask: "{next_question}"

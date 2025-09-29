@@ -118,7 +118,10 @@ def extract_entities(messages: List[Dict[str, str]]) -> Dict[str, Any]:
         response = client.chat.completions.create(
             model=MODEL,
             messages=[
-                {"role": "system", "content": "Extract mortgage information from the user's message. Only include information explicitly mentioned."},
+                {"role": "system", "content": """Extract mortgage information from the user's message. Apply intelligent inference:
+- When a well-known US city is mentioned, automatically include the state (e.g., Miami→FL, NYC→NY, Los Angeles→CA, Chicago→IL, Houston→TX, Phoenix→AZ, Philadelphia→PA, San Antonio→TX, San Diego→CA, Dallas→TX, San Jose→CA, Austin→TX, Jacksonville→FL, San Francisco→CA, Columbus→OH, Indianapolis→IN, Charlotte→NC, Seattle→WA, Denver→CO, Boston→MA, Detroit→MI, Nashville→TN, Portland→OR, Las Vegas→NV, Memphis→TN, Baltimore→MD, Milwaukee→WI, Albuquerque→NM, Tucson→AZ, Fresno→CA, Sacramento→CA, Kansas City→MO, Atlanta→GA, Miami Beach→FL, Orlando→FL, Tampa→FL)
+- Extract both explicit and reasonably implied information
+- Use common knowledge for geographic relationships"""},
                 {"role": "user", "content": f"Extract entities from: '{latest_message}'"}
             ],
             functions=[extraction_function],
@@ -317,11 +320,14 @@ LOAN CALCULATION RULES:
 - Max loan amount = max property price - down payment
 
 YOUR TASK:
-1. Answer any question the user asked (be helpful and specific)
-2. If they ask about loan amounts, provide calculations using the rules above
-3. Based on the conversation context, ask the most logical next question to collect missing information
-4. Be natural and contextually aware - don't ask for information they just mentioned
-5. Keep responses concise and always end with a question
+1. First, be helpful - answer any question the user asked with specific information
+2. If the user seems confused or is exploring options, engage helpfully to clarify their needs
+3. Assess whether to continue the dialogue or transition to pre-qualification questions
+4. Always find a natural way to guide back to collecting missing information
+5. Be conversational and supportive while maintaining focus on pre-qualification goal
+6. Keep responses concise and always end with a question that moves the conversation forward
+
+IMPORTANT: Balance being helpful with making progress. If user needs clarification, provide it, then smoothly transition back to pre-qualification.
 
 Generate a natural response that answers their question (if any) and asks for the next most relevant missing information."""
     

@@ -5,7 +5,7 @@ services:
     runtime: python
     plan: free  # Can upgrade to 'starter' or 'standard' for production
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn src.simple_api:app --host 0.0.0.0 --port $PORT
+    startCommand: python run_simple.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -39,8 +39,7 @@ services:
     # Build filters - only rebuild when these paths change
     buildFilter:
       paths:
-        - mortgage-agent/**
-        - requirements.txt
+        - "**"
     
     # Static files configuration
     staticPublishPath: ./static

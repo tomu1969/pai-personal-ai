@@ -647,3 +647,101 @@ docker-compose down -v
 ```
 
 This guide provides comprehensive context for any Claude session to understand and work effectively with the triple assistant PAI System, including the newly operational PAI Mortgage assistant with all recent fixes and improvements.
+
+## Standalone Mortgage Agent (September 2025)
+
+In addition to the PAI Mortgage WhatsApp integration, there is a **standalone mortgage qualification system** deployed separately:
+
+### Mortgage Agent v3.0.0 - Simplified Architecture
+
+**Location**: `/ai_pbx/mortgage-agent/`
+**Live URL**: https://mortgage-agent.onrender.com
+**Local Port**: 8000
+
+#### Key Features
+- **Single System Prompt Architecture**: Replaced complex graph-based approach with unified conversation logic
+- **Universal Confirmation Protocol**: Consistent Answer → Confirm → Proceed flow for all user questions
+- **Smart Entity Management**: Prevents data corruption with confirmed value tracking
+- **Foreign National Specialization**: 25% down payment, visa requirements, reserves calculation
+- **Production Ready**: Deployed on Render with auto-deploy from GitHub
+
+#### Core Architecture
+```
+User → simple_api.py → conversation_simple.py → OpenAI GPT-4o → Response
+```
+
+**Active Files**:
+- `src/simple_api.py`: FastAPI application with chat endpoints
+- `src/conversation_simple.py`: Single system prompt conversation engine
+- `src/legacy/`: Previous implementations (v1.0-v2.0 slot-filling and graph-based)
+
+#### Recent Major Fixes (September 2025)
+
+**Universal Confirmation Protocol**:
+- Fixed protocol violations where assistant jumped to next question without confirmation
+- Example Fix: "what visas are admissible?" → List visas → "Do you have one of these visas?" (not jump to income)
+
+**Entity Persistence & Smart Merging**:
+- Fixed entity reversion bug (down payment reverting from 250k to 200k during conversation)
+- Added confirmed entities tracking throughout conversation history
+- Implemented context-aware LLM analysis for understanding user confirmations
+
+**Reserve Calculation Fixes**:
+- Fixed magnitude errors ($1B instead of $1M calculations)
+- Added proper loan amount calculations: monthly payment ≈ (loan amount × 0.005)
+- Example: $1M property - $250k down = $750k loan → $3,750/month → $22,500-45k reserves
+
+**Down Payment Validation**:
+- Prevents premature validation before having both down payment AND property price
+- Only validates 25% requirement after collecting both values
+
+#### 8-Question Pre-Qualification Process
+1. Down payment amount (≥25%)
+2. Property price  
+3. Property purpose (primary/second/investment)
+4. Property location (city/state)
+5. Valid passport (required for foreign nationals)
+6. Valid U.S. visa (B1/B2, E-2, H-1B, L-1, etc.)
+7. Income documentation capability
+8. Financial reserves (6-12 months saved)
+
+#### API Usage
+```bash
+# Start conversation
+curl -X POST https://mortgage-agent.onrender.com/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "I want to apply for a mortgage"}'
+
+# Continue conversation
+curl -X POST https://mortgage-agent.onrender.com/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "250k", "conversation_id": "your-id"}'
+```
+
+#### Technical Implementation
+- **Model**: OpenAI GPT-4o (fallback from GPT-5)
+- **Dependencies**: fastapi, uvicorn, openai, python-dotenv, pydantic
+- **Storage**: In-memory conversations (production should use Redis/Database)
+- **Deployment**: Render.com with auto-deploy from main branch
+
+#### Integration with PAI System
+The standalone mortgage agent complements the PAI Mortgage WhatsApp integration:
+- **Standalone**: Direct web/API access for lenders and brokers
+- **PAI Mortgage**: WhatsApp integration for consumer messaging
+- **Shared Logic**: Both use similar qualification criteria and business rules
+
+#### Documentation
+- `README.md`: Complete v3.0.0 documentation
+- `NEW_ARCHITECTURE.md`: Detailed architecture explanation  
+- `FIXES_HISTORY.md`: Consolidated fix history from all versions
+- `DEPLOYMENT.md`: Render deployment guide
+
+#### Troubleshooting Common Issues
+1. **Missing Dependencies**: Ensure `python-dotenv>=1.0.0` in requirements.txt
+2. **OpenAI API Errors**: Verify OPENAI_API_KEY environment variable
+3. **Confirmation Protocol**: All user questions should trigger confirmation before proceeding
+4. **Entity Persistence**: Confirmed values should never revert to previous values
+
+This standalone system provides a robust, production-ready mortgage qualification solution that can be easily integrated into existing lending workflows or used as a standalone qualification tool.
+
+This guide provides comprehensive context for any Claude session to understand and work effectively with the triple assistant PAI System, including the newly operational PAI Mortgage assistant with all recent fixes and improvements.

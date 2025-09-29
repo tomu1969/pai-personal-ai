@@ -1,60 +1,66 @@
-# Mortgage Pre-Approval Chatbot MVP
+# Mortgage Pre-Qualification Assistant (v3.0.0)
 
-A stateful conversational AI agent built with Python, LangChain, and LangGraph for mortgage pre-approval screening of Foreign Nationals.
+A simplified conversational AI agent for foreign national mortgage pre-qualification using a single system prompt architecture.
 
-## 🎯 Features
+## 🎯 Current Features
 
-- **Stateful Conversations**: Maintains context across multiple interactions
-- **Rules Engine**: Pure Python logic for loan approval decisions  
-- **Conversational Intelligence**: Handles user questions and clarifications
-- **Interactive Web UI**: Clean chat interface for testing
-- **RESTful API**: Conversation management with unique IDs
+- **Universal Confirmation Protocol**: Consistent Answer → Confirm → Proceed flow
+- **Smart Entity Management**: Contextual value extraction with confidence tracking
+- **Natural Conversation Flow**: Single prompt handles both answers and questions
+- **Foreign National Specialization**: 25% down payment, visa requirements, reserves
+- **Web Interface**: Clean chat interface for testing
+- **Production Deployment**: Live on Render.com
 
-## 🏗️ Architecture
+## 🏗️ Architecture (v3.0.0 - Simplified)
 
-- **Phase 1**: Foundation (GraphState, rules engine, FastAPI)
-- **Phase 2**: Happy Path (8 sequential questions with LLM extraction)  
-- **Phase 3**: Conversational Intelligence (router + clarification handling)
-- **Phase 4**: API + Web UI (conversation management + HTML interface)
+The current implementation uses a **simplified single-prompt architecture** that replaced the previous graph-based approach:
 
-## 📋 Requirements
+```
+User Message → simple_api.py → conversation_simple.py → OpenAI GPT-4o → Response
+```
 
-The chatbot asks 8 questions based on Foreign Nationals Non-QM Loan Guidelines:
+### Core Files:
+- `src/simple_api.py` - FastAPI application with chat endpoints
+- `src/conversation_simple.py` - Single system prompt conversation logic
+- `src/legacy/` - Previous slot-filling and graph-based implementations (v1.0-v2.0)
 
-1. **Property Location**: City/state in the U.S.
-2. **Loan Purpose**: Personal, second home, or investment
-3. **Property Price**: Approximate property value
-4. **Down Payment**: Available cash for down payment  
-5. **Documentation**: Valid passport and visa
-6. **Current Location**: Living in origin country or U.S.
-7. **Income Proof**: Bank statements or CPA letter capability
-8. **Reserves**: 6-12 months of mortgage payments saved
+## 📋 Pre-Qualification Questions
+
+The assistant collects 8 pieces of information for foreign nationals:
+
+1. **Down Payment Amount** (minimum 25% required)
+2. **Property Price** 
+3. **Property Purpose** (primary residence, second home, investment)
+4. **Property Location** (city and state)
+5. **Valid Passport** (required for foreign nationals)
+6. **Valid U.S. Visa** (B1/B2, E-2, H-1B, L-1, etc.)
+7. **Income Documentation** (bank statements, tax returns, employment letters)
+8. **Financial Reserves** (6-12 months of mortgage payments saved)
 
 ## 🚀 Quick Start
 
-### Installation
+### Local Development
 
 ```bash
-# Clone or navigate to the project
-cd mortgage-agent
-
 # Install dependencies
 pip install -r requirements.txt
 
-# Set OpenAI API key (required for LLM extraction)
+# Set OpenAI API key
 export OPENAI_API_KEY="your-openai-api-key"
+
+# Start the server
+python -m uvicorn src.simple_api:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### Start the Server
+### Access the Interface
 
-```bash
-# Start FastAPI server
-python -m uvicorn src.api:app --host 0.0.0.0 --port 8000 --reload
-```
+- **Web Interface**: http://localhost:8000
+- **API Documentation**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
 
-### Access the Web Interface
+### Production Deployment
 
-Open your browser and go to: **http://localhost:8000**
+**Live URL**: https://mortgage-agent.onrender.com
 
 ## 🧪 Testing with cURL
 
@@ -63,239 +69,199 @@ Open your browser and go to: **http://localhost:8000**
 ```bash
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
-  -d '{
-    "message": "Hi, I want to apply for a mortgage"
-  }'
+  -d '{"message": "I want to apply for a mortgage"}'
 ```
 
-**Expected Response:**
-```json
-{
-  "response": "Hello! I'm here to help you with your mortgage pre-approval...",
-  "conversation_id": "550e8400-e29b-41d4-a716-446655440000",
-  "complete": false,
-  "decision": null
-}
-```
-
-### Continue an Existing Conversation
+### Continue Conversation
 
 ```bash
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
   -d '{
-    "message": "Miami, Florida",
-    "conversation_id": "550e8400-e29b-41d4-a716-446655440000"
+    "message": "200k", 
+    "conversation_id": "your-conversation-id"
   }'
-```
-
-**Expected Response:**
-```json
-{
-  "response": "Is the loan for a personal home, a second home, or an investment?",
-  "conversation_id": "550e8400-e29b-41d4-a716-446655440000", 
-  "complete": false,
-  "decision": null
-}
 ```
 
 ### Example Complete Flow
 
-Here's a complete conversation example:
-
 ```bash
-# Question 1: Property location
+# 1. Down payment
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "Miami, Florida"}'
+  -d '{"message": "250k"}'
 
-# Question 2: Loan purpose  
+# 2. Property price  
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "Personal home", "conversation_id": "YOUR_CONVERSATION_ID"}'
+  -d '{"message": "1M", "conversation_id": "your-id"}'
 
-# Question 3: Property price
+# 3. Property purpose
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "$400,000", "conversation_id": "YOUR_CONVERSATION_ID"}'
+  -d '{"message": "investment", "conversation_id": "your-id"}'
 
-# Question 4: Down payment
+# 4. Location
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "$120,000", "conversation_id": "YOUR_CONVERSATION_ID"}'
+  -d '{"message": "Miami", "conversation_id": "your-id"}'
 
-# Question 5: Documents
+# 5. Passport
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "Yes, I have both passport and visa", "conversation_id": "YOUR_CONVERSATION_ID"}'
+  -d '{"message": "yes", "conversation_id": "your-id"}'
 
-# Question 6: Current location
+# 6. Visa (with confirmation protocol)
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "I am living in the USA", "conversation_id": "YOUR_CONVERSATION_ID"}'
+  -d '{"message": "what visas are admissible?", "conversation_id": "your-id"}'
+# Response: "Admissible visas include B1/B2, E-2, H-1B. Do you have one of these visas?"
 
-# Question 7: Income documentation
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "Yes, I have bank statements", "conversation_id": "YOUR_CONVERSATION_ID"}'
+  -d '{"message": "yes", "conversation_id": "your-id"}'
 
-# Question 8: Reserves (final question)
+# 7. Income documentation
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "Yes, I have 8 months saved", "conversation_id": "YOUR_CONVERSATION_ID"}'
+  -d '{"message": "yes", "conversation_id": "your-id"}'
+
+# 8. Reserves
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "yes", "conversation_id": "your-id"}'
 ```
 
-**Final Response (Pre-Approved):**
-```json
-{
-  "response": "🎉 Congratulations! You are PRE-APPROVED for our Foreign Nationals loan program!\n\nHere's your loan summary:\n• Property Price: $400,000.00\n• Down Payment: $120,000.00 (30.0%)\n• Loan Amount: $280,000.00\n• LTV Ratio: 70.0%\n\nNext steps: A loan officer will contact you within 24 hours to proceed with your application.",
-  "conversation_id": "550e8400-e29b-41d4-a716-446655440000",
-  "complete": true,
-  "decision": "Pre-Approved"
-}
+## 🤝 Universal Confirmation Protocol
+
+The v3.0.0 system implements a universal confirmation protocol for ALL user questions:
+
+### How It Works
+1. **User asks any question** → System answers the question
+2. **System asks for confirmation** → Never jumps to next topic
+3. **User confirms** → System proceeds to next qualification question
+
+### Examples
+
+**Before (v2.0.0 - Protocol Violation):**
+```
+User: "what visas are admissible?"
+Assistant: "Admissible visas include B1/B2, E-2, H-1B. Do you have income documentation?"
 ```
 
-## 🧠 Conversational Intelligence
-
-The chatbot can handle user questions during the flow:
-
-### Question Example
-
-```bash
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Why do you need to know the property location?", "conversation_id": "YOUR_ID"}'
+**After (v3.0.0 - Correct Protocol):**
+```
+User: "what visas are admissible?"  
+Assistant: "Admissible visas include B1/B2, E-2, H-1B. Do you have one of these visas?"
+User: "yes"
+Assistant: "Can you demonstrate income with bank statements or tax returns?"
 ```
 
-**Response:**
-```json
-{
-  "response": "I need to know the location to determine which state's lending regulations apply. You can provide either just the state (like 'California') or a specific city and state (like 'Miami, Florida').\n\nNow, could you please answer the original question?",
-  "conversation_id": "YOUR_ID",
-  "complete": false,
-  "decision": null
-}
-```
-
-Then provide the actual answer:
-
-```bash
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Miami, Florida", "conversation_id": "YOUR_ID"}'
-```
+### Question Types Covered
+- **Exploratory**: "how much can I afford?", "what if I put down 300k?"
+- **Educational**: "what visas are admissible?", "what type of documentation?"
+- **Clarification**: "do I need reserves?", "is it required?"
 
 ## 📊 Decision Logic
 
-The rules engine evaluates applications based on:
-
-- **Down Payment**: Minimum 25% required (75% max LTV)
-- **Documentation**: Valid passport AND visa required
-- **Income Proof**: Bank statements or CPA letter capability
-- **Reserves**: 6-12 months of mortgage payments
-- **Property Type**: 1-4 unit residential (personal, second, investment)
+### Pre-Approval Requirements
+- **Down Payment**: ≥25% of property price
+- **Documentation**: Valid passport AND visa
+- **Income Proof**: Bank statements, tax returns, or employment letters
+- **Reserves**: 6-12 months of mortgage payments saved
+- **Property Type**: Residential (personal, second home, investment)
 
 ### Possible Decisions
-
-- **"Pre-Approved"**: All requirements met
-- **"Rejected"**: Critical requirements not met  
-- **"Needs Review"**: Incomplete information or edge cases
+- **"Pre-Qualified"**: All requirements met
+- **"Unfortunately, you don't qualify"**: Critical requirements missing
 
 ## 🔍 API Endpoints
 
-### Core Endpoints
-
-- `POST /chat` - Main chat endpoint
-- `GET /conversations/{id}` - Get conversation state
+- `POST /chat` - Main conversation endpoint
+- `GET /conversations/{id}` - Get conversation history
 - `DELETE /conversations/{id}` - Delete conversation
 - `GET /health` - Health check
 - `GET /` - Web interface
 
-### Conversation Management
-
-```bash
-# Get conversation state
-curl http://localhost:8000/conversations/YOUR_CONVERSATION_ID
-
-# Delete conversation
-curl -X DELETE http://localhost:8000/conversations/YOUR_CONVERSATION_ID
-```
-
-## 🧪 Running Tests
-
-```bash
-# Test rules engine (Phase 1)
-python tests/test_rules.py
-
-# Test conversational intelligence (Phase 3) 
-python tests/test_clarification.py
-
-# Test with PYTHONPATH
-PYTHONPATH=. python tests/test_rules.py
-PYTHONPATH=. python tests/test_clarification.py
-```
-
-## 🏢 Production Considerations
-
-For production deployment:
-
-1. **Replace in-memory storage** with Redis or database
-2. **Add authentication** and rate limiting
-3. **Implement proper logging** and monitoring
-4. **Add input validation** and sanitization
-5. **Use environment variables** for configuration
-6. **Add error recovery** and conversation repair
-7. **Implement conversation timeouts**
-
-## 📝 Example Scenarios
-
-### Scenario 1: Pre-Approved
-- Property: $400,000 in Miami, FL
-- Down Payment: $120,000 (30%)
-- Has passport, visa, bank statements, reserves
-- **Result**: Pre-Approved
-
-### Scenario 2: Rejected (Insufficient Down Payment)
-- Property: $400,000
-- Down Payment: $80,000 (20%)
-- **Result**: Rejected (need 25% minimum)
-
-### Scenario 3: Rejected (Missing Documents)
-- All financials good
-- Missing passport or visa
-- **Result**: Rejected (documentation required)
-
-## 🎨 Web Interface Features
-
-- **Real-time chat** with typing indicators
-- **Message history** preservation
-- **Completion status** with color coding
-- **Responsive design** for mobile/desktop
-- **Error handling** with user feedback
-
 ## 📚 Technical Stack
 
-- **Backend**: FastAPI, Python 3.8+
-- **AI Framework**: LangChain, LangGraph
-- **LLM**: OpenAI GPT-3.5-turbo
+- **Backend**: FastAPI, Python 3.11+
+- **AI Model**: OpenAI GPT-4o (fallback from GPT-5)
 - **Frontend**: Vanilla HTML/CSS/JavaScript
-- **State Management**: TypedDict with in-memory storage
-- **Testing**: pytest, manual testing scripts
+- **Deployment**: Render.com with auto-deploy
+- **Storage**: In-memory (production should use Redis/Database)
 
-## 🚀 Success Criteria ✅
+## 🔧 Recent Fixes (September 2025)
 
-All master prompt requirements completed:
+### Universal Confirmation Protocol
+- Fixed issue where assistant would skip confirmation for educational questions
+- Implemented consistent Answer → Confirm → Proceed flow for all question types
 
-✅ **Phase 1**: GraphState TypedDict, rules engine, FastAPI setup  
-✅ **Phase 2**: 8 question nodes, LLM extraction, sequential flow  
-✅ **Phase 3**: Router for answer/question classification, clarifications  
-✅ **Phase 4**: Conversation ID management, HTML interface, curl examples  
+### Entity Persistence & Smart Merging
+- Fixed entity reversion bug (down payment reverting from 250k to 200k)
+- Added confirmed entities tracking throughout conversation history
+- Implemented smart merging to protect confirmed values
 
-**Testing Results:**
-- ✅ Rules engine rejects insufficient down payment
-- ✅ Rules engine approves when all conditions met  
-- ✅ Router correctly classifies answers vs questions
-- ✅ Clarification flow returns to original question
-- ✅ Web interface successfully logs FastAPI requests
+### Reserve Calculations
+- Fixed magnitude errors ($1B instead of $1M)
+- Added proper loan amount calculations and formatting
 
-The mortgage pre-approval chatbot MVP is **fully functional** and ready for demonstration! 🎉
+### Down Payment Validation
+- Prevents premature validation before having both down payment and property price
+- Only validates percentage after collecting both values
+
+## 🏢 Production Deployment
+
+**Live Service**: https://mortgage-agent.onrender.com
+
+### Environment Variables Required
+```bash
+OPENAI_API_KEY=your-openai-api-key
+```
+
+### Deployment Configuration
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `uvicorn src.simple_api:app --host 0.0.0.0 --port $PORT`
+- **Auto-Deploy**: Enabled from main branch
+- **Health Check**: `/health`
+
+## 📈 Version History
+
+- **v3.0.0** (Current): Simplified single-prompt architecture with universal confirmation protocol
+- **v2.0.0**: Slot-filling approach with complex state management (moved to legacy/)
+- **v1.0.0**: Graph-based LangGraph implementation (moved to legacy/)
+
+## 🧪 Testing
+
+The system includes comprehensive test files for various scenarios. For the current v3.0.0 implementation, focus on:
+
+- `test_simple_api.py` - API endpoint testing
+- `test_simple_flow.py` - Conversation flow testing
+
+Legacy test files for previous implementations are available in the repository.
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+1. **ModuleNotFoundError: No module named 'dotenv'**
+   - Solution: Ensure `python-dotenv>=1.0.0` is in requirements.txt
+
+2. **OpenAI API Key Issues**
+   - Verify OPENAI_API_KEY is set correctly
+   - Check if key is valid and has sufficient credits
+
+3. **Render Deployment Failures**
+   - Check build logs for missing dependencies
+   - Verify all required files are in repository
+
+### Development Tips
+
+- Use `--reload` flag for auto-restart during development
+- Check logs with `tail -f` for real-time debugging
+- Test API endpoints with `/docs` interface
+- Monitor conversation state with debug endpoints
+
+---
+
+The Mortgage Pre-Qualification Assistant v3.0.0 provides a streamlined, production-ready solution for foreign national mortgage pre-qualification with consistent conversation flow and robust entity management.

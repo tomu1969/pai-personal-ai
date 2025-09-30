@@ -16,6 +16,7 @@ import uuid
 import os
 
 from .conversation_simple import process_conversation_turn
+from .logging_utils import log_api_error
 
 # Initialize app
 app = FastAPI(title="Mortgage Pre-Qualification - Simplified", version="3.0.0")
@@ -75,7 +76,7 @@ async def chat_endpoint(request: ChatRequest):
         messages.append({"role": "user", "content": request.message})
         
         # Process turn with simplified system
-        response = process_conversation_turn(messages)
+        response = process_conversation_turn(messages, conversation_id)
         
         # Add assistant response
         messages.append({"role": "assistant", "content": response})
@@ -98,10 +99,36 @@ async def chat_endpoint(request: ChatRequest):
         )
         
     except Exception as e:
+        # Enhanced error handling with conversation state preservation
+        log_api_error(conversation_id, "/chat", e, conversation_preserved=True)
+        
         print(f"ERROR in simple chat_endpoint: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+        
+        # CRITICAL: Preserve conversation state even on errors
+        # The user's message was already added to the conversation, so keep it
+        # Add a recovery response instead of crashing the conversation
+        
+        error_type = type(e).__name__
+        if "openai" in str(e).lower() or "api" in str(e).lower():
+            recovery_response = "I'm experiencing a connection issue. Could you please try again?"
+        elif "function" in str(e).lower() or "tool" in str(e).lower():
+            recovery_response = "I'm having trouble processing that response. Let me continue with the next question."
+        else:
+            recovery_response = "I encountered an issue. Could you please rephrase your response?"
+        
+        # Add the recovery response to maintain conversation flow
+        messages.append({"role": "assistant", "content": recovery_response})
+        conversations[conversation_id] = messages
+        
+        print(f">>> CONVERSATION PRESERVED: Added recovery response: {recovery_response}")
+        
+        return ChatResponse(
+            response=recovery_response,
+            conversation_id=conversation_id,
+            complete=False
+        )
 
 
 # ============================================================================

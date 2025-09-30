@@ -230,7 +230,9 @@ def extract_entities(messages: List[Dict[str, str]]) -> Dict[str, Any]:
         response = client.chat.completions.create(
             model=WORKING_MODEL,
             messages=[
-                {"role": "system", "content": """Extract mortgage information from the user's message. Apply intelligent inference:
+                {"role": "system", "content": """Extract mortgage information from the user's message only if entities are present. Apply intelligent inference:
+
+IMPORTANT: Only call the function if there are actual entities to extract. For pure clarification questions like "what do you mean by status?", don't call the function.
 
 ENTITY EXTRACTION:
 - When a well-known US city is mentioned, automatically include the state (e.g., Miami→FL, NYC→NY, Los Angeles→CA, etc.)
@@ -268,13 +270,17 @@ EXAMPLES:
                 {"role": "user", "content": f"Extract entities from: '{latest_message}'"}
             ],
             tools=[{"type": "function", "function": extraction_function}],
-            tool_choice={"type": "function", "function": {"name": "extract_mortgage_entities"}},
+            tool_choice="auto",  # Changed from forced to auto - prevents crashes on clarification questions
             temperature=1
         )
         
+        # Handle both function call and regular responses
         tool_calls = response.choices[0].message.tool_calls
         if tool_calls and tool_calls[0].function.arguments:
             return json.loads(tool_calls[0].function.arguments)
+        else:
+            # No function call - indicates no entities were found (which is normal for clarification questions)
+            return {}
     
     except Exception as e:
         print(f"Entity extraction error: {e}")
@@ -616,7 +622,7 @@ Analyze the user's response in context and extract confirmation status and value
     }
 
 
-def process_conversation_turn(messages: List[Dict[str, str]]) -> str:
+def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: str = None) -> str:
     """
     Process a single conversation turn using the simplified architecture.
     

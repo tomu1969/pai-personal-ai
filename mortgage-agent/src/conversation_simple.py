@@ -9,6 +9,7 @@ Replaces complex slot-filling system with coherent conversational flow.
 
 import os
 import json
+import re
 from typing import Dict, List, Any, Optional
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -276,14 +277,242 @@ EXAMPLES:
         
         # Handle both function call and regular responses
         tool_calls = response.choices[0].message.tool_calls
+        extracted = {}
         if tool_calls and tool_calls[0].function.arguments:
-            return json.loads(tool_calls[0].function.arguments)
+            extracted = json.loads(tool_calls[0].function.arguments)
         else:
             # No function call - indicates no entities were found (which is normal for clarification questions)
-            return {}
+            extracted = {}
+        
+        # Post-process: Handle percentage inputs for down payment
+        extracted = handle_percentage_inputs(latest_message, extracted, messages)
+        
+        # Post-process: Improve location extraction
+        extracted = enhance_location_extraction(latest_message, extracted)
+        
+        return extracted
     
     except Exception as e:
         print(f"Entity extraction error: {e}")
+    
+    return {}
+
+
+def handle_percentage_inputs(latest_message: str, extracted: Dict[str, Any], messages: List[Dict[str, str]]) -> Dict[str, Any]:
+    """
+    Handle percentage inputs for down payment by converting them to dollar amounts.
+    
+    Args:
+        latest_message: The user's current message
+        extracted: Currently extracted entities
+        messages: Full conversation history to find property price
+    
+    Returns:
+        Updated extracted entities with percentage converted to dollars
+    """
+    import re
+    
+    # Check if user mentioned a percentage
+    percentage_match = re.search(r'(\d+(?:\.\d+)?)\s*%', latest_message)
+    if not percentage_match:
+        return extracted
+    
+    percentage_value = float(percentage_match.group(1))
+    print(f">>> [PERCENTAGE] Detected {percentage_value}% in user input")
+    
+    # Find property price from conversation history or current extraction
+    property_price = None
+    
+    # First check if property price is in current extraction
+    if 'property_price' in extracted and extracted['property_price']:
+        property_price = extracted['property_price']
+    else:
+        # Look through conversation history for property price
+        temp_messages = []
+        for msg in messages:
+            temp_messages.append(msg)
+            if msg["role"] == "user":
+                temp_extracted = extract_entities_basic(temp_messages)
+                if 'property_price' in temp_extracted and temp_extracted['property_price']:
+                    property_price = temp_extracted['property_price']
+                    break
+    
+    if property_price:
+        # Convert percentage to dollar amount
+        dollar_amount = property_price * (percentage_value / 100)
+        extracted['down_payment'] = dollar_amount
+        print(f">>> [PERCENTAGE] Converted {percentage_value}% of ${property_price:,} = ${dollar_amount:,}")
+    else:
+        print(f">>> [PERCENTAGE] Cannot convert {percentage_value}% - no property price available")
+    
+    return extracted
+
+
+def enhance_location_extraction(latest_message: str, extracted: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Enhance location extraction with state name mapping and case handling.
+    
+    Args:
+        latest_message: The user's current message
+        extracted: Currently extracted entities
+    
+    Returns:
+        Updated extracted entities with improved location data
+    """
+    import re
+    
+    # State name to abbreviation mapping
+    STATE_MAPPING = {
+        'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR', 'california': 'CA',
+        'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE', 'florida': 'FL', 'georgia': 'GA',
+        'hawaii': 'HI', 'idaho': 'ID', 'illinois': 'IL', 'indiana': 'IN', 'iowa': 'IA',
+        'kansas': 'KS', 'kentucky': 'KY', 'louisiana': 'LA', 'maine': 'ME', 'maryland': 'MD',
+        'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN', 'mississippi': 'MS', 'missouri': 'MO',
+        'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ',
+        'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH',
+        'oklahoma': 'OK', 'oregon': 'OR', 'pennsylvania': 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+        'south dakota': 'SD', 'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT', 'vermont': 'VT',
+        'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV', 'wisconsin': 'WI', 'wyoming': 'WY'
+    }
+    
+    # City to state mapping for common cities
+    CITY_STATE_MAPPING = {
+        'miami': 'FL', 'orlando': 'FL', 'tampa': 'FL', 'jacksonville': 'FL', 'fort lauderdale': 'FL',
+        'new york': 'NY', 'brooklyn': 'NY', 'manhattan': 'NY', 'queens': 'NY', 'bronx': 'NY',
+        'los angeles': 'CA', 'san francisco': 'CA', 'san diego': 'CA', 'sacramento': 'CA',
+        'chicago': 'IL', 'houston': 'TX', 'dallas': 'TX', 'austin': 'TX', 'san antonio': 'TX',
+        'phoenix': 'AZ', 'philadelphia': 'PA', 'atlanta': 'GA', 'boston': 'MA', 'seattle': 'WA',
+        'denver': 'CO', 'las vegas': 'NV', 'detroit': 'MI', 'nashville': 'TN', 'charlotte': 'NC'
+    }
+    
+    message_lower = latest_message.lower().strip()
+    
+    # Skip location extraction for clarification questions or non-location contexts
+    clarification_patterns = [
+        r'\bwhat do you mean\b',
+        r'\bwhat does\b',
+        r'\bcan you explain\b',
+        r'\bi don\'t understand\b',
+        r'\bwhat is\b',
+        r'\bhow do you\b',
+        r'\bwhy\b',
+        r'\bwhen\b'
+    ]
+    
+    # Check if this looks like a clarification question
+    is_clarification = any(re.search(pattern, message_lower) for pattern in clarification_patterns)
+    if is_clarification:
+        print(f">>> [LOCATION] Skipping extraction for clarification question: {latest_message}")
+        return extracted
+    
+    # Extract location information
+    city = None
+    state = None
+    
+    # Check if we already have extracted city/state
+    if 'property_city' in extracted:
+        city = extracted['property_city']
+    if 'property_state' in extracted:
+        state = extracted['property_state']
+    
+    # Pattern 1: "City, State" or "City State"
+    city_state_patterns = [
+        r'([a-zA-Z\s]+),\s*([a-zA-Z\s]{2,})',  # Miami, Florida
+        r'([a-zA-Z\s]+)\s+([a-zA-Z]{2})(?:\s|$)',  # Miami FL
+        r'([a-zA-Z\s]+)\s+([a-zA-Z\s]{4,})(?:\s|$)'  # Miami Florida
+    ]
+    
+    for pattern in city_state_patterns:
+        match = re.search(pattern, message_lower)
+        if match:
+            potential_city = match.group(1).strip().title()
+            potential_state = match.group(2).strip()
+            
+            # Handle state
+            if len(potential_state) == 2:
+                state = potential_state.upper()
+            elif potential_state.lower() in STATE_MAPPING:
+                state = STATE_MAPPING[potential_state.lower()]
+            
+            # Use the city if we found a valid state
+            if state:
+                city = potential_city
+                break
+    
+    # Pattern 2: Just city name (try to infer state)
+    if not city or not state:
+        for known_city, known_state in CITY_STATE_MAPPING.items():
+            if known_city in message_lower:
+                city = known_city.title()
+                state = known_state
+                print(f">>> [LOCATION] Inferred {city}, {state} from common city mapping")
+                break
+    
+    # Pattern 3: Just state name
+    if not state:
+        for state_name, state_abbrev in STATE_MAPPING.items():
+            if state_name in message_lower:
+                state = state_abbrev
+                print(f">>> [LOCATION] Found state {state} from full name")
+                break
+        
+        # Check for state abbreviations (case insensitive)
+        state_abbrev_match = re.search(r'\b([a-zA-Z]{2})\b', message_lower)
+        if state_abbrev_match:
+            potential_state = state_abbrev_match.group(1).upper()
+            # Validate it's a real state abbreviation
+            if potential_state in STATE_MAPPING.values():
+                state = potential_state
+                print(f">>> [LOCATION] Found state abbreviation {state}")
+    
+    # Update extracted entities
+    if city:
+        extracted['property_city'] = city
+        print(f">>> [LOCATION] Enhanced city extraction: {city}")
+    
+    if state:
+        extracted['property_state'] = state
+        print(f">>> [LOCATION] Enhanced state extraction: {state}")
+    
+    return extracted
+
+
+def extract_entities_basic(messages: List[Dict[str, str]]) -> Dict[str, Any]:
+    """
+    Basic entity extraction without percentage handling to avoid recursion.
+    Used internally by handle_percentage_inputs.
+    """
+    user_messages = [m for m in messages if m["role"] == "user"]
+    if not user_messages:
+        return {}
+    
+    latest_message = user_messages[-1]["content"]
+    
+    # Simple regex-based extraction for property price
+    property_price_patterns = [
+        r'\$(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*(?:k|thousand)',  # $500k
+        r'(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*k',                # 500k
+        r'\$(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*(?:m|million)',  # $1m
+        r'(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*(?:m|million)',    # 1 million
+        r'\$(\d{1,3}(?:,\d{3})*(?:\.\d+)?)',                  # $500000
+        r'(\d{3,})'                                           # 500000
+    ]
+    
+    for pattern in property_price_patterns:
+        match = re.search(pattern, latest_message.lower())
+        if match:
+            amount_str = match.group(1).replace(',', '')
+            amount = float(amount_str)
+            
+            # Apply multipliers
+            if 'k' in latest_message.lower() or 'thousand' in latest_message.lower():
+                amount *= 1000
+            elif 'm' in latest_message.lower() or 'million' in latest_message.lower():
+                amount *= 1000000
+            
+            # Only consider amounts that could be property prices (>= $50k)
+            if amount >= 50000:
+                return {'property_price': amount}
     
     return {}
 
@@ -487,6 +716,7 @@ def is_positive_confirmation(message: str) -> bool:
 def analyze_user_response_with_llm(user_message: str, assistant_message: str, current_entities: Dict[str, Any]) -> Dict[str, Any]:
     """
     Use LLM to contextually analyze user's response for confirmations, rejections, and value updates.
+    Enhanced with simplified pattern matching for compound responses.
     
     Args:
         user_message: The user's current message
@@ -496,6 +726,38 @@ def analyze_user_response_with_llm(user_message: str, assistant_message: str, cu
     Returns:
         Dictionary with confirmation analysis and extracted values
     """
+    
+    # Pre-process compound responses with simplified patterns
+    user_message_clean = user_message.lower().strip()
+    
+    # Handle compound responses like "yes adjust", "ok but change", "sure modify"
+    compound_patterns = [
+        (r'\b(yes|yeah|ok|sure|sounds good)\b.*\b(adjust|change|modify|update|make it)\b', 'positive_with_adjustment'),
+        (r'\b(no|nah|not really)\b.*\b(instead|rather|actually|but)\b', 'negative_with_alternative'),
+        (r'\b(yes|yeah|ok|sure)\b\s*,?\s*\b(but|however|though)\b', 'positive_with_condition')
+    ]
+    
+    compound_type = None
+    for pattern, response_type in compound_patterns:
+        if re.search(pattern, user_message_clean):
+            compound_type = response_type
+            print(f">>> Detected compound response: {response_type}")
+            break
+    
+    # Simple confirmation patterns for quick detection
+    simple_confirmations = {
+        'positive': [r'\b(yes|yeah|yep|sure|ok|okay|sounds good|that works|correct|right|exactly)\b'],
+        'negative': [r'\b(no|nah|nope|not really|don\'t think so|incorrect|wrong)\b']
+    }
+    
+    simple_confirmation = None
+    for conf_type, patterns in simple_confirmations.items():
+        for pattern in patterns:
+            if re.search(pattern, user_message_clean):
+                simple_confirmation = conf_type
+                break
+        if simple_confirmation:
+            break
     
     analysis_function = {
         "name": "analyze_user_response",
@@ -509,8 +771,8 @@ def analyze_user_response_with_llm(user_message: str, assistant_message: str, cu
                 },
                 "confirmation_type": {
                     "type": "string",
-                    "enum": ["positive", "negative", "neutral"],
-                    "description": "positive = accepting/agreeing, negative = rejecting/declining, neutral = unclear"
+                    "enum": ["positive", "negative", "neutral", "positive_with_adjustment", "negative_with_alternative", "positive_with_condition"],
+                    "description": "positive = accepting/agreeing, negative = rejecting/declining, neutral = unclear, positive_with_adjustment = yes but wants changes, negative_with_alternative = no but offers alternative, positive_with_condition = yes but has conditions"
                 },
                 "confirmed_values": {
                     "type": "object",
@@ -558,29 +820,42 @@ def analyze_user_response_with_llm(user_message: str, assistant_message: str, cu
         response = client.chat.completions.create(
             model=WORKING_MODEL,
             messages=[
-                {"role": "system", "content": """You are analyzing user responses in a mortgage pre-qualification conversation.
+                {"role": "system", "content": f"""You are analyzing user responses in a mortgage pre-qualification conversation.
+
+COMPOUND RESPONSE ANALYSIS:
+{f"DETECTED: {compound_type} - Handle this as a confirmation with additional action required." if compound_type else "No compound pattern detected."}
+{f"SIMPLE CONFIRMATION: {simple_confirmation}" if simple_confirmation else "No simple confirmation pattern detected."}
 
 CONTEXT UNDERSTANDING:
 - Look at the assistant's previous message to understand what the user is responding to
 - Determine if the user is confirming, rejecting, or providing new information
 - Extract both explicit values and contextual confirmations
+- Handle compound responses that combine confirmation with adjustment requests
 
 CONFIRMATION DETECTION:
 - "yes", "sure", "that works", "sounds good" = positive confirmation
 - "no", "not really", "I'd rather", "actually..." = negative confirmation  
 - Direct statements like "I'll put down 250k" = positive confirmation with new value
 - Questions or uncertainty = needs clarification
+- Compound responses like "yes adjust" = positive confirmation + request for modification
+
+COMPOUND RESPONSE HANDLING:
+- positive_with_adjustment: User confirms but wants to modify something
+- negative_with_alternative: User rejects but offers alternative
+- positive_with_condition: User agrees but has conditions
 
 VALUE EXTRACTION FROM CONTEXT:
 - When user says "yes" to assistant's proposal, extract the values from the assistant's message
 - Look for phrases like "proceed with $X property and $Y down" or "confirm $Z down payment"
 - Extract amounts mentioned in assistant's confirmation questions
 - Handle formats: $250k, $250,000, 1M, etc.
+- For compound responses, still extract base values but note adjustment needed
 
 EXAMPLES:
 Assistant: "Should we proceed with $1M property and $250k down?"
 User: "yes" → positive confirmation of both values (extract 1000000 for property_price, 250000 for down_payment)
-User: "yes but make it 300k down" → positive confirmation of property, update down payment
+User: "yes but make it 300k down" → positive confirmation of property, update down payment to 300000
+User: "yes adjust" → positive confirmation, but flag that user wants to make changes
 User: "actually I want 2M" → negative confirmation, new property price"""},
                 {"role": "user", "content": f"""
 ASSISTANT'S PREVIOUS MESSAGE: "{assistant_message}"
@@ -604,13 +879,19 @@ Analyze the user's response in context and extract confirmation status and value
     
     except Exception as e:
         print(f"LLM analysis error: {e}")
-        # Fallback to simple analysis
+        # Enhanced fallback using pre-processed patterns
+        fallback_confirmation_type = "neutral"
+        if compound_type:
+            fallback_confirmation_type = compound_type
+        elif simple_confirmation:
+            fallback_confirmation_type = simple_confirmation
+        
         return {
-            "is_confirmation": False,
-            "confirmation_type": "neutral", 
+            "is_confirmation": bool(simple_confirmation or compound_type),
+            "confirmation_type": fallback_confirmation_type, 
             "confirmed_values": {},
             "new_information": {},
-            "reasoning": f"LLM analysis failed: {e}"
+            "reasoning": f"LLM analysis failed, used pattern matching: {fallback_confirmation_type}"
         }
     
     return {
@@ -654,13 +935,20 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
     )
     
     is_confirmation = llm_analysis.get("is_confirmation", False)
-    is_positive_conf = llm_analysis.get("confirmation_type") == "positive"
+    confirmation_type = llm_analysis.get("confirmation_type", "neutral")
+    
+    # Handle compound response types as positive confirmations with special handling
+    positive_types = ["positive", "positive_with_adjustment", "positive_with_condition"]
+    is_positive_conf = confirmation_type in positive_types
+    is_compound_response = confirmation_type in ["positive_with_adjustment", "negative_with_alternative", "positive_with_condition"]
+    
     confirmed_values = llm_analysis.get("confirmed_values", {})
     new_information = llm_analysis.get("new_information", {})
     
     print(f">>> Last user message: '{last_user_message}'")
     print(f">>> LLM Analysis: {llm_analysis.get('reasoning', '')}")
-    print(f">>> Is confirmation: {is_confirmation} ({llm_analysis.get('confirmation_type', 'neutral')})")
+    print(f">>> Is confirmation: {is_confirmation} ({confirmation_type})")
+    print(f">>> Is compound response: {is_compound_response}")
     print(f">>> Confirmed values: {confirmed_values}")
     print(f">>> New information: {new_information}")
     
@@ -688,9 +976,11 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
                     all_entities
                 )
                 
-                # If this is a positive confirmation, store the confirmed values
+                # If this is a positive confirmation (including compound types), store the confirmed values
                 # Later confirmations overwrite earlier ones (more recent = more accurate)
-                if temp_analysis.get("is_confirmation") and temp_analysis.get("confirmation_type") == "positive":
+                temp_confirmation_type = temp_analysis.get("confirmation_type", "neutral")
+                is_positive_temp = temp_confirmation_type in ["positive", "positive_with_adjustment", "positive_with_condition"]
+                if temp_analysis.get("is_confirmation") and is_positive_temp:
                     temp_confirmed = temp_analysis.get("confirmed_values", {})
                     for field, value in temp_confirmed.items():
                         if value is not None:

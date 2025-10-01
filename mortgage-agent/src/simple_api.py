@@ -18,9 +18,16 @@ import os
 from .conversation_simple import process_conversation_turn
 from .logging_utils import log_api_error
 from .debug_api import add_debug_endpoints
+from .database import init_database, get_or_create_conversation, save_conversation_safe, delete_conversation
 
 # Initialize app
 app = FastAPI(title="Mortgage Pre-Qualification - Simplified", version="3.0.0")
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database on application startup"""
+    await init_database()
+    print("✅ Database initialized for conversation persistence")
 
 # Add debug endpoints
 add_debug_endpoints(app)
@@ -31,8 +38,10 @@ if os.path.exists(static_path):
     app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 # ============================================================================
-# IN-MEMORY CONVERSATION STORAGE
+# DATABASE CONVERSATION STORAGE (with in-memory fallback)
 # ============================================================================
+# Note: Conversations are now persisted in database via database.py
+# In-memory storage maintained as fallback only
 conversations: Dict[str, List[Dict[str, str]]] = {}
 
 
@@ -143,11 +152,9 @@ async def chat_endpoint(request: ChatRequest):
         print(f"User Message: {request.message}")
         print(f"{'='*80}")
         
-        if conversation_id not in conversations:
-            conversations[conversation_id] = []
-            print(f"Created new conversation")
-        
-        messages = conversations[conversation_id]
+        # Load conversation from database (with fallback to memory)
+        messages = await get_or_create_conversation(conversation_id)
+        print(f"Loaded conversation with {len(messages)} existing messages")
         
         # Add user message
         messages.append({"role": "user", "content": request.message})
@@ -158,8 +165,9 @@ async def chat_endpoint(request: ChatRequest):
         # Add assistant response
         messages.append({"role": "assistant", "content": response})
         
-        # Save updated conversation
-        conversations[conversation_id] = messages
+        # Save updated conversation to database (with fallback to memory)
+        await save_conversation_safe(conversation_id, messages)
+        print(f"✅ Conversation saved to database (total messages: {len(messages)})")
         
         # Check if conversation is complete
         is_complete = ("pre-qualified" in response.lower() or 
@@ -201,7 +209,7 @@ async def chat_endpoint(request: ChatRequest):
         
         # Add the recovery response to maintain conversation flow
         messages.append({"role": "assistant", "content": recovery_response})
-        conversations[conversation_id] = messages
+        await save_conversation_safe(conversation_id, messages)
         
         print(f">>> CONVERSATION PRESERVED: Added recovery response: {recovery_response}")
         
@@ -217,19 +225,25 @@ async def chat_endpoint(request: ChatRequest):
 # ============================================================================
 
 @app.get("/conversations/{conversation_id}")
-async def get_conversation(conversation_id: str):
+async def get_conversation_debug(conversation_id: str):
     """Get full conversation for debugging."""
-    if conversation_id not in conversations:
+    messages = await get_or_create_conversation(conversation_id)
+    
+    if not messages:
         raise HTTPException(status_code=404, detail="Conversation not found")
     
-    return {"messages": conversations[conversation_id]}
+    return {"messages": messages}
 
 
 @app.delete("/conversations/{conversation_id}")
-async def delete_conversation(conversation_id: str):
+async def delete_conversation_endpoint(conversation_id: str):
     """Delete a conversation."""
-    if conversation_id in conversations:
-        del conversations[conversation_id]
+    deleted = await delete_conversation(conversation_id)
+    
+    if deleted:
+        # Also remove from memory fallback if present
+        if conversation_id in conversations:
+            del conversations[conversation_id]
         return {"message": "Conversation deleted"}
     else:
         raise HTTPException(status_code=404, detail="Conversation not found")

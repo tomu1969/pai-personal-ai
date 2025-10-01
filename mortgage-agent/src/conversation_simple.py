@@ -14,11 +14,25 @@ from typing import Dict, List, Any, Optional
 from openai import OpenAI
 from dotenv import load_dotenv
 
+# Enhanced logging for debugging
+from .enhanced_logging import (
+    logger, 
+    log_function_call, 
+    log_api_call, 
+    log_processing_step,
+    log_entity_state,
+    log_conversation_state,
+    check_environment
+)
+
 # Load environment variables
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
+# Log environment at startup
+check_environment()
 
 # Check if GPT-5 is available, fallback to GPT-4o
 def get_working_model():
@@ -813,6 +827,7 @@ def is_positive_confirmation(message: str) -> bool:
     return message_lower in positive_words
 
 
+@log_api_call("OpenAI-Analysis")
 def analyze_user_response_with_llm(user_message: str, assistant_message: str, current_entities: Dict[str, Any]) -> Dict[str, Any]:
     """
     Use LLM to contextually analyze user's response for confirmations, rejections, and value updates.
@@ -1003,6 +1018,7 @@ Analyze the user's response in context and extract confirmation status and value
     }
 
 
+@log_function_call("process_conversation_turn")
 def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: str = None) -> str:
     """
     Process a single conversation turn using the simplified architecture.
@@ -1014,9 +1030,13 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
         Assistant response
     """
     
+    # Log conversation state
+    log_conversation_state(messages, "Starting conversation processing")
+    
     # Handle initial greeting
     assistant_messages = [m for m in messages if m["role"] == "assistant"]
     if len(assistant_messages) == 0:
+        logger.log("No assistant messages - returning initial greeting", 'INFO')
         return "I can help pre-qualify you for a mortgage with 8 questions. How much can you put down?"
     
     # Get the last user message and analyze it with LLM
@@ -1024,8 +1044,10 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
     last_user_message = user_messages[-1]["content"] if user_messages else ""
     last_assistant_content = assistant_messages[-1]["content"] if assistant_messages else ""
     
+    log_processing_step("Extracting basic entities")
     # Extract basic entities first to provide context to LLM analysis
     basic_entities = extract_entities(messages)
+    log_entity_state(basic_entities, {}, "After basic extraction")
     
     # Use LLM to analyze the user's response contextually
     llm_analysis = analyze_user_response_with_llm(
@@ -1267,6 +1289,9 @@ A loan officer will contact you within 2 business days to proceed."""
     try:
         print(f">>> Sending to OpenAI - Model: {WORKING_MODEL}")
         print(f">>> Prompt length: {len(prompt)}")
+        
+        log_processing_step("Making final OpenAI API call for response generation")
+        logger.log(f"Using model: {WORKING_MODEL}, prompt length: {len(prompt)}", 'INFO')
         
         response = client.chat.completions.create(
             model=WORKING_MODEL,

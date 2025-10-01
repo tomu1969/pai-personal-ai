@@ -17,9 +17,13 @@ import os
 
 from .conversation_simple import process_conversation_turn
 from .logging_utils import log_api_error
+from .debug_api import add_debug_endpoints
 
 # Initialize app
 app = FastAPI(title="Mortgage Pre-Qualification - Simplified", version="3.0.0")
+
+# Add debug endpoints
+add_debug_endpoints(app)
 
 # Static files
 static_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")

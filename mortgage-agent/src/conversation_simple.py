@@ -22,6 +22,7 @@ from .enhanced_logging import (
     log_processing_step,
     log_entity_state,
     log_conversation_state,
+    log_api_metrics,
     check_environment
 )
 
@@ -30,6 +31,9 @@ load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
+# Feature flag for batched analysis approach (leverages OpenAI's automatic caching)
+USE_BATCHED_ANALYSIS = os.getenv("USE_BATCHED_ANALYSIS", "true").lower() == "true"
 
 # Log environment at startup
 check_environment()
@@ -1018,6 +1022,170 @@ Analyze the user's response in context and extract confirmation status and value
     }
 
 
+def analyze_conversation_history_batched(messages: List[Dict[str, str]], current_entities: Dict[str, Any]) -> Dict[int, Dict[str, Any]]:
+    """
+    Batch analyze all user messages in conversation history with single API call.
+    Leverages OpenAI's automatic prompt caching for efficiency.
+    
+    Args:
+        messages: Full conversation history
+        current_entities: Current conversation entities
+    
+    Returns:
+        Dictionary mapping message index to analysis results
+    """
+    
+    # Build conversation pairs for analysis
+    conversation_pairs = []
+    for i, msg in enumerate(messages):
+        if msg["role"] == "user" and i > 0:
+            # Find previous assistant message
+            prev_assistant_msg = ""
+            for j in range(i-1, -1, -1):
+                if messages[j]["role"] == "assistant":
+                    prev_assistant_msg = messages[j]["content"]
+                    break
+            
+            if prev_assistant_msg:
+                conversation_pairs.append({
+                    "index": i,
+                    "user_message": msg["content"],
+                    "assistant_message": prev_assistant_msg
+                })
+    
+    if not conversation_pairs:
+        return {}
+    
+    # Function definition for batch analysis
+    batch_analysis_function = {
+        "name": "analyze_conversation_history",
+        "description": "Batch analyze all user responses in conversation history for confirmations and value updates",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "analyses": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "message_index": {"type": "integer", "description": "Index of the user message in conversation"},
+                            "is_confirmation": {"type": "boolean", "description": "True if user is confirming/rejecting something"},
+                            "confirmation_type": {
+                                "type": "string",
+                                "enum": ["positive", "negative", "neutral", "positive_with_adjustment", "negative_with_alternative", "positive_with_condition"],
+                                "description": "Type of confirmation response"
+                            },
+                            "confirmed_values": {
+                                "type": "object",
+                                "properties": {
+                                    "down_payment": {"type": "number", "description": "Down payment amount if confirmed"},
+                                    "property_price": {"type": "number", "description": "Property price if confirmed"},
+                                    "loan_purpose": {"type": "string", "description": "Property purpose if confirmed"},
+                                    "property_city": {"type": "string", "description": "Property city if confirmed"},
+                                    "property_state": {"type": "string", "description": "Property state if confirmed"},
+                                    "has_valid_passport": {"type": "boolean", "description": "Passport status if confirmed"},
+                                    "has_valid_visa": {"type": "boolean", "description": "Visa status if confirmed"},
+                                    "can_demonstrate_income": {"type": "boolean", "description": "Income documentation if confirmed"},
+                                    "has_reserves": {"type": "boolean", "description": "Reserves status if confirmed"}
+                                },
+                                "description": "Values confirmed by the user"
+                            },
+                            "reasoning": {"type": "string", "description": "Brief explanation of analysis"}
+                        },
+                        "required": ["message_index", "is_confirmation", "confirmation_type", "confirmed_values", "reasoning"]
+                    },
+                    "description": "Analysis results for each user message"
+                }
+            },
+            "required": ["analyses"]
+        }
+    }
+    
+    # Create system prompt for cache optimization (common prefix across calls)
+    system_prompt = f"""You are analyzing user responses in a mortgage pre-qualification conversation.
+
+ANALYSIS FRAMEWORK:
+- Identify confirmations, rejections, and new information in each user response
+- Consider the assistant's previous message as context for each user response
+- Extract values from context when user confirms assistant's proposals
+- Handle compound responses (confirmation + adjustment request)
+
+CONFIRMATION PATTERNS:
+- positive: "yes", "sure", "that works", "sounds good", "I'll do that"
+- negative: "no", "not really", "I'd rather not", "can't do that"
+- positive_with_adjustment: "yes but change X", "sure, adjust Y"
+- negative_with_alternative: "no, instead I'd like Z"
+- positive_with_condition: "yes, but only if W"
+
+VALUE EXTRACTION RULES:
+- When user says "yes" to assistant's proposal, extract values from assistant's message
+- Look for dollar amounts, percentages, locations, yes/no answers
+- Handle formats: $250k, $250,000, 1M, 25%, etc.
+- For property location, extract both city and state
+
+CURRENT CONVERSATION CONTEXT:
+Current entities: {json.dumps(current_entities)}
+
+Analyze each user message in the context of the assistant's previous message."""
+
+    # Build conversation context for analysis
+    conversation_context = []
+    for pair in conversation_pairs:
+        conversation_context.append({
+            "message_index": pair["index"],
+            "assistant_context": pair["assistant_message"],
+            "user_response": pair["user_message"]
+        })
+    
+    try:
+        logger.log("Starting batched conversation analysis", 'INFO')
+        
+        response = client.chat.completions.create(
+            model=WORKING_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Analyze these conversation exchanges:\n\n{json.dumps(conversation_context, indent=2)}"}
+            ],
+            tools=[{"type": "function", "function": batch_analysis_function}],
+            tool_choice={"type": "function", "function": {"name": "analyze_conversation_history"}},
+            temperature=0.1
+        )
+        
+        # Log cache usage if available
+        usage = response.usage
+        usage_data = {
+            'total_tokens': usage.total_tokens if usage else 0,
+            'cached_tokens': 0
+        }
+        
+        if hasattr(usage, 'prompt_tokens_details') and hasattr(usage.prompt_tokens_details, 'cached_tokens'):
+            cached_tokens = usage.prompt_tokens_details.cached_tokens
+            total_tokens = usage.prompt_tokens
+            usage_data['cached_tokens'] = cached_tokens
+            cache_hit_rate = (cached_tokens / total_tokens * 100) if total_tokens > 0 else 0
+            logger.log(f"Cache effectiveness: {cached_tokens}/{total_tokens} tokens cached ({cache_hit_rate:.1f}%)", 'INFO')
+        
+        tool_calls = response.choices[0].message.tool_calls
+        if tool_calls and tool_calls[0].function.arguments:
+            result = json.loads(tool_calls[0].function.arguments)
+            analyses = result.get("analyses", [])
+            
+            # Convert to indexed dictionary
+            indexed_results = {}
+            for analysis in analyses:
+                msg_index = analysis.get("message_index")
+                if msg_index is not None:
+                    indexed_results[msg_index] = analysis
+                    logger.log(f"Batch analysis for message {msg_index}: {analysis.get('reasoning', 'No reasoning')}", 'DEBUG')
+            
+            logger.log(f"Batched analysis completed: {len(indexed_results)} messages analyzed in 1 API call", 'SUCCESS')
+            return indexed_results, usage_data
+    
+    except Exception as e:
+        logger.log(f"Batched analysis failed: {e}", 'ERROR')
+        return {}, {'total_tokens': 0, 'cached_tokens': 0}
+
+
 @log_function_call("process_conversation_turn")
 def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: str = None) -> str:
     """
@@ -1029,6 +1197,13 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
     Returns:
         Assistant response
     """
+    import time
+    
+    # Initialize metrics tracking
+    start_time = time.time()
+    api_call_count = 0
+    total_tokens_used = 0
+    cached_tokens_used = 0
     
     # Log conversation state
     log_conversation_state(messages, "Starting conversation processing")
@@ -1081,36 +1256,64 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
     latest_extraction = {}
     
     # First pass: identify all confirmations throughout the conversation history
-    for i, msg in enumerate(messages):
-        if msg["role"] == "user" and i > 0:  # Skip first message, need assistant context
-            # Get assistant's previous message for context
-            prev_assistant_msg = ""
-            for j in range(i-1, -1, -1):
-                if messages[j]["role"] == "assistant":
-                    prev_assistant_msg = messages[j]["content"]
-                    break
+    if USE_BATCHED_ANALYSIS:
+        # BATCHED APPROACH: Analyze all history in single API call (leverages OpenAI caching)
+        logger.log(f"Using batched analysis for {len(messages)} messages", 'INFO')
+        batched_results, batch_usage = analyze_conversation_history_batched(messages, all_entities)
+        
+        # Track API usage from batched analysis
+        api_call_count += 1
+        total_tokens_used += batch_usage.get('total_tokens', 0)
+        cached_tokens_used += batch_usage.get('cached_tokens', 0)
+        
+        # Process batched results to build confirmed_entities
+        for msg_index, analysis in batched_results.items():
+            msg = messages[msg_index]
+            temp_confirmation_type = analysis.get("confirmation_type", "neutral")
+            is_positive_temp = temp_confirmation_type in ["positive", "positive_with_adjustment", "positive_with_condition"]
             
-            # Analyze this user message for confirmations
-            if prev_assistant_msg:
-                temp_analysis = analyze_user_response_with_llm(
-                    msg["content"], 
-                    prev_assistant_msg, 
-                    all_entities
-                )
+            if analysis.get("is_confirmation") and is_positive_temp:
+                temp_confirmed = analysis.get("confirmed_values", {})
+                for field, value in temp_confirmed.items():
+                    if value is not None:
+                        if field in confirmed_entities:
+                            print(f">>> [BATCHED SCAN] Updating confirmed {field}: {confirmed_entities[field]} → {value} (from: '{msg['content']}')")
+                        else:
+                            print(f">>> [BATCHED SCAN] Found confirmed {field}: {value} (from: '{msg['content']}')")
+                        confirmed_entities[field] = value
+    else:
+        # LEGACY APPROACH: Per-message analysis (expensive - for rollback only)
+        logger.log(f"Using legacy per-message analysis for {len(messages)} messages", 'WARNING')
+        for i, msg in enumerate(messages):
+            if msg["role"] == "user" and i > 0:  # Skip first message, need assistant context
+                # Get assistant's previous message for context
+                prev_assistant_msg = ""
+                for j in range(i-1, -1, -1):
+                    if messages[j]["role"] == "assistant":
+                        prev_assistant_msg = messages[j]["content"]
+                        break
                 
-                # If this is a positive confirmation (including compound types), store the confirmed values
-                # Later confirmations overwrite earlier ones (more recent = more accurate)
-                temp_confirmation_type = temp_analysis.get("confirmation_type", "neutral")
-                is_positive_temp = temp_confirmation_type in ["positive", "positive_with_adjustment", "positive_with_condition"]
-                if temp_analysis.get("is_confirmation") and is_positive_temp:
-                    temp_confirmed = temp_analysis.get("confirmed_values", {})
-                    for field, value in temp_confirmed.items():
-                        if value is not None:
-                            if field in confirmed_entities:
-                                print(f">>> [HISTORY SCAN] Updating confirmed {field}: {confirmed_entities[field]} → {value} (from: '{msg['content']}')")
-                            else:
-                                print(f">>> [HISTORY SCAN] Found confirmed {field}: {value} (from: '{msg['content']}')")
-                            confirmed_entities[field] = value  # Later confirmations overwrite earlier ones
+                # Analyze this user message for confirmations
+                if prev_assistant_msg:
+                    temp_analysis = analyze_user_response_with_llm(
+                        msg["content"], 
+                        prev_assistant_msg, 
+                        all_entities
+                    )
+                    
+                    # If this is a positive confirmation (including compound types), store the confirmed values
+                    # Later confirmations overwrite earlier ones (more recent = more accurate)
+                    temp_confirmation_type = temp_analysis.get("confirmation_type", "neutral")
+                    is_positive_temp = temp_confirmation_type in ["positive", "positive_with_adjustment", "positive_with_condition"]
+                    if temp_analysis.get("is_confirmation") and is_positive_temp:
+                        temp_confirmed = temp_analysis.get("confirmed_values", {})
+                        for field, value in temp_confirmed.items():
+                            if value is not None:
+                                if field in confirmed_entities:
+                                    print(f">>> [HISTORY SCAN] Updating confirmed {field}: {confirmed_entities[field]} → {value} (from: '{msg['content']}')")
+                                else:
+                                    print(f">>> [HISTORY SCAN] Found confirmed {field}: {value} (from: '{msg['content']}')")
+                                confirmed_entities[field] = value  # Later confirmations overwrite earlier ones
     
     # Second pass: extract entities with confirmed values protection
     for msg in messages:
@@ -1310,8 +1513,39 @@ A loan officer will contact you within 2 business days to proceed."""
             print(">>> WARNING: OpenAI returned empty response!")
             return "I understand. What's the property price you're considering?"
         
+        # Log API metrics before returning
+        end_time = time.time()
+        response_time_ms = (end_time - start_time) * 1000
+        
+        log_api_metrics({
+            "message_count": len(messages),
+            "call_count": api_call_count,
+            "usage": {
+                "total_tokens": total_tokens_used,
+                "cached_tokens": cached_tokens_used
+            },
+            "response_time_ms": response_time_ms,
+            "approach": "batched" if USE_BATCHED_ANALYSIS else "legacy"
+        })
+        
         return result.strip()
     
     except Exception as e:
+        # Log metrics even for errors
+        end_time = time.time()
+        response_time_ms = (end_time - start_time) * 1000
+        
+        log_api_metrics({
+            "message_count": len(messages),
+            "call_count": api_call_count,
+            "usage": {
+                "total_tokens": total_tokens_used,
+                "cached_tokens": cached_tokens_used
+            },
+            "response_time_ms": response_time_ms,
+            "approach": "batched" if USE_BATCHED_ANALYSIS else "legacy",
+            "error": str(e)
+        })
+        
         print(f"Response generation error: {e}")
         return "Sorry, I'm having trouble processing your response. Could you please try again?"

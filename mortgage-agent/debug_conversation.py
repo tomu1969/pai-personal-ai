@@ -58,7 +58,7 @@ def test_conversation():
         # Import with error handling
         log("Importing conversation_simple module...", "TRACE")
         try:
-            from conversation_simple import process_conversation_turn
+            from src.conversation_simple import process_conversation_turn
             log("Module imported successfully", "SUCCESS")
         except ImportError as e:
             log(f"Import error: {e}", "ERROR")
@@ -67,9 +67,9 @@ def test_conversation():
             log(f"Syntax error in module: {e}", "ERROR")
             return
         
-        # Patch the functions to add logging
+        # Patch the functions for debugging
         log("Patching functions for debugging...", "TRACE")
-        import conversation_simple as cs
+        import src.conversation_simple as cs
         
         # Wrap the main function
         original_process = cs.process_conversation_turn

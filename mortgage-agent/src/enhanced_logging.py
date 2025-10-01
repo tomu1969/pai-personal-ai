@@ -177,6 +177,28 @@ def check_environment():
     logger.log("Environment", 'INFO', env_status)
     logger.log("=== END ENVIRONMENT CHECK ===", 'INFO')
 
+def log_api_metrics(api_call_data: dict):
+    """Log API performance metrics for monitoring"""
+    from datetime import datetime
+    import json
+    
+    metrics = {
+        "timestamp": datetime.now().isoformat(),
+        "conversation_length": api_call_data.get("message_count", 0),
+        "api_calls_made": api_call_data.get("call_count", 0),
+        "total_tokens": api_call_data.get("usage", {}).get("total_tokens", 0),
+        "cached_tokens": api_call_data.get("usage", {}).get("cached_tokens", 0),
+        "cache_hit_rate": 0,
+        "response_time_ms": api_call_data.get("response_time_ms", 0),
+        "approach": api_call_data.get("approach", "unknown")
+    }
+    
+    # Calculate cache hit rate
+    if metrics["total_tokens"] > 0:
+        metrics["cache_hit_rate"] = (metrics["cached_tokens"] / metrics["total_tokens"]) * 100
+    
+    logger.log(f"API_METRICS: {json.dumps(metrics)}", 'METRICS', metrics)
+
 # Export logger instance and decorators
 __all__ = [
     'logger',
@@ -185,6 +207,7 @@ __all__ = [
     'log_processing_step',
     'log_entity_state',
     'log_conversation_state',
+    'log_api_metrics',
     'check_environment',
     'LOG_FILE'
 ]

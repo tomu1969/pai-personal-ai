@@ -287,8 +287,12 @@ EXAMPLES:
         # Post-process: Handle percentage inputs for down payment
         extracted = handle_percentage_inputs(latest_message, extracted, messages)
         
-        # Post-process: Improve location extraction
-        extracted = enhance_location_extraction(latest_message, extracted)
+        # Post-process: Improve location extraction (only in location context)
+        if is_location_context(messages):
+            print(f">>> [CONTEXT] Location context detected - running extraction")
+            extracted = enhance_location_extraction(latest_message, extracted)
+        else:
+            print(f">>> [CONTEXT] No location context - skipping extraction")
         
         return extracted
     
@@ -348,6 +352,38 @@ def handle_percentage_inputs(latest_message: str, extracted: Dict[str, Any], mes
     return extracted
 
 
+def is_location_context(messages: List[Dict[str, str]]) -> bool:
+    """
+    Check if the conversation context suggests location information is expected.
+    
+    Args:
+        messages: Full conversation history
+    
+    Returns:
+        True if the assistant's last question was about location
+    """
+    if len(messages) < 2:
+        return False
+    
+    # Find the last assistant message
+    last_assistant_message = None
+    for msg in reversed(messages):
+        if msg["role"] == "assistant":
+            last_assistant_message = msg["content"].lower()
+            break
+    
+    if not last_assistant_message:
+        return False
+    
+    # Check for location-related keywords in assistant's question
+    location_keywords = [
+        "location", "city", "state", "where", "located", 
+        "address", "area", "region", "property location"
+    ]
+    
+    return any(keyword in last_assistant_message for keyword in location_keywords)
+
+
 def enhance_location_extraction(latest_message: str, extracted: Dict[str, Any]) -> Dict[str, Any]:
     """
     Enhance location extraction with state name mapping and case handling.
@@ -385,6 +421,12 @@ def enhance_location_extraction(latest_message: str, extracted: Dict[str, Any]) 
         'denver': 'CO', 'las vegas': 'NV', 'detroit': 'MI', 'nashville': 'TN', 'charlotte': 'NC'
     }
     
+    # Common 2-letter words that should NOT be treated as state codes
+    COMMON_TWO_LETTER_WORDS = {
+        'do', 'to', 'is', 'in', 'it', 'of', 'be', 'as', 'at', 'so', 'we', 'he', 'by', 
+        'or', 'on', 'an', 'if', 'go', 'me', 'no', 'us', 'am', 'up', 'my', 'ad', 'ah'
+    }
+    
     message_lower = latest_message.lower().strip()
     
     # Skip location extraction for clarification questions or non-location contexts
@@ -415,11 +457,11 @@ def enhance_location_extraction(latest_message: str, extracted: Dict[str, Any]) 
     if 'property_state' in extracted:
         state = extracted['property_state']
     
-    # Pattern 1: "City, State" or "City State"
+    # Pattern 1: "City, State" or "City State" - TIGHTENED with minimum lengths
     city_state_patterns = [
-        r'([a-zA-Z\s]+),\s*([a-zA-Z\s]{2,})',  # Miami, Florida
-        r'([a-zA-Z\s]+)\s+([a-zA-Z]{2})(?:\s|$)',  # Miami FL
-        r'([a-zA-Z\s]+)\s+([a-zA-Z\s]{4,})(?:\s|$)'  # Miami Florida
+        r'([a-zA-Z\s]{3,}),\s*([a-zA-Z\s]{2,})',  # Miami, Florida (min 3-char city)
+        r'([a-zA-Z\s]{3,})\s+([a-zA-Z]{2})(?:\s|$)',  # Miami FL (min 3-char city)
+        r'([a-zA-Z\s]{3,})\s+([a-zA-Z\s]{4,})(?:\s|$)'  # Miami Florida (min 3-char city)
     ]
     
     for pattern in city_state_patterns:
@@ -428,11 +470,22 @@ def enhance_location_extraction(latest_message: str, extracted: Dict[str, Any]) 
             potential_city = match.group(1).strip().title()
             potential_state = match.group(2).strip()
             
-            # Handle state
+            # Handle state - VALIDATE ALL 2-letter codes against STATE_MAPPING
             if len(potential_state) == 2:
-                state = potential_state.upper()
+                potential_state_upper = potential_state.upper()
+                potential_state_lower = potential_state.lower()
+                
+                # CRITICAL FIX: Check blacklist first, then validate against valid states
+                if potential_state_lower in COMMON_TWO_LETTER_WORDS:
+                    print(f">>> [LOCATION] Rejected common word: {potential_state_upper}")
+                elif potential_state_upper in STATE_MAPPING.values():
+                    state = potential_state_upper
+                    print(f">>> [LOCATION] Validated 2-letter state: {state}")
+                else:
+                    print(f">>> [LOCATION] Rejected invalid 2-letter code: {potential_state_upper}")
             elif potential_state.lower() in STATE_MAPPING:
                 state = STATE_MAPPING[potential_state.lower()]
+                print(f">>> [LOCATION] Mapped full state name: {potential_state} -> {state}")
             
             # Use the city if we found a valid state
             if state:
@@ -459,11 +512,17 @@ def enhance_location_extraction(latest_message: str, extracted: Dict[str, Any]) 
         # Check for state abbreviations (case insensitive)
         state_abbrev_match = re.search(r'\b([a-zA-Z]{2})\b', message_lower)
         if state_abbrev_match:
-            potential_state = state_abbrev_match.group(1).upper()
-            # Validate it's a real state abbreviation
-            if potential_state in STATE_MAPPING.values():
-                state = potential_state
+            potential_state_upper = state_abbrev_match.group(1).upper()
+            potential_state_lower = state_abbrev_match.group(1).lower()
+            
+            # Apply blacklist filter and validate against real state abbreviations
+            if potential_state_lower in COMMON_TWO_LETTER_WORDS:
+                print(f">>> [LOCATION] Rejected common word in state search: {potential_state_upper}")
+            elif potential_state_upper in STATE_MAPPING.values():
+                state = potential_state_upper
                 print(f">>> [LOCATION] Found state abbreviation {state}")
+            else:
+                print(f">>> [LOCATION] Rejected invalid state abbreviation: {potential_state_upper}")
     
     # Update extracted entities
     if city:
@@ -681,6 +740,47 @@ def smart_merge_entities(current_entities: Dict[str, Any], new_entities: Dict[st
                 # Only add if value is meaningful
                 if value is not None:
                     merged[key] = value
+        
+        # Location field validation
+        elif key in ['property_city', 'property_state']:
+            if value is not None:
+                # Validate state fields
+                if key == 'property_state':
+                    # Get valid states and common words
+                    valid_states = {
+                        'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+                        'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+                        'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+                        'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+                        'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
+                    }
+                    common_words = {
+                        'do', 'to', 'is', 'in', 'it', 'of', 'be', 'as', 'at', 'so', 'we', 'he', 'by', 
+                        'or', 'on', 'an', 'if', 'go', 'me', 'no', 'us', 'am', 'up', 'my', 'ad', 'ah'
+                    }
+                    
+                    value_upper = str(value).upper()
+                    value_lower = str(value).lower()
+                    
+                    if value_lower in common_words:
+                        print(f">>> [SMART_MERGE] Rejected common word as state: {value}")
+                    elif value_upper in valid_states:
+                        merged[key] = value_upper
+                        print(f">>> [SMART_MERGE] Accepted valid state: {value_upper}")
+                    else:
+                        print(f">>> [SMART_MERGE] Rejected invalid state: {value}")
+                
+                # Validate city fields (basic sanity check)
+                elif key == 'property_city':
+                    # Reject obviously invalid city names
+                    invalid_cities = {'i', 'i can', 'i do', 'me', 'you', 'we', 'they'}
+                    if str(value).lower() in invalid_cities:
+                        print(f">>> [SMART_MERGE] Rejected invalid city: {value}")
+                    elif len(str(value).strip()) >= 2:  # Minimum length requirement
+                        merged[key] = value
+                        print(f">>> [SMART_MERGE] Accepted city: {value}")
+                    else:
+                        print(f">>> [SMART_MERGE] Rejected too-short city: {value}")
         
         else:
             # For other fields, update normally

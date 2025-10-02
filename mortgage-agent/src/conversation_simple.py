@@ -26,6 +26,9 @@ from .enhanced_logging import (
     check_environment
 )
 
+# Database functions
+from .database import get_or_create_conversation, save_conversation_safe
+
 # Load environment variables
 load_dotenv()
 
@@ -1273,11 +1276,7 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
         property_type = property_types[user_msg_clean]
         logger.log(f"Fast-path: Property type '{user_msg_clean}' -> {property_type}", 'INFO')
         
-        # Save the property purpose
-        conversation = get_or_create_conversation(conversation_id)
-        if conversation and hasattr(conversation, 'property_purpose'):
-            conversation.property_purpose = property_type
-            save_conversation_safe(conversation)
+        # Note: Property purpose will be saved later in the normal flow
         
         # Move to next question based on property type
         if property_type == "investment":
@@ -1326,13 +1325,7 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
         entity_data = obvious_values[user_msg_clean]
         logger.log(f"Fast-path: Obvious value '{user_msg_clean}' -> {entity_data}", 'INFO')
         
-        # Save to conversation if possible
-        conversation = get_or_create_conversation(conversation_id)
-        if conversation:
-            for key, value in entity_data.items():
-                if hasattr(conversation, key):
-                    setattr(conversation, key, value)
-            save_conversation_safe(conversation)
+        # Note: Entity data will be saved later in the normal flow
         
         # Return appropriate response based on what was confirmed
         if "credit_score" in entity_data:
@@ -1346,6 +1339,10 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
     # Extract basic entities first to provide context to LLM analysis
     basic_entities = extract_entities(messages)
     log_entity_state(basic_entities, {}, "After basic extraction")
+    
+    # TIMING: Basic extraction checkpoint
+    basic_extraction_time = time.time() - start_time
+    logger.log(f"⏱️  Basic extraction completed in {basic_extraction_time:.2f}s", 'INFO')
     
     # Use LLM to analyze the user's response contextually
     llm_analysis = analyze_user_response_with_llm(
@@ -1364,6 +1361,10 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
     
     confirmed_values = llm_analysis.get("confirmed_values", {})
     new_information = llm_analysis.get("new_information", {})
+    
+    # TIMING: LLM analysis checkpoint
+    llm_analysis_time = time.time() - start_time
+    logger.log(f"⏱️  LLM analysis completed in {llm_analysis_time:.2f}s", 'INFO')
     
     print(f">>> Last user message: '{last_user_message}'")
     print(f">>> LLM Analysis: {llm_analysis.get('reasoning', '')}")
@@ -1409,6 +1410,11 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
                         else:
                             print(f">>> [BATCHED SCAN] Found confirmed {field}: {value} (from: '{msg['content']}')")
                         confirmed_entities[field] = value
+    
+    # TIMING: Batched analysis checkpoint
+    if USE_BATCHED_ANALYSIS:
+        batched_analysis_time = time.time() - start_time
+        logger.log(f"⏱️  Batched analysis completed in {batched_analysis_time:.2f}s", 'INFO')
     else:
         # LEGACY APPROACH: Per-message analysis (expensive - for rollback only)
         logger.log(f"Using legacy per-message analysis for {len(messages)} messages", 'WARNING')
@@ -1443,55 +1449,55 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
                                     print(f">>> [HISTORY SCAN] Found confirmed {field}: {value} (from: '{msg['content']}')")
                                 confirmed_entities[field] = value  # Later confirmations overwrite earlier ones
     
-    # Second pass: extract entities with confirmed values protection
-    for msg in messages:
-        temp_messages.append(msg)
-        if msg["role"] == "user":
-            extracted = extract_entities(temp_messages)
-            
-            # Use smart merging instead of simple update, prioritizing confirmed values
-            all_entities = smart_merge_entities(all_entities, extracted, confirmed_entities)
-            latest_extraction = extracted  # Keep track of latest message extraction
-            
-            # If this is the current message and it's a positive confirmation, apply confirmed values
-            if is_confirmation and is_positive_conf and msg["content"] == last_user_message:
-                # Store confirmed values in the confirmed_entities tracker
-                for field, value in confirmed_values.items():
-                    if value is not None:
-                        confirmed_entities[field] = value
-                        all_entities[field] = value
-                        print(f">>> [CURRENT CONFIRMATION] Confirmed and applied {field}: {value}")
-                
-                # Remove any updated_ fields that were just confirmed
-                for field in ["down_payment", "property_price"]:
-                    updated_field = f"updated_{field}"
-                    if field in confirmed_values and updated_field in all_entities:
-                        del all_entities[updated_field]
-                        print(f">>> [CURRENT CONFIRMATION] Cleaned up {updated_field}")
-                
-                # Also promote any updated fields that exist but weren't specifically confirmed
-                # BUT only if we don't already have a confirmed value from history scan
-                if "updated_down_payment" in all_entities and "down_payment" not in confirmed_values:
-                    promoted_value = all_entities["updated_down_payment"]
-                    # Don't overwrite confirmed values from history scan
-                    if "down_payment" not in confirmed_entities:
-                        confirmed_entities["down_payment"] = promoted_value  # Mark as confirmed
-                        all_entities["down_payment"] = promoted_value
-                        print(f">>> [CURRENT CONFIRMATION] Promoted and confirmed updated_down_payment: ${promoted_value:,}")
-                    else:
-                        print(f">>> [CURRENT CONFIRMATION] Skipping promotion of updated_down_payment: ${promoted_value:,} (already confirmed: ${confirmed_entities['down_payment']:,})")
-                    del all_entities["updated_down_payment"]
-                
-                if "updated_property_price" in all_entities and "property_price" not in confirmed_values:
-                    promoted_value = all_entities["updated_property_price"]
-                    # Don't overwrite confirmed values from history scan
-                    if "property_price" not in confirmed_entities:
-                        confirmed_entities["property_price"] = promoted_value  # Mark as confirmed
-                        all_entities["property_price"] = promoted_value
-                        print(f">>> [CURRENT CONFIRMATION] Promoted and confirmed updated_property_price: ${promoted_value:,}")
-                    else:
-                        print(f">>> [CURRENT CONFIRMATION] Skipping promotion of updated_property_price: ${promoted_value:,} (already confirmed: ${confirmed_entities['property_price']:,})")
-                    del all_entities["updated_property_price"]
+    # OPTIMIZED: Use only the current message extraction + batched analysis results
+    # The batched analysis already found all confirmed values - no need for redundant API calls
+    
+    # Extract entities from ONLY the current message (not entire conversation)
+    latest_extraction = basic_entities
+    
+    # Start with basic entities and merge in confirmed values from batched analysis
+    all_entities = basic_entities.copy()
+    
+    # Apply all confirmed values from batched analysis
+    for field, value in confirmed_entities.items():
+        all_entities[field] = value
+        print(f">>> [BATCHED] Applied confirmed {field}: {value}")
+    
+    # If current message is a positive confirmation, apply confirmed values from LLM analysis
+    if is_confirmation and is_positive_conf:
+        for field, value in confirmed_values.items():
+            if value is not None:
+                confirmed_entities[field] = value
+                all_entities[field] = value
+                print(f">>> [CURRENT CONFIRMATION] Confirmed and applied {field}: {value}")
+        
+        # Clean up any updated_ fields that were just confirmed
+        for field in ["down_payment", "property_price"]:
+            updated_field = f"updated_{field}"
+            if field in confirmed_values and updated_field in all_entities:
+                del all_entities[updated_field]
+                print(f">>> [CURRENT CONFIRMATION] Cleaned up {updated_field}")
+        
+        # Promote updated fields only if not already confirmed
+        if "updated_down_payment" in all_entities and "down_payment" not in confirmed_values:
+            promoted_value = all_entities["updated_down_payment"]
+            if "down_payment" not in confirmed_entities:
+                confirmed_entities["down_payment"] = promoted_value
+                all_entities["down_payment"] = promoted_value
+                print(f">>> [CURRENT CONFIRMATION] Promoted and confirmed updated_down_payment: ${promoted_value:,}")
+            else:
+                print(f">>> [CURRENT CONFIRMATION] Skipping promotion of updated_down_payment: ${promoted_value:,} (already confirmed: ${confirmed_entities['down_payment']:,})")
+            del all_entities["updated_down_payment"]
+        
+        if "updated_property_price" in all_entities and "property_price" not in confirmed_values:
+            promoted_value = all_entities["updated_property_price"]
+            if "property_price" not in confirmed_entities:
+                confirmed_entities["property_price"] = promoted_value
+                all_entities["property_price"] = promoted_value
+                print(f">>> [CURRENT CONFIRMATION] Promoted and confirmed updated_property_price: ${promoted_value:,}")
+            else:
+                print(f">>> [CURRENT CONFIRMATION] Skipping promotion of updated_property_price: ${promoted_value:,} (already confirmed: ${confirmed_entities['property_price']:,})")
+            del all_entities["updated_property_price"]
     
     # Apply new information from LLM analysis (outside of confirmation context)
     if not is_confirmation:
@@ -1517,6 +1523,10 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
     print(f">>> Final entities: {all_entities}")
     print(f">>> Confirmed entities: {confirmed_entities}")
     print(f">>> Latest extraction: {latest_extraction}")
+    
+    # TIMING: Entity processing checkpoint
+    entity_processing_time = time.time() - start_time
+    logger.log(f"⏱️  Entity processing completed in {entity_processing_time:.2f}s", 'INFO')
     
     # Check if user has a pending question that needs answering (use LLM analysis when available)
     user_question = None

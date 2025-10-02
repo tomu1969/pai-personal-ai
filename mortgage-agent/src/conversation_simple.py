@@ -74,6 +74,173 @@ def get_working_model():
 WORKING_MODEL = get_working_model()
 print(f"Using model: {WORKING_MODEL}")
 
+
+def validate_response_against_state(response: str, all_entities: Dict[str, Any], last_user_message: str, messages: List[Dict[str, str]]) -> str:
+    """
+    Validate the LLM response against conversation state and enforce guardrails.
+    Prevents re-asking answered questions and ensures proper conversation flow.
+    
+    Args:
+        response: The LLM-generated response
+        all_entities: Current conversation state with all collected entities
+        last_user_message: User's latest message
+        messages: Full conversation history
+    
+    Returns:
+        Validated and potentially corrected response
+    """
+    
+    logger.log("Validating response against conversation state", 'INFO')
+    
+    # GUARDRAIL 1: Prevent re-asking already answered questions
+    collected_fields = {
+        'down_payment': all_entities.get('down_payment'),
+        'property_price': all_entities.get('property_price'), 
+        'loan_purpose': all_entities.get('loan_purpose'),
+        'property_city': all_entities.get('property_city'),
+        'property_state': all_entities.get('property_state'),
+        'has_valid_passport': all_entities.get('has_valid_passport'),
+        'has_valid_visa': all_entities.get('has_valid_visa'),
+        'can_demonstrate_income': all_entities.get('can_demonstrate_income'),
+        'has_reserves': all_entities.get('has_reserves')
+    }
+    
+    # Check if response asks for already provided information
+    response_lower = response.lower()
+    
+    violations = []
+    
+    if collected_fields['down_payment'] and any(phrase in response_lower for phrase in ['down payment', 'put down', 'how much can you']):
+        violations.append(f"Re-asking down payment (already: ${collected_fields['down_payment']:,})")
+    
+    if collected_fields['property_price'] and any(phrase in response_lower for phrase in ['property price', 'cost of', 'price you']):
+        violations.append(f"Re-asking property price (already: ${collected_fields['property_price']:,})")
+    
+    if collected_fields['loan_purpose'] and any(phrase in response_lower for phrase in ['purpose', 'property purpose', 'primary residence', 'second home', 'investment']):
+        violations.append(f"Re-asking loan purpose (already: {collected_fields['loan_purpose']})")
+    
+    if (collected_fields['property_city'] and collected_fields['property_state']) and any(phrase in response_lower for phrase in ['location', 'city', 'where is', 'state']):
+        violations.append(f"Re-asking location (already: {collected_fields['property_city']}, {collected_fields['property_state']})")
+    
+    if collected_fields['has_valid_passport'] is not None and any(phrase in response_lower for phrase in ['passport', 'valid passport']):
+        violations.append(f"Re-asking passport status (already: {'Yes' if collected_fields['has_valid_passport'] else 'No'})")
+    
+    if collected_fields['has_valid_visa'] is not None and any(phrase in response_lower for phrase in ['visa', 'u.s. visa']):
+        violations.append(f"Re-asking visa status (already: {'Yes' if collected_fields['has_valid_visa'] else 'No'})")
+    
+    if collected_fields['can_demonstrate_income'] is not None and any(phrase in response_lower for phrase in ['income', 'documentation', 'demonstrate income']):
+        violations.append(f"Re-asking income documentation (already: {'Yes' if collected_fields['can_demonstrate_income'] else 'No'})")
+    
+    if collected_fields['has_reserves'] is not None and any(phrase in response_lower for phrase in ['reserves', 'saved', 'payments saved']):
+        violations.append(f"Re-asking reserves (already: {'Yes' if collected_fields['has_reserves'] else 'No'})")
+    
+    # GUARDRAIL 2: Block irrelevant questions for foreign nationals
+    irrelevant_patterns = ['credit score', 'credit rating', 'fico', 'employment history', 'job history']
+    for pattern in irrelevant_patterns:
+        if pattern in response_lower:
+            violations.append(f"Asking irrelevant question: {pattern} (not needed for foreign nationals)")
+    
+    # GUARDRAIL 3: Enforce confirmation protocol - don't combine confirmation with next question
+    user_msg_lower = last_user_message.lower().strip()
+    is_user_exploring = any(phrase in user_msg_lower for phrase in ['what if', 'how much would', 'can you calculate', 'what about', 'suppose'])
+    
+    if is_user_exploring:
+        # User is exploring options - response should ask for confirmation, not jump to next topic
+        next_topic_phrases = ['property purpose', 'what\'s the purpose', 'primary residence', 'second home', 'investment', 
+                             'location', 'city', 'state', 'passport', 'visa', 'income', 'documentation', 'reserves']
+        
+        has_next_topic = any(phrase in response_lower for phrase in next_topic_phrases)
+        has_confirmation = any(phrase in response_lower for phrase in ['would you like', 'should i', 'proceed with', 'confirm'])
+        
+        if has_next_topic and not has_confirmation:
+            violations.append("Jumping to next topic without confirmation after user exploration")
+    
+    # GUARDRAIL 4: Consistency checks
+    if 'down payment' in response_lower and 'property price' in response_lower:
+        # Check for inconsistent down payment requirements
+        if '20%' in response_lower or '20-25%' in response_lower:
+            violations.append("Inconsistent down payment requirement (should be 25% for foreign nationals)")
+    
+    # If violations found, generate corrected response
+    if violations:
+        logger.log(f"Response validation violations: {violations}", 'WARNING')
+        print(f">>> GUARDRAIL VIOLATIONS: {violations}")
+        
+        # Generate state-aware corrected response
+        return generate_corrected_response(all_entities, last_user_message, violations)
+    
+    logger.log("Response passed validation", 'INFO')
+    return response
+
+
+def generate_corrected_response(all_entities: Dict[str, Any], last_user_message: str, violations: List[str]) -> str:
+    """
+    Generate a corrected response that respects conversation state and flow.
+    
+    Args:
+        all_entities: Current conversation state
+        last_user_message: User's latest message
+        violations: List of detected violations
+    
+    Returns:
+        State-aware corrected response
+    """
+    
+    user_msg_lower = last_user_message.lower().strip()
+    
+    # Determine the next appropriate question based on missing information
+    missing_context = get_missing_information_context(all_entities)
+    
+    # Handle user exploration/questions first
+    is_exploring = any(phrase in user_msg_lower for phrase in ['what if', 'how much would', 'can you calculate', 'what about', 'suppose'])
+    is_simple_confirmation = user_msg_lower in ['ok yes', 'yes', 'sure', 'ok', 'sounds good', 'that works']
+    
+    if is_exploring:
+        # User is exploring - provide answer and ask for confirmation
+        if all_entities.get('down_payment') and all_entities.get('property_price'):
+            down_payment = all_entities['down_payment']
+            property_price = all_entities['property_price']
+            return f"With ${down_payment:,} down, you can afford up to ${property_price:,}. Would you like to proceed with these amounts?"
+        else:
+            return "I can help calculate that. What specific scenario would you like me to analyze?"
+    
+    elif is_simple_confirmation:
+        # User confirmed - move to next missing information
+        if 'Down payment amount: Not provided' in missing_context:
+            return "How much can you put down?"
+        elif 'Property price: Not provided' in missing_context:
+            return "What's the property price you're considering?"
+        elif 'Property purpose: Not provided' in missing_context:
+            return "What's the property purpose: primary residence, second home, or investment?"
+        elif 'Property city: Not provided' in missing_context or 'Property state: Not provided' in missing_context:
+            return "What city and state is the property in?"
+        elif 'Valid passport status: Not provided' in missing_context:
+            return "Do you have a valid passport?"
+        elif 'Valid U.S. visa status: Not provided' in missing_context:
+            return "Do you have a valid U.S. visa?"
+        elif 'Income documentation capability: Not provided' in missing_context:
+            return "Can you demonstrate income with bank statements or tax returns?"
+        elif 'Financial reserves: Not provided' in missing_context:
+            return "Do you have 6-12 months of payments saved in reserves?"
+        else:
+            # All information collected - check qualification
+            qualification = calculate_qualification(all_entities)
+            if qualification.get('qualified', False):
+                return "Based on your information, you appear to pre-qualify! I'll connect you with a loan officer to proceed."
+            else:
+                return f"Unfortunately, you don't qualify at this time. {qualification.get('reason', 'Please review the requirements.')}"
+    
+    # Default: Ask next missing question
+    if 'Down payment amount: Not provided' in missing_context:
+        return "How much can you put down?"
+    elif 'Property price: Not provided' in missing_context:
+        return "What's the property price you're considering?"
+    elif 'Property purpose: Not provided' in missing_context:
+        return "What's the property purpose: primary residence, second home, or investment?"
+    else:
+        return "What other information can you provide to help with your pre-qualification?"
+
+
 # Master system prompt for natural conversation flow
 MASTER_SYSTEM_PROMPT = """You are a mortgage pre-qualification assistant specializing in foreign national loans.
 
@@ -1656,6 +1823,13 @@ A loan officer will contact you within 2 business days to proceed."""
             print(">>> WARNING: OpenAI returned empty response!")
             return "I understand. What's the property price you're considering?"
         
+        # RESPONSE VALIDATION: Apply guardrails to enforce state-aware conversation flow
+        validated_result = validate_response_against_state(result.strip(), all_entities, last_user_message, messages)
+        
+        if validated_result != result.strip():
+            print(f">>> GUARDRAIL CORRECTION: '{result.strip()}' -> '{validated_result}'")
+            logger.log(f"Response corrected by guardrails: {result.strip()} -> {validated_result}", 'INFO')
+        
         # Log API metrics before returning
         end_time = time.time()
         response_time_ms = (end_time - start_time) * 1000
@@ -1671,7 +1845,7 @@ A loan officer will contact you within 2 business days to proceed."""
             "approach": "batched" if USE_BATCHED_ANALYSIS else "legacy"
         })
         
-        return result.strip()
+        return validated_result
     
     except Exception as e:
         # Log metrics even for errors

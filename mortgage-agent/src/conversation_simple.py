@@ -1035,20 +1035,28 @@ def analyze_conversation_history_batched(messages: List[Dict[str, str]], current
         Dictionary mapping message index to analysis results
     """
     
-    # Build conversation pairs for analysis
+    # Build conversation pairs for analysis - SLIDING WINDOW: Only analyze recent messages
+    # This prevents O(n²) complexity that was causing timeouts
     conversation_pairs = []
-    for i, msg in enumerate(messages):
+    
+    # Only analyze the last 6 messages (3 exchanges) to prevent exponential slowdown
+    recent_messages = messages[-6:] if len(messages) > 6 else messages
+    
+    # Adjust indices for the sliding window
+    offset = len(messages) - len(recent_messages)
+    
+    for i, msg in enumerate(recent_messages):
         if msg["role"] == "user" and i > 0:
-            # Find previous assistant message
+            # Find previous assistant message within the recent window
             prev_assistant_msg = ""
             for j in range(i-1, -1, -1):
-                if messages[j]["role"] == "assistant":
-                    prev_assistant_msg = messages[j]["content"]
+                if recent_messages[j]["role"] == "assistant":
+                    prev_assistant_msg = recent_messages[j]["content"]
                     break
             
             if prev_assistant_msg:
                 conversation_pairs.append({
-                    "index": i,
+                    "index": i + offset,  # Adjust index for original message position
                     "user_message": msg["content"],
                     "assistant_message": prev_assistant_msg
                 })
@@ -1205,6 +1213,16 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
     total_tokens_used = 0
     cached_tokens_used = 0
     
+    # TIMEOUT PROTECTION: Maximum processing time to prevent gateway timeouts
+    MAX_PROCESSING_TIME = 10.0  # seconds - well under Render's 30s limit
+    
+    def check_timeout():
+        elapsed = time.time() - start_time
+        if elapsed > MAX_PROCESSING_TIME:
+            logger.log(f"Timeout protection triggered after {elapsed:.1f}s", 'WARNING')
+            return True
+        return False
+    
     # Log conversation state
     log_conversation_state(messages, "Starting conversation processing")
     
@@ -1218,6 +1236,111 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
     user_messages = [m for m in messages if m["role"] == "user"]
     last_user_message = user_messages[-1]["content"] if user_messages else ""
     last_assistant_content = assistant_messages[-1]["content"] if assistant_messages else ""
+    
+    # FAST-PATH: Handle simple confirmations and property types without API calls to prevent timeouts
+    simple_confirmations = ["ok yes", "yes", "sure", "ok", "sounds good", "that works", "i agree"]
+    property_types = {
+        "investment": "investment",
+        "investment property": "investment", 
+        "rental": "investment",
+        "rental property": "investment",
+        "primary": "primary_residence",
+        "primary residence": "primary_residence",
+        "live in": "primary_residence",
+        "own home": "primary_residence",
+        "main home": "primary_residence",
+        "second home": "second_home",
+        "vacation": "second_home",
+        "vacation home": "second_home",
+        "holiday home": "second_home"
+    }
+    
+    user_msg_clean = last_user_message.lower().strip()
+    
+    # DEBUG: Log assistant message content for fast-path debugging
+    logger.log(f"Fast-path debug: user='{user_msg_clean}', assistant='{last_assistant_content[:50]}...'", 'DEBUG')
+    
+    # Fast-path for property purpose responses
+    property_purpose_patterns = [
+        "property purpose",
+        "property's purpose", 
+        "purpose of the property",
+        "property: primary residence"
+    ]
+    assistant_mentions_property_purpose = any(pattern in last_assistant_content.lower() for pattern in property_purpose_patterns)
+    
+    if assistant_mentions_property_purpose and user_msg_clean in property_types:
+        property_type = property_types[user_msg_clean]
+        logger.log(f"Fast-path: Property type '{user_msg_clean}' -> {property_type}", 'INFO')
+        
+        # Save the property purpose
+        conversation = get_or_create_conversation(conversation_id)
+        if conversation and hasattr(conversation, 'property_purpose'):
+            conversation.property_purpose = property_type
+            save_conversation_safe(conversation)
+        
+        # Move to next question based on property type
+        if property_type == "investment":
+            return "Thanks! For investment properties, you'll typically need 20-25% down. Do you have good credit (score 700+)?"
+        else:
+            return "Perfect! Do you have good credit (score 700+)?"
+    
+    # Fast-path for simple confirmations
+    if user_msg_clean in simple_confirmations:
+        # Determine what was being confirmed based on assistant's last message
+        if "would you like to adjust" in last_assistant_content.lower():
+            logger.log("Fast-path: Simple confirmation to down payment adjustment", 'INFO')
+            return "Great! What's the property purpose: primary residence, second home, or investment?"
+        elif "minimum down payment" in last_assistant_content.lower():
+            logger.log("Fast-path: Simple confirmation to minimum down payment question", 'INFO')
+            return "Perfect! What's the property purpose: primary residence, second home, or investment?"
+        elif "property price" in last_assistant_content.lower():
+            logger.log("Fast-path: Simple confirmation to property price", 'INFO')
+            # Need to extract values for validation but can use fast logic
+            pass  # Fall through to normal processing for price validation
+        # Add more fast-path patterns as needed
+    
+    # UNIVERSAL FAST-PATH: Handle obvious entity values without heavy processing
+    obvious_values = {
+        # Credit scores
+        "excellent": {"credit_score": "excellent"},
+        "good": {"credit_score": "good"}, 
+        "fair": {"credit_score": "fair"},
+        "poor": {"credit_score": "poor"},
+        
+        # Income patterns (simple cases)
+        "unemployed": {"employment_status": "unemployed"},
+        "retired": {"employment_status": "retired"},
+        "self employed": {"employment_status": "self_employed"},
+        
+        # Simple yes/no for existing customers
+        "new customer": {"existing_customer": False},
+        "existing customer": {"existing_customer": True},
+        
+        # Other obvious answers
+        "no": {"generic_no": True},
+        "none": {"generic_none": True}
+    }
+    
+    if user_msg_clean in obvious_values:
+        entity_data = obvious_values[user_msg_clean]
+        logger.log(f"Fast-path: Obvious value '{user_msg_clean}' -> {entity_data}", 'INFO')
+        
+        # Save to conversation if possible
+        conversation = get_or_create_conversation(conversation_id)
+        if conversation:
+            for key, value in entity_data.items():
+                if hasattr(conversation, key):
+                    setattr(conversation, key, value)
+            save_conversation_safe(conversation)
+        
+        # Return appropriate response based on what was confirmed
+        if "credit_score" in entity_data:
+            return "Great! What's your approximate annual income?"
+        elif "employment_status" in entity_data:
+            return "Thanks for that information. What else would you like me to know?"
+        else:
+            return "I understand. What's the next piece of information you'd like to provide?"
     
     log_processing_step("Extracting basic entities")
     # Extract basic entities first to provide context to LLM analysis
@@ -1257,6 +1380,11 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
     
     # First pass: identify all confirmations throughout the conversation history
     if USE_BATCHED_ANALYSIS:
+        # Check timeout before expensive batched analysis
+        if check_timeout():
+            logger.log("Timeout: Skipping batched analysis", 'WARNING')
+            return "I understand. Could you please tell me the property purpose: primary residence, second home, or investment?"
+        
         # BATCHED APPROACH: Analyze all history in single API call (leverages OpenAI caching)
         logger.log(f"Using batched analysis for {len(messages)} messages", 'INFO')
         batched_results, batch_usage = analyze_conversation_history_batched(messages, all_entities)
@@ -1490,6 +1618,11 @@ A loan officer will contact you within 2 business days to proceed."""
     prompt = "\n".join(prompt_parts)
     
     try:
+        # Final timeout check before expensive OpenAI call
+        if check_timeout():
+            logger.log("Timeout: Using fallback response instead of OpenAI call", 'WARNING')
+            return "I understand. What's the next piece of information you'd like to provide?"
+        
         print(f">>> Sending to OpenAI - Model: {WORKING_MODEL}")
         print(f">>> Prompt length: {len(prompt)}")
         

@@ -10,6 +10,7 @@ Replaces complex slot-filling system with coherent conversational flow.
 import os
 import json
 import re
+import time
 from typing import Dict, List, Any, Optional
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -529,24 +530,52 @@ def generate_response_and_update_entities(messages: List[Dict[str, str]], persis
     # Build conversation context for the LLM
     conversation_history = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in messages])
     
+    # Add qualification context to prevent premature qualification
+    qualification_context = ""
+    all_info_collected = all([
+        persistent_entities.get('down_payment'),
+        persistent_entities.get('property_price'),
+        persistent_entities.get('loan_purpose'),
+        persistent_entities.get('property_city'),
+        persistent_entities.get('has_valid_passport') is not None,
+        persistent_entities.get('has_valid_visa') is not None,
+        persistent_entities.get('can_demonstrate_income') is not None,
+        persistent_entities.get('has_reserves') is not None
+    ])
+
+    if persistent_entities.get('down_payment') and persistent_entities.get('property_price'):
+        down_pct = persistent_entities['down_payment'] / persistent_entities['property_price']
+        if down_pct < 0.30:
+            qualification_context = f"""
+CRITICAL: Down payment is {down_pct*100:.1f}% - BELOW 30% requirement!
+- Required: ${int(persistent_entities['property_price'] * 0.30):,}
+- Current: ${persistent_entities['down_payment']:,}
+DO NOT say user qualifies. Offer to adjust down payment first."""
+
+    if all_info_collected:
+        qualification_context += """
+ALL INFO COLLECTED: Present a summary and ask "Is everything correct?" 
+Wait for confirmation before declaring qualification status."""
+
     system_prompt = f"""{MASTER_SYSTEM_PROMPT}
 
 CURRENT CONFIRMED ENTITIES:
 {json.dumps(persistent_entities, indent=2)}
+{qualification_context}
 
 INSTRUCTIONS:
 1. Read the conversation and understand what the user just said
 2. Generate a natural, helpful response 
 3. Update entities ONLY if the user confirms or provides new information
 4. Handle ALL scenarios naturally:
-   - "adjust downpayment" → Calculate 25% and offer specific amount
+   - "adjust downpayment" → Calculate 30% and offer specific amount
    - "what cities?" → Provide examples and ask which one
    - "yes" → Understand what they're confirming from context
    - Questions → Answer directly, then ask for confirmation
 
 ENTITY UPDATE RULES:
 - Only update entities when user explicitly confirms or provides new info
-- If user says "adjust downpayment", calculate required 25% minimum and update down_payment
+- If user says "adjust downpayment", calculate required 30% minimum and update down_payment
 - If user asks "what if I put 300k?", treat as exploratory (don't update entities)
 - If user says "yes" to a proposal, extract the values from the assistant's proposal
 - Preserve existing entities unless explicitly changed
@@ -554,10 +583,14 @@ ENTITY UPDATE RULES:
 RESPONSE RULES:
 - Be conversational and helpful
 - Answer questions directly before asking next question  
-- Use confirmation protocol: Answer → Confirm → Proceed
-- Handle calculations naturally (25% down payment for foreign nationals)"""
+- When user provides info, acknowledge it and move to next question
+- NO confirmation needed during collection phase
+- ONLY confirm once: After all 8 pieces collected, summarize everything
+- Check 30% down payment rule BEFORE saying "qualified"
+- Handle calculations naturally (30% down payment for foreign nationals)"""
 
     try:
+        start_time = time.time()
         response = client.chat.completions.create(
             model=WORKING_MODEL,
             messages=[
@@ -568,6 +601,7 @@ RESPONSE RULES:
             tool_choice={"type": "function", "function": {"name": "process_mortgage_conversation"}},
             temperature=0.7
         )
+        extraction_time = time.time() - start_time
         
         tool_calls = response.choices[0].message.tool_calls
         if tool_calls and tool_calls[0].function.arguments:
@@ -579,6 +613,10 @@ RESPONSE RULES:
             # Merge with persistent entities (updated entities override persistent ones)
             final_entities = persistent_entities.copy()
             final_entities.update(updated_entities)
+            
+            # Log extraction details that watch_logs.py expects
+            user_message = messages[-1]["content"] if messages else ""
+            log_extraction_details("unified_llm", user_message, updated_entities, extraction_time)
             
             print(f">>> [UNIFIED LLM] Response: {response_text[:80]}...")
             print(f">>> [UNIFIED LLM] Entity updates: {updated_entities}")
@@ -1508,6 +1546,14 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
     
     # Use new unified LLM approach - no separate entity extraction
     logger.log("[RESPONSE_SOURCE] Calling unified LLM function", 'INFO')
+    entities_before = persistent_confirmed_entities.copy() if persistent_confirmed_entities else {}
     response, entities = generate_response_and_update_entities(messages, persistent_confirmed_entities or {})
     logger.log(f"[RESPONSE_SOURCE] Unified LLM response: {response[:80]}...", 'INFO')
+    
+    # Log conversation flow details that watch_logs.py expects
+    log_conversation_flow(last_user_message, response, entities_before, entities, {
+        "model": WORKING_MODEL,
+        "processing_time": timing.checkpoints[-1]['elapsed_seconds'] if timing.checkpoints else 0
+    })
+    
     return response, entities

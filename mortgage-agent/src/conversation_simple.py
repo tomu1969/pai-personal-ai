@@ -23,7 +23,13 @@ from .enhanced_logging import (
     log_entity_state,
     log_conversation_state,
     log_api_metrics,
-    check_environment
+    check_environment,
+    TimingTracker,
+    log_extraction_details,
+    log_conversation_flow,
+    log_failure_point,
+    log_entity_validation,
+    validate_entities
 )
 
 # Database functions
@@ -143,6 +149,7 @@ def validate_response_against_state(response: str, all_entities: Dict[str, Any],
     # GUARDRAIL 3: Enforce confirmation protocol - don't combine confirmation with next question
     user_msg_lower = last_user_message.lower().strip()
     is_user_exploring = any(phrase in user_msg_lower for phrase in ['what if', 'how much would', 'can you calculate', 'what about', 'suppose'])
+    is_asking_for_options = 'options' in user_msg_lower
     
     if is_user_exploring:
         # User is exploring options - response should ask for confirmation, not jump to next topic
@@ -154,6 +161,14 @@ def validate_response_against_state(response: str, all_entities: Dict[str, Any],
         
         if has_next_topic and not has_confirmation:
             violations.append("Jumping to next topic without confirmation after user exploration")
+    
+    # GUARDRAIL 3B: Handle location options requests
+    if is_asking_for_options:
+        # Check what was asked in the previous assistant message to understand context
+        if any(phrase in messages[-2]["content"].lower() for phrase in ['location', 'city', 'state']) if len(messages) >= 2 else False:
+            # User is asking for location options, not property options
+            if any(phrase in response_lower for phrase in ['property price', 'down payment', 'price you']):
+                violations.append("Misunderstanding location options request as property question")
     
     # GUARDRAIL 4: Consistency checks
     if 'down payment' in response_lower and 'property price' in response_lower:
@@ -194,8 +209,13 @@ def generate_corrected_response(all_entities: Dict[str, Any], last_user_message:
     # Handle user exploration/questions first
     is_exploring = any(phrase in user_msg_lower for phrase in ['what if', 'how much would', 'can you calculate', 'what about', 'suppose'])
     is_simple_confirmation = user_msg_lower in ['ok yes', 'yes', 'sure', 'ok', 'sounds good', 'that works']
+    is_asking_location_options = 'options' in user_msg_lower and not all_entities.get('property_city')
     
-    if is_exploring:
+    if is_asking_location_options:
+        # User is asking for location options specifically
+        return "For foreign nationals, popular locations include states with no income tax (Florida, Texas, Nevada) or major cities with strong rental markets (Miami, Austin, Las Vegas). Which location interests you?"
+    
+    elif is_exploring:
         # User is exploring - provide answer and ask for confirmation
         if all_entities.get('down_payment') and all_entities.get('property_price'):
             down_payment = all_entities['down_payment']
@@ -230,269 +250,354 @@ def generate_corrected_response(all_entities: Dict[str, Any], last_user_message:
             else:
                 return f"Unfortunately, you don't qualify at this time. {qualification.get('reason', 'Please review the requirements.')}"
     
-    # Default: Ask next missing question
-    if 'Down payment amount: Not provided' in missing_context:
+    # Default: Ask next missing question based on priority order
+    # Check what's missing by looking at the actual entities, not the context string
+    if not all_entities.get('down_payment'):
         return "How much can you put down?"
-    elif 'Property price: Not provided' in missing_context:
+    elif not all_entities.get('property_price'):
         return "What's the property price you're considering?"
-    elif 'Property purpose: Not provided' in missing_context:
+    elif not all_entities.get('loan_purpose'):
+        # Before asking for loan purpose, check if down payment is sufficient
+        down_payment = all_entities.get('down_payment', 0)
+        property_price = all_entities.get('property_price', 0)
+        
+        if down_payment and property_price:
+            down_pct = (down_payment / property_price) * 100
+            if down_pct < 25:
+                required_down = property_price * 0.25
+                return f"Your ${down_payment:,} down payment is {down_pct:.1f}% of the ${property_price:,} property. Foreign nationals need 25% minimum (${required_down:,}). Would you like to increase your down payment or lower the property price?"
+        
         return "What's the property purpose: primary residence, second home, or investment?"
+    elif not all_entities.get('property_city') or not all_entities.get('property_state'):
+        # Handle user asking for location options
+        if 'options' in last_user_message.lower():
+            return "For foreign nationals, popular locations include states with no income tax (Florida, Texas, Nevada) or major cities with strong rental markets (Miami, Austin, Las Vegas). Which location interests you?"
+        return "What city and state is the property in?"
+    elif all_entities.get('has_valid_passport') is None:
+        return "Do you have a valid passport?"
+    elif all_entities.get('has_valid_visa') is None:
+        return "Do you have a valid U.S. visa?"
+    elif all_entities.get('can_demonstrate_income') is None:
+        return "Can you demonstrate income with bank statements or tax returns?"
+    elif all_entities.get('has_reserves') is None:
+        return "Do you have 6-12 months of payments saved in reserves?"
     else:
-        return "What other information can you provide to help with your pre-qualification?"
+        # All information collected - check qualification
+        qualification = calculate_qualification(all_entities)
+        if qualification.get('qualified', False):
+            return "Based on your information, you appear to pre-qualify! I'll connect you with a loan officer to proceed."
+        else:
+            return f"Unfortunately, you don't qualify at this time. {qualification.get('reason', 'Please review the requirements.')}"
 
 
-# Master system prompt for natural conversation flow
-MASTER_SYSTEM_PROMPT = """You are a mortgage pre-qualification assistant specializing in foreign national loans.
+# Load system prompt from external markdown file
+def load_system_prompt():
+    """Load system prompt from markdown file"""
+    prompt_path = os.path.join(os.path.dirname(__file__), '..', 'new_system_prompt.md')
+    try:
+        with open(prompt_path, 'r') as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        print(f"Error: System prompt file not found at {prompt_path}")
+        # Fallback to a basic prompt
+        return "You are a mortgage pre-qualification assistant for foreign nationals."
 
-Your mission: Pre-qualify users by collecting these 8 pieces of information:
-1. Down payment amount 
-2. Property price 
-3. Property purpose: primary residence, second home, or investment
-4. Property location (city and state)
-5. Valid passport status
-6. Valid U.S. visa status  
-7. Income documentation capability
-8. Financial reserves (6-12 months of payments saved)
-
-CONVERSATION RULES:
-- If user asks a question, answer it directly BEFORE asking the next question
-- If user changes their requirements (down payment/property price), acknowledge the change and update
-- Provide specific examples when user asks "what type" or "how much"
-- Don't rush to qualification if user is still exploring or has pending questions
-- Be direct, professional, and concise
-- Ask one question at a time in logical order
-
-CRITICAL: DOWN PAYMENT VALIDATION RULES:
-- NEVER validate down payment percentage until you have BOTH down payment AND property price
-- Foreign nationals need 25% minimum down payment, but this can only be calculated with both values
-- If user provides down payment but no property price, ask for property price next
-- Only after having both values, check if down payment ≥ 25% of property price
-- If insufficient, ask user to adjust EITHER down payment up OR property price down
-
-CONFIRMATION PROTOCOL (CRITICAL):
-- After answering ANY question from the user, ask for confirmation
-- NEVER move to the next qualification topic without confirming the user's choice
-- When multiple options are discussed, explicitly ask which one to proceed with
-- Pattern: Answer → Confirm → Proceed
-
-Response Examples:
-- User asks "how much for 2M?" → Calculate, then ask "Would you like to proceed with $2M and $500k down?"
-- User says "what if I put 300k?" → Calculate, then ask "Should I update your down payment to $300k?"
-- User asks "what visas are admissible?" → List visas, then ask "Do you have one of these visas?"
-- User explores multiple options → Present options, ask "Which option works best for you?"
-
-NEVER combine confirmation with next question. Keep them separate:
-❌ Wrong: "Would you like $2M? What's the property purpose?"
-❌ Wrong: "Is this correct? Next, what's the location?"
-❌ Wrong: "Would you like to proceed with this? If so, what's the property purpose?"
-❌ Wrong: "With $200k down, you can afford $800k maximum. What's the purpose of the property?"
-❌ Wrong: "Admissible visas include B1/B2, E-2, H-1B. Do you have income documentation?"
-✅ Right: "Would you like to proceed with $2M and $500k down?"
-[Wait for answer]
-✅ Then: "Great! What's the property purpose?"
-✅ Right: "Admissible visas include B1/B2, E-2, H-1B. Do you have one of these visas?"
-[Wait for answer]
-✅ Then: "Great! Can you demonstrate income with bank statements or tax returns?"
-
-CONFIRMATION MODE RULES (STRICTLY ENFORCED):
-- When asking for confirmation after exploratory questions, ask ONLY the confirmation question
-- ABSOLUTELY DO NOT ask about property purpose, location, passport, visa, income, or reserves
-- Keep confirmation questions under 20 words
-- Wait for user response before asking the next question
-- If you catch yourself starting to ask about qualification topics, STOP and ask only for confirmation
-
-EDUCATIONAL RESPONSES:
-- Documentation types: "Bank statements, tax returns, employment letters, or business financials work well."
-- Down payment requirements: Always 25% minimum for foreign nationals
-
-RESERVE CALCULATION (CRITICAL - AVOID MAGNITUDE ERRORS):
-- For reserves, calculate using loan amount (NOT property price)
-- Monthly payment ≈ (loan amount × 0.005) for 30-year mortgage estimation
-- Loan amount = property price - down payment
-- Reserves needed = monthly payment × 6-12 months
-- IMPORTANT: $1,000,000 = $1M = one million dollars (NOT billion)
-- Example: $1M property with $250k down = $750k loan → $750,000 × 0.005 = $3,750/month → $22,500-$45,000 reserves
-
-NUMBER FORMATTING (CRITICAL - PREVENT MAGNITUDE ERRORS):
-- $1,000,000 = $1M = one million dollars (NEVER say $1B or billion)
-- $750,000 = $750k = seven hundred fifty thousand dollars
-- Always use full numbers in calculations to avoid confusion
-- When showing results, format as: $1,000,000 or $1M (never just "1")
-
-LOAN CALCULATIONS:
-- Foreign nationals need 25% minimum down payment (75% max LTV)
-- Max property price = down payment ÷ 0.25
-- Max loan amount = max property price - down payment
-- When user wants higher property price, calculate new required down payment
-- Example: "For a $1M property, you need $250k down (25%). What's your actual down payment?"
-
-QUALIFICATION RULES:
-- Only qualify when ALL 8 pieces collected AND user has no pending questions
-- If down payment insufficient for desired property price, guide them to correct amount
-- Provide helpful rejection explanations with next steps"""
+# Load the system prompt at module level
+MASTER_SYSTEM_PROMPT = load_system_prompt()
 
 
-def extract_entities(messages: List[Dict[str, str]]) -> Dict[str, Any]:
+def handle_context_aware_response(user_question: str, user_message: str, entities: Dict[str, Any]) -> str:
     """
-    Extract mortgage-related entities from conversation using OpenAI function calling.
+    Handle context-aware responses for user help requests and clarification needs.
+    
+    Args:
+        user_question: The question/request extracted from user's message
+        user_message: The full user message
+        entities: Current conversation entities
+    
+    Returns:
+        Context-appropriate response or None if not handled
+    """
+    user_msg_lower = user_message.lower().strip()
+    question_lower = user_question.lower() if user_question else ""
+    
+    
+    # Location options/suggestions
+    if any(phrase in user_msg_lower for phrase in ["want options", "give me options", "i want choices", "what cities", "examples", "suggestions"]):
+        # Check if we're asking for location
+        missing_location = not entities.get("property_city") or not entities.get("property_state")
+        
+        if missing_location:
+            # If state is provided, suggest cities in that state
+            state = entities.get("property_state", "").upper()
+            if state == "FL" or state == "FLORIDA":
+                return "Popular Florida cities include Miami, Orlando, Tampa, Jacksonville, Fort Lauderdale, and Gainesville. Please provide the city and state like 'Miami, Florida'."
+            elif state == "CA" or state == "CALIFORNIA":
+                return "Popular California cities include Los Angeles, San Francisco, San Diego, Sacramento, and San Jose. Please provide the city and state like 'Los Angeles, California'."
+            elif state == "NY" or state == "NEW YORK":
+                return "Popular New York cities include New York City, Buffalo, Rochester, Syracuse, and Albany. Please provide the city and state like 'New York, NY'."
+            elif state == "TX" or state == "TEXAS":
+                return "Popular Texas cities include Houston, Dallas, Austin, San Antonio, and Fort Worth. Please provide the city and state like 'Austin, Texas'."
+            else:
+                return "Please provide the city and state where the property is located. For example: 'Miami, Florida' or 'Austin, Texas'."
+        
+    # Partial location handling - if only state provided, ask for city specifically  
+    if entities.get("property_state") and not entities.get("property_city"):
+        state = entities.get("property_state", "").upper()
+        if user_msg_lower in ["fl", "florida"]:
+            return "Thank you for specifying Florida. Which city in Florida? For example: Miami, Orlando, Tampa, or Jacksonville?"
+        elif state:
+            return f"Thank you for specifying {state}. Which city in {state} is the property located?"
+    
+    # Help with incomplete location
+    if any(phrase in user_msg_lower for phrase in ["i don't know", "not sure", "help"]) and not entities.get("property_city"):
+        return "For the property location, I need both city and state. Popular examples: 'Miami, Florida', 'Austin, Texas', 'Los Angeles, California'. What city and state?"
+    
+    return None
+
+
+def handle_down_payment_adjustment(entities: Dict[str, Any]) -> str:
+    """
+    Handle user requests to adjust down payment for foreign national requirements.
+    
+    Args:
+        entities: Current conversation entities
+    
+    Returns:
+        Helpful response with calculated adjustment or None if not applicable
+    """
+    down_payment = entities.get("down_payment")
+    property_price = entities.get("property_price")
+    
+    if not down_payment or not property_price:
+        return None
+    
+    # Calculate current percentage and required amount
+    current_percentage = (down_payment / property_price) * 100
+    required_down_payment = property_price * 0.25  # 25% minimum
+    
+    # Only handle if currently below 25%
+    if current_percentage >= 25:
+        return None
+    
+    # Calculate the adjustment needed
+    adjustment_needed = required_down_payment - down_payment
+    
+    return f"To meet the 25% minimum for foreign nationals, you'll need ${required_down_payment:,.0f} down payment (currently ${down_payment:,.0f}). That's an increase of ${adjustment_needed:,.0f}. Would you like to proceed with ${required_down_payment:,.0f} down, or would you prefer to lower the property price?"
+
+
+def generate_next_question_from_context(entities: Dict[str, Any]) -> str:
+    """
+    Generate the next appropriate question based on missing entities and context.
+    
+    Args:
+        entities: Current conversation entities
+    
+    Returns:
+        Appropriate next question to ask the user
+    """
+    
+    # Handle multiple city options case
+    if 'property_city_options' in entities and entities['property_city_options']:
+        cities = entities['property_city_options']
+        if len(cities) == 2:
+            return f"Would you prefer {cities[0]} or {cities[1]} for your investment property?"
+        else:
+            city_list = ", ".join(cities[:-1]) + f", or {cities[-1]}"
+            return f"Which city would you prefer: {city_list}?"
+    
+    # Normal question sequence based on missing entities
+    if not entities.get('down_payment'):
+        return "How much can you put down?"
+    elif not entities.get('property_price'):
+        return "What's the property price you're considering?"
+    elif not entities.get('loan_purpose'):
+        # Check if down payment is sufficient first
+        down_payment = entities.get('down_payment', 0)
+        property_price = entities.get('property_price', 0)
+        
+        if down_payment and property_price:
+            down_pct = (down_payment / property_price) * 100
+            if down_pct < 25:
+                required_down = property_price * 0.25
+                return f"Your ${down_payment:,} down payment is {down_pct:.1f}% of the ${property_price:,} property. Foreign nationals need 25% minimum (${required_down:,}). Would you like to increase your down payment or lower the property price?"
+        
+        return "What's the property purpose: primary residence, second home, or investment?"
+    elif not entities.get('property_city') or not entities.get('property_state'):
+        return "What city and state is the property in?"
+    elif entities.get('has_valid_passport') is None:
+        return "Do you have a valid passport?"
+    elif entities.get('has_valid_visa') is None:
+        return "Do you have a valid U.S. visa?"
+    elif entities.get('can_demonstrate_income') is None:
+        return "Can you demonstrate income with bank statements or tax returns?"
+    elif entities.get('has_reserves') is None:
+        return "Do you have 6-12 months of payments saved in reserves?"
+    else:
+        return "Based on your information, let me check your qualification status..."
+
+
+def validate_extracted_values(extracted: Dict[str, Any], latest_message: str) -> Dict[str, Any]:
+    """
+    Validate extracted values for reasonableness and context appropriateness.
+    
+    Args:
+        extracted: Dictionary of extracted entities
+        latest_message: Original user message for context
+    
+    Returns:
+        Validated extracted entities with unrealistic values removed
+    """
+    validated = extracted.copy()
+    
+    # Validate down payment amount
+    if 'down_payment' in validated and validated['down_payment'] is not None:
+        down_payment = validated['down_payment']
+        
+        # Reject unreasonably low amounts (likely extraction errors)
+        if down_payment < 10000:  # Less than $10k is unrealistic for foreign national mortgages
+            print(f">>> [VALIDATION] Rejected unrealistic down_payment: ${down_payment:,} from '{latest_message}'")
+            del validated['down_payment']
+        elif down_payment > 10000000:  # More than $10M is extremely high
+            print(f">>> [VALIDATION] Rejected extremely high down_payment: ${down_payment:,} from '{latest_message}'")
+            del validated['down_payment']
+        else:
+            print(f">>> [VALIDATION] Accepted down_payment: ${down_payment:,}")
+    
+    # Validate property price
+    if 'property_price' in validated and validated['property_price'] is not None:
+        property_price = validated['property_price']
+        
+        # Reject unreasonably low amounts
+        if property_price < 50000:  # Less than $50k is unrealistic
+            print(f">>> [VALIDATION] Rejected unrealistic property_price: ${property_price:,} from '{latest_message}'")
+            del validated['property_price']
+        elif property_price > 50000000:  # More than $50M is extremely high
+            print(f">>> [VALIDATION] Rejected extremely high property_price: ${property_price:,} from '{latest_message}'")
+            del validated['property_price']
+        else:
+            print(f">>> [VALIDATION] Accepted property_price: ${property_price:,}")
+    
+    return validated
+
+
+def generate_response_and_update_entities(messages: List[Dict[str, str]], persistent_entities: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
+    """
+    Pure LLM-based conversation processing that both generates response AND updates entities.
+    No regex, no pattern matching - just natural language understanding.
     
     Args:
         messages: Full conversation history
+        persistent_entities: Previously confirmed entities
     
     Returns:
-        Dictionary of extracted entities
+        Tuple of (response_text, updated_entities)
     """
     
-    # Get the latest user message
-    user_messages = [m for m in messages if m["role"] == "user"]
-    if not user_messages:
-        return {}
-    
-    latest_message = user_messages[-1]["content"]
-    
-    # Function definition for entity extraction
-    extraction_function = {
-        "name": "extract_mortgage_entities",
-        "description": "Extract mortgage-related information from user message",
+    # Function for the LLM to both respond and update entities
+    conversation_function = {
+        "name": "process_mortgage_conversation",
+        "description": "Process user message and respond naturally while updating entity state",
         "parameters": {
             "type": "object",
             "properties": {
-                "down_payment": {
-                    "type": "number",
-                    "description": "Down payment amount in dollars"
-                },
-                "property_price": {
-                    "type": "number", 
-                    "description": "Property price in dollars"
-                },
-                "loan_purpose": {
+                "response": {
                     "type": "string",
-                    "enum": ["personal", "second", "investment"],
-                    "description": "Property purpose: personal=primary residence, second=second home, investment=investment property"
+                    "description": "Your natural response to the user"
                 },
-                "property_city": {
-                    "type": "string",
-                    "description": "City where property is located"
-                },
-                "property_state": {
-                    "type": "string",
-                    "description": "State where property is located (2-letter code)"
-                },
-                "has_valid_passport": {
-                    "type": "boolean",
-                    "description": "Whether user has valid passport"
-                },
-                "has_valid_visa": {
-                    "type": "boolean", 
-                    "description": "Whether user has valid U.S. visa"
-                },
-                "can_demonstrate_income": {
-                    "type": "boolean",
-                    "description": "Whether user can provide income documentation"
-                },
-                "has_reserves": {
-                    "type": "boolean",
-                    "description": "Whether user has 6-12 months of reserves saved"
-                },
-                "user_question": {
-                    "type": "string",
-                    "description": "Any question the user asked that needs an answer (e.g., 'what type of documentation?', 'how much would that be?')"
-                },
-                "needs_clarification": {
-                    "type": "boolean",
-                    "description": "True if user is asking questions or seems uncertain about requirements"
-                },
-                "updated_down_payment": {
-                    "type": "number",
-                    "description": "New down payment amount if user is adjusting their requirements"
-                },
-                "updated_property_price": {
-                    "type": "number",
-                    "description": "New property price if user is exploring different options"
+                "updated_entities": {
+                    "type": "object",
+                    "properties": {
+                        "down_payment": {"type": "number", "description": "Down payment amount in dollars"},
+                        "property_price": {"type": "number", "description": "Property price in dollars"},
+                        "loan_purpose": {"type": "string", "enum": ["primary_residence", "second_home", "investment"], "description": "Property purpose"},
+                        "property_city": {"type": "string", "description": "Property city"},
+                        "property_state": {"type": "string", "description": "Property state (2-letter code)"},
+                        "has_valid_passport": {"type": "boolean", "description": "Valid passport status"},
+                        "has_valid_visa": {"type": "boolean", "description": "Valid U.S. visa status"},
+                        "can_demonstrate_income": {"type": "boolean", "description": "Can provide income documentation"},
+                        "has_reserves": {"type": "boolean", "description": "Has 6-12 months reserves saved"}
+                    },
+                    "description": "Updated entities based on conversation (only include entities that are confirmed or changed)"
                 }
             },
+            "required": ["response", "updated_entities"],
             "additionalProperties": False
         }
     }
     
+    # Build conversation context for the LLM
+    conversation_history = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in messages])
+    
+    system_prompt = f"""{MASTER_SYSTEM_PROMPT}
+
+CURRENT CONFIRMED ENTITIES:
+{json.dumps(persistent_entities, indent=2)}
+
+INSTRUCTIONS:
+1. Read the conversation and understand what the user just said
+2. Generate a natural, helpful response 
+3. Update entities ONLY if the user confirms or provides new information
+4. Handle ALL scenarios naturally:
+   - "adjust downpayment" → Calculate 25% and offer specific amount
+   - "what cities?" → Provide examples and ask which one
+   - "yes" → Understand what they're confirming from context
+   - Questions → Answer directly, then ask for confirmation
+
+ENTITY UPDATE RULES:
+- Only update entities when user explicitly confirms or provides new info
+- If user says "adjust downpayment", calculate required 25% minimum and update down_payment
+- If user asks "what if I put 300k?", treat as exploratory (don't update entities)
+- If user says "yes" to a proposal, extract the values from the assistant's proposal
+- Preserve existing entities unless explicitly changed
+
+RESPONSE RULES:
+- Be conversational and helpful
+- Answer questions directly before asking next question  
+- Use confirmation protocol: Answer → Confirm → Proceed
+- Handle calculations naturally (25% down payment for foreign nationals)"""
+
     try:
         response = client.chat.completions.create(
             model=WORKING_MODEL,
             messages=[
-                {"role": "system", "content": """Extract mortgage information from the user's message only if entities are present. Apply intelligent inference:
-
-IMPORTANT: Only call the function if there are actual entities to extract. For pure clarification questions like "what do you mean by status?", don't call the function.
-
-ENTITY EXTRACTION:
-- When a well-known US city is mentioned, automatically include the state (e.g., Miami→FL, NYC→NY, Los Angeles→CA, etc.)
-- Extract both explicit and reasonably implied information
-- Use common knowledge for geographic relationships
-
-QUESTION DETECTION:
-- If user asks ANY question (contains ?, "what", "how", "which", "when", "where", "why"), extract it as user_question
-- Common questions: "what type of documentation?", "how much would that be?", "which documents are good?"
-- Set needs_clarification=true if user is asking questions or seems uncertain
-
-EXPLORATORY LANGUAGE DETECTION:
-- Detect exploratory phrases: "what if", "how much would", "can you calculate", "what about", "suppose I"
-- These indicate user is exploring options, not committing to changes
-- Always set needs_clarification=true for exploratory language
-- Examples: "what if I put down 300k?" "how much would I need for 2M?" "can you calculate for 1.5M?"
-
-ENTITY UPDATES:
-- If user mentions a different down payment amount, extract as updated_down_payment
-- If user mentions a different property price, extract as updated_property_price
-- Detect phrases like "i'd like to buy a 1m property" or "what if I put down 300k"
-
-REJECTION HANDLING:
-- If user says "no" to a question about updating values, DO NOT extract any updated amounts
-- "no, keep my original" → NO extraction of updated_down_payment or updated_property_price
-- "no, that's too much" → NO extraction of updated amounts
-- Only extract amounts when user actually provides new specific numbers
-
-EXAMPLES:
-- "what type of documentation is good?" → user_question="what type of documentation is good?", needs_clarification=true
-- "how much would that be?" → user_question="how much would that be?", needs_clarification=true  
-- "i'd like to buy a 1m property" → updated_property_price=1000000
-- "what if I put down 300k" → updated_down_payment=300000
-- "no, keep my original" → NO extraction of updated amounts"""},
-                {"role": "user", "content": f"Extract entities from: '{latest_message}'"}
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"CONVERSATION:\n{conversation_history}\n\nProcess the latest user message and respond naturally."}
             ],
-            tools=[{"type": "function", "function": extraction_function}],
-            tool_choice="auto",  # Changed from forced to auto - prevents crashes on clarification questions
-            temperature=1
+            tools=[{"type": "function", "function": conversation_function}],
+            tool_choice={"type": "function", "function": {"name": "process_mortgage_conversation"}},
+            temperature=0.7
         )
         
-        # Handle both function call and regular responses
         tool_calls = response.choices[0].message.tool_calls
-        extracted = {}
         if tool_calls and tool_calls[0].function.arguments:
-            extracted = json.loads(tool_calls[0].function.arguments)
-        else:
-            # No function call - indicates no entities were found (which is normal for clarification questions)
-            extracted = {}
+            result = json.loads(tool_calls[0].function.arguments)
+            
+            response_text = result.get("response", "I understand. Let me help you with your mortgage needs.")
+            updated_entities = result.get("updated_entities", {})
+            
+            # Merge with persistent entities (updated entities override persistent ones)
+            final_entities = persistent_entities.copy()
+            final_entities.update(updated_entities)
+            
+            print(f">>> [UNIFIED LLM] Response: {response_text[:80]}...")
+            print(f">>> [UNIFIED LLM] Entity updates: {updated_entities}")
+            print(f">>> [UNIFIED LLM] Final entities: {final_entities}")
+            
+            logger.log(f"[RESPONSE_SOURCE] Unified LLM generated response successfully", 'INFO')
+            return response_text, final_entities
         
-        # Post-process: Handle percentage inputs for down payment
-        extracted = handle_percentage_inputs(latest_message, extracted, messages)
-        
-        # Post-process: Improve location extraction (only in location context)
-        if is_location_context(messages):
-            print(f">>> [CONTEXT] Location context detected - running extraction")
-            extracted = enhance_location_extraction(latest_message, extracted)
-        else:
-            print(f">>> [CONTEXT] No location context - skipping extraction")
-        
-        return extracted
-    
     except Exception as e:
-        print(f"Entity extraction error: {e}")
+        print(f"Unified LLM processing error: {e}")
+        return "I understand. Let me help you with your mortgage needs.", persistent_entities
     
-    return {}
+    return "I understand. Let me help you with your mortgage needs.", persistent_entities
 
 
 def handle_percentage_inputs(latest_message: str, extracted: Dict[str, Any], messages: List[Dict[str, str]]) -> Dict[str, Any]:
     """
     Handle percentage inputs for down payment by converting them to dollar amounts.
+    Now uses LLM-based extraction only, no regex.
     
     Args:
         latest_message: The user's current message
@@ -502,41 +607,15 @@ def handle_percentage_inputs(latest_message: str, extracted: Dict[str, Any], mes
     Returns:
         Updated extracted entities with percentage converted to dollars
     """
-    import re
     
-    # Check if user mentioned a percentage
-    percentage_match = re.search(r'(\d+(?:\.\d+)?)\s*%', latest_message)
-    if not percentage_match:
+    # Simple check for percentage symbol - if not present, skip
+    if '%' not in latest_message:
         return extracted
     
-    percentage_value = float(percentage_match.group(1))
-    print(f">>> [PERCENTAGE] Detected {percentage_value}% in user input")
+    print(f">>> [PERCENTAGE] Detected percentage symbol in user input - relying on LLM extraction")
     
-    # Find property price from conversation history or current extraction
-    property_price = None
-    
-    # First check if property price is in current extraction
-    if 'property_price' in extracted and extracted['property_price']:
-        property_price = extracted['property_price']
-    else:
-        # Look through conversation history for property price
-        temp_messages = []
-        for msg in messages:
-            temp_messages.append(msg)
-            if msg["role"] == "user":
-                temp_extracted = extract_entities_basic(temp_messages)
-                if 'property_price' in temp_extracted and temp_extracted['property_price']:
-                    property_price = temp_extracted['property_price']
-                    break
-    
-    if property_price:
-        # Convert percentage to dollar amount
-        dollar_amount = property_price * (percentage_value / 100)
-        extracted['down_payment'] = dollar_amount
-        print(f">>> [PERCENTAGE] Converted {percentage_value}% of ${property_price:,} = ${dollar_amount:,}")
-    else:
-        print(f">>> [PERCENTAGE] Cannot convert {percentage_value}% - no property price available")
-    
+    # Let the LLM handle percentage conversion through the main extraction
+    # The system prompt already instructs the LLM to handle percentages contextually
     return extracted
 
 
@@ -616,6 +695,24 @@ def enhance_location_extraction(latest_message: str, extracted: Dict[str, Any]) 
     }
     
     message_lower = latest_message.lower().strip()
+    
+    # ENHANCED: Handle multiple city options like "miami or orlando"
+    or_patterns = ['or', 'vs', 'versus', 'and', ',']
+    for pattern in or_patterns:
+        if pattern in message_lower:
+            cities_mentioned = []
+            for city_name, state_code in CITY_STATE_MAPPING.items():
+                if city_name in message_lower:
+                    cities_mentioned.append((city_name.title(), state_code))
+            
+            if len(cities_mentioned) >= 2:
+                # User mentioned multiple cities - need clarification
+                city_names = [city for city, state in cities_mentioned]
+                print(f">>> [LOCATION] Multiple cities detected: {city_names}")
+                # Store a special marker to indicate multiple options
+                extracted['property_city_options'] = city_names
+                extracted['property_state'] = cities_mentioned[0][1]  # Use first state as default
+                return extracted
     
     # Skip location extraction for clarification questions or non-location contexts
     clarification_patterns = [
@@ -724,44 +821,9 @@ def enhance_location_extraction(latest_message: str, extracted: Dict[str, Any]) 
     return extracted
 
 
-def extract_entities_basic(messages: List[Dict[str, str]]) -> Dict[str, Any]:
-    """
-    Basic entity extraction without percentage handling to avoid recursion.
-    Used internally by handle_percentage_inputs.
-    """
-    user_messages = [m for m in messages if m["role"] == "user"]
-    if not user_messages:
-        return {}
-    
-    latest_message = user_messages[-1]["content"]
-    
-    # Simple regex-based extraction for property price
-    property_price_patterns = [
-        r'\$(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*(?:k|thousand)',  # $500k
-        r'(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*k',                # 500k
-        r'\$(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*(?:m|million)',  # $1m
-        r'(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*(?:m|million)',    # 1 million
-        r'\$(\d{1,3}(?:,\d{3})*(?:\.\d+)?)',                  # $500000
-        r'(\d{3,})'                                           # 500000
-    ]
-    
-    for pattern in property_price_patterns:
-        match = re.search(pattern, latest_message.lower())
-        if match:
-            amount_str = match.group(1).replace(',', '')
-            amount = float(amount_str)
-            
-            # Apply multipliers
-            if 'k' in latest_message.lower() or 'thousand' in latest_message.lower():
-                amount *= 1000
-            elif 'm' in latest_message.lower() or 'million' in latest_message.lower():
-                amount *= 1000000
-            
-            # Only consider amounts that could be property prices (>= $50k)
-            if amount >= 50000:
-                return {'property_price': amount}
-    
-    return {}
+# extract_entities_basic function removed - replaced with pure LLM-based extraction
+
+
 
 
 def get_missing_information_context(filled_entities: Dict[str, Any]) -> str:
@@ -1117,6 +1179,9 @@ COMPOUND RESPONSE ANALYSIS:
 
 CONTEXT UNDERSTANDING:
 - Look at the assistant's previous message to understand what the user is responding to
+- CRITICAL: Only extract values that match what the assistant was asking for
+- If assistant asked about "property purpose" but user gives a number like "500k", do NOT extract as property_price
+- If assistant asked about "property price" but user gives non-numeric response, do NOT extract as property_price
 - Determine if the user is confirming, rejecting, or providing new information
 - Extract both explicit values and contextual confirmations
 - Handle compound responses that combine confirmation with adjustment requests
@@ -1140,14 +1205,26 @@ VALUE EXTRACTION FROM CONTEXT:
 - Handle formats: $250k, $250,000, 1M, etc.
 - For compound responses, still extract base values but note adjustment needed
 
+QUESTION-RESPONSE MATCHING:
+- If assistant asks "property purpose" and user says "500k" → this is a confused response, extract nothing
+- If assistant asks "property price" and user says "investment" → this is a confused response, extract nothing  
+- If assistant asks "down payment" and user says "primary residence" → this is a confused response, extract nothing
+- Only extract values when the user's response type matches what was asked
+
+META RESPONSES (HELP REQUESTS):
+- "i want options", "give me options", "what are my choices" → user_question, needs_clarification=true
+- "examples", "suggestions", "help", "what cities" → user_question, needs_clarification=true
+- "I don't know", "not sure", "what do you recommend" → needs_clarification=true
+- These are NOT direct answers - they are requests for help or clarification
+- Do NOT extract entity values from meta responses - preserve existing entities
+
 EXAMPLES:
 Assistant: "Should we proceed with $1M property and $250k down?"
 User: "yes" → positive confirmation of both values (extract 1000000 for property_price, 250000 for down_payment)
 User: "yes but make it 300k down" → positive confirmation of property, update down payment to 300000
 User: "yes adjust" → positive confirmation, but flag that user wants to make changes
 User: "actually I want 2M" → negative confirmation, new property price"""},
-                {"role": "user", "content": f"""
-ASSISTANT'S PREVIOUS MESSAGE: "{assistant_message}"
+                {"role": "user", "content": f"""ASSISTANT'S PREVIOUS MESSAGE: "{assistant_message}"
 
 USER'S RESPONSE: "{user_message}"
 
@@ -1209,8 +1286,14 @@ def analyze_conversation_history_batched(messages: List[Dict[str, str]], current
     # This prevents O(n²) complexity that was causing timeouts
     conversation_pairs = []
     
-    # Only analyze the last 6 messages (3 exchanges) to prevent exponential slowdown
-    recent_messages = messages[-6:] if len(messages) > 6 else messages
+    # Only analyze the last 12 messages (6 exchanges) to retain entity context longer
+    recent_messages = messages[-12:] if len(messages) > 12 else messages
+    
+    # Log sliding window details
+    logger.log(f"[BATCHED_WINDOW] Total messages: {len(messages)}, analyzing last {len(recent_messages)} messages", 'DEBUG')
+    if len(messages) > 12:
+        skipped_count = len(messages) - len(recent_messages)
+        logger.log(f"[BATCHED_WARNING] Skipping {skipped_count} older messages - may lose entity state!", 'WARNING')
     
     # Adjust indices for the sliding window
     offset = len(messages) - len(recent_messages)
@@ -1365,20 +1448,24 @@ Analyze each user message in the context of the assistant's previous message."""
 
 
 @log_function_call("process_conversation_turn")
-def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: str = None) -> str:
+def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: str = None, persistent_confirmed_entities: Dict[str, Any] = None) -> tuple[str, Dict[str, Any]]:
     """
     Process a single conversation turn using the simplified architecture.
     
     Args:
         messages: Full conversation history
+        conversation_id: Unique conversation identifier  
+        persistent_confirmed_entities: Confirmed entities from previous conversation turns
     
     Returns:
-        Assistant response
+        Tuple of (assistant_response, updated_confirmed_entities)
     """
     import time
     
+    # Initialize comprehensive timing tracker
+    timing = TimingTracker("conversation_turn")
+    
     # Initialize metrics tracking
-    start_time = time.time()
     api_call_count = 0
     total_tokens_used = 0
     cached_tokens_used = 0
@@ -1387,482 +1474,40 @@ def process_conversation_turn(messages: List[Dict[str, str]], conversation_id: s
     MAX_PROCESSING_TIME = 10.0  # seconds - well under Render's 30s limit
     
     def check_timeout():
-        elapsed = time.time() - start_time
+        elapsed = timing.checkpoints[-1]['elapsed_seconds'] if timing.checkpoints else 0
         if elapsed > MAX_PROCESSING_TIME:
             logger.log(f"Timeout protection triggered after {elapsed:.1f}s", 'WARNING')
             return True
         return False
     
-    # Log conversation state
+    # Log conversation state with detailed analysis
     log_conversation_state(messages, "Starting conversation processing")
+    timing.checkpoint("conversation_state_logged", {
+        "message_count": len(messages),
+        "conversation_id": conversation_id
+    })
     
     # Handle initial greeting
     assistant_messages = [m for m in messages if m["role"] == "assistant"]
     if len(assistant_messages) == 0:
         logger.log("No assistant messages - returning initial greeting", 'INFO')
-        return "I can help pre-qualify you for a mortgage with 8 questions. How much can you put down?"
+        initial_entities = persistent_confirmed_entities.copy() if persistent_confirmed_entities else {}
+        return "I can help pre-qualify you for a mortgage with 8 questions. How much can you put down?", initial_entities
     
     # Get the last user message and analyze it with LLM
     user_messages = [m for m in messages if m["role"] == "user"]
     last_user_message = user_messages[-1]["content"] if user_messages else ""
     last_assistant_content = assistant_messages[-1]["content"] if assistant_messages else ""
     
-    # FAST-PATH: Handle simple confirmations and property types without API calls to prevent timeouts
-    simple_confirmations = ["ok yes", "yes", "sure", "ok", "sounds good", "that works", "i agree"]
-    property_types = {
-        "investment": "investment",
-        "investment property": "investment", 
-        "rental": "investment",
-        "rental property": "investment",
-        "primary": "primary_residence",
-        "primary residence": "primary_residence",
-        "live in": "primary_residence",
-        "own home": "primary_residence",
-        "main home": "primary_residence",
-        "second home": "second_home",
-        "vacation": "second_home",
-        "vacation home": "second_home",
-        "holiday home": "second_home"
-    }
+    # Handle initial greeting case
+    assistant_messages = [m for m in messages if m["role"] == "assistant"]
+    if len(assistant_messages) == 0:
+        logger.log("[RESPONSE_SOURCE] Initial greeting - no LLM call needed", 'INFO')
+        initial_entities = persistent_confirmed_entities.copy() if persistent_confirmed_entities else {}
+        return "I can help pre-qualify you for a mortgage with 8 questions. How much can you put down?", initial_entities
     
-    user_msg_clean = last_user_message.lower().strip()
-    
-    # DEBUG: Log assistant message content for fast-path debugging
-    logger.log(f"Fast-path debug: user='{user_msg_clean}', assistant='{last_assistant_content[:50]}...'", 'DEBUG')
-    
-    # Fast-path for property purpose responses
-    property_purpose_patterns = [
-        "property purpose",
-        "property's purpose", 
-        "purpose of the property",
-        "property: primary residence"
-    ]
-    assistant_mentions_property_purpose = any(pattern in last_assistant_content.lower() for pattern in property_purpose_patterns)
-    
-    if assistant_mentions_property_purpose and user_msg_clean in property_types:
-        property_type = property_types[user_msg_clean]
-        logger.log(f"Fast-path: Property type '{user_msg_clean}' -> {property_type}", 'INFO')
-        
-        # Note: Property purpose will be saved later in the normal flow
-        
-        # Move to next question based on property type
-        if property_type == "investment":
-            return "Thanks! For investment properties, you'll typically need 20-25% down. Do you have good credit (score 700+)?"
-        else:
-            return "Perfect! Do you have good credit (score 700+)?"
-    
-    # Fast-path for simple confirmations
-    if user_msg_clean in simple_confirmations:
-        # Determine what was being confirmed based on assistant's last message
-        if "would you like to adjust" in last_assistant_content.lower():
-            logger.log("Fast-path: Simple confirmation to down payment adjustment", 'INFO')
-            return "Great! What's the property purpose: primary residence, second home, or investment?"
-        elif "minimum down payment" in last_assistant_content.lower():
-            logger.log("Fast-path: Simple confirmation to minimum down payment question", 'INFO')
-            return "Perfect! What's the property purpose: primary residence, second home, or investment?"
-        elif "property price" in last_assistant_content.lower():
-            logger.log("Fast-path: Simple confirmation to property price", 'INFO')
-            # Need to extract values for validation but can use fast logic
-            pass  # Fall through to normal processing for price validation
-        # Add more fast-path patterns as needed
-    
-    # UNIVERSAL FAST-PATH: Handle obvious entity values without heavy processing
-    obvious_values = {
-        # Credit scores
-        "excellent": {"credit_score": "excellent"},
-        "good": {"credit_score": "good"}, 
-        "fair": {"credit_score": "fair"},
-        "poor": {"credit_score": "poor"},
-        
-        # Income patterns (simple cases)
-        "unemployed": {"employment_status": "unemployed"},
-        "retired": {"employment_status": "retired"},
-        "self employed": {"employment_status": "self_employed"},
-        
-        # Simple yes/no for existing customers
-        "new customer": {"existing_customer": False},
-        "existing customer": {"existing_customer": True},
-        
-        # Other obvious answers
-        "no": {"generic_no": True},
-        "none": {"generic_none": True}
-    }
-    
-    if user_msg_clean in obvious_values:
-        entity_data = obvious_values[user_msg_clean]
-        logger.log(f"Fast-path: Obvious value '{user_msg_clean}' -> {entity_data}", 'INFO')
-        
-        # Note: Entity data will be saved later in the normal flow
-        
-        # Return appropriate response based on what was confirmed
-        if "credit_score" in entity_data:
-            return "Great! What's your approximate annual income?"
-        elif "employment_status" in entity_data:
-            return "Thanks for that information. What else would you like me to know?"
-        else:
-            return "I understand. What's the next piece of information you'd like to provide?"
-    
-    log_processing_step("Extracting basic entities")
-    # Extract basic entities first to provide context to LLM analysis
-    basic_entities = extract_entities(messages)
-    log_entity_state(basic_entities, {}, "After basic extraction")
-    
-    # TIMING: Basic extraction checkpoint
-    basic_extraction_time = time.time() - start_time
-    logger.log(f"⏱️  Basic extraction completed in {basic_extraction_time:.2f}s", 'INFO')
-    
-    # Use LLM to analyze the user's response contextually
-    llm_analysis = analyze_user_response_with_llm(
-        last_user_message, 
-        last_assistant_content, 
-        basic_entities
-    )
-    
-    is_confirmation = llm_analysis.get("is_confirmation", False)
-    confirmation_type = llm_analysis.get("confirmation_type", "neutral")
-    
-    # Handle compound response types as positive confirmations with special handling
-    positive_types = ["positive", "positive_with_adjustment", "positive_with_condition"]
-    is_positive_conf = confirmation_type in positive_types
-    is_compound_response = confirmation_type in ["positive_with_adjustment", "negative_with_alternative", "positive_with_condition"]
-    
-    confirmed_values = llm_analysis.get("confirmed_values", {})
-    new_information = llm_analysis.get("new_information", {})
-    
-    # TIMING: LLM analysis checkpoint
-    llm_analysis_time = time.time() - start_time
-    logger.log(f"⏱️  LLM analysis completed in {llm_analysis_time:.2f}s", 'INFO')
-    
-    print(f">>> Last user message: '{last_user_message}'")
-    print(f">>> LLM Analysis: {llm_analysis.get('reasoning', '')}")
-    print(f">>> Is confirmation: {is_confirmation} ({confirmation_type})")
-    print(f">>> Is compound response: {is_compound_response}")
-    print(f">>> Confirmed values: {confirmed_values}")
-    print(f">>> New information: {new_information}")
-    
-    # Extract entities from entire conversation with smart merging
-    all_entities = {}
-    confirmed_entities = {}  # Track explicitly confirmed values throughout the conversation
-    temp_messages = []
-    latest_extraction = {}
-    
-    # First pass: identify all confirmations throughout the conversation history
-    if USE_BATCHED_ANALYSIS:
-        # Check timeout before expensive batched analysis
-        if check_timeout():
-            logger.log("Timeout: Skipping batched analysis", 'WARNING')
-            return "I understand. Could you please tell me the property purpose: primary residence, second home, or investment?"
-        
-        # BATCHED APPROACH: Analyze all history in single API call (leverages OpenAI caching)
-        logger.log(f"Using batched analysis for {len(messages)} messages", 'INFO')
-        batched_results, batch_usage = analyze_conversation_history_batched(messages, all_entities)
-        
-        # Track API usage from batched analysis
-        api_call_count += 1
-        total_tokens_used += batch_usage.get('total_tokens', 0)
-        cached_tokens_used += batch_usage.get('cached_tokens', 0)
-        
-        # Process batched results to build confirmed_entities
-        for msg_index, analysis in batched_results.items():
-            msg = messages[msg_index]
-            temp_confirmation_type = analysis.get("confirmation_type", "neutral")
-            is_positive_temp = temp_confirmation_type in ["positive", "positive_with_adjustment", "positive_with_condition"]
-            
-            if analysis.get("is_confirmation") and is_positive_temp:
-                temp_confirmed = analysis.get("confirmed_values", {})
-                for field, value in temp_confirmed.items():
-                    if value is not None:
-                        if field in confirmed_entities:
-                            print(f">>> [BATCHED SCAN] Updating confirmed {field}: {confirmed_entities[field]} → {value} (from: '{msg['content']}')")
-                        else:
-                            print(f">>> [BATCHED SCAN] Found confirmed {field}: {value} (from: '{msg['content']}')")
-                        confirmed_entities[field] = value
-    
-    # TIMING: Batched analysis checkpoint
-    if USE_BATCHED_ANALYSIS:
-        batched_analysis_time = time.time() - start_time
-        logger.log(f"⏱️  Batched analysis completed in {batched_analysis_time:.2f}s", 'INFO')
-    else:
-        # LEGACY APPROACH: Per-message analysis (expensive - for rollback only)
-        logger.log(f"Using legacy per-message analysis for {len(messages)} messages", 'WARNING')
-        for i, msg in enumerate(messages):
-            if msg["role"] == "user" and i > 0:  # Skip first message, need assistant context
-                # Get assistant's previous message for context
-                prev_assistant_msg = ""
-                for j in range(i-1, -1, -1):
-                    if messages[j]["role"] == "assistant":
-                        prev_assistant_msg = messages[j]["content"]
-                        break
-                
-                # Analyze this user message for confirmations
-                if prev_assistant_msg:
-                    temp_analysis = analyze_user_response_with_llm(
-                        msg["content"], 
-                        prev_assistant_msg, 
-                        all_entities
-                    )
-                    
-                    # If this is a positive confirmation (including compound types), store the confirmed values
-                    # Later confirmations overwrite earlier ones (more recent = more accurate)
-                    temp_confirmation_type = temp_analysis.get("confirmation_type", "neutral")
-                    is_positive_temp = temp_confirmation_type in ["positive", "positive_with_adjustment", "positive_with_condition"]
-                    if temp_analysis.get("is_confirmation") and is_positive_temp:
-                        temp_confirmed = temp_analysis.get("confirmed_values", {})
-                        for field, value in temp_confirmed.items():
-                            if value is not None:
-                                if field in confirmed_entities:
-                                    print(f">>> [HISTORY SCAN] Updating confirmed {field}: {confirmed_entities[field]} → {value} (from: '{msg['content']}')")
-                                else:
-                                    print(f">>> [HISTORY SCAN] Found confirmed {field}: {value} (from: '{msg['content']}')")
-                                confirmed_entities[field] = value  # Later confirmations overwrite earlier ones
-    
-    # OPTIMIZED: Use only the current message extraction + batched analysis results
-    # The batched analysis already found all confirmed values - no need for redundant API calls
-    
-    # Extract entities from ONLY the current message (not entire conversation)
-    latest_extraction = basic_entities
-    
-    # Start with basic entities and merge in confirmed values from batched analysis
-    all_entities = basic_entities.copy()
-    
-    # Apply all confirmed values from batched analysis
-    for field, value in confirmed_entities.items():
-        all_entities[field] = value
-        print(f">>> [BATCHED] Applied confirmed {field}: {value}")
-    
-    # If current message is a positive confirmation, apply confirmed values from LLM analysis
-    if is_confirmation and is_positive_conf:
-        for field, value in confirmed_values.items():
-            if value is not None:
-                confirmed_entities[field] = value
-                all_entities[field] = value
-                print(f">>> [CURRENT CONFIRMATION] Confirmed and applied {field}: {value}")
-        
-        # Clean up any updated_ fields that were just confirmed
-        for field in ["down_payment", "property_price"]:
-            updated_field = f"updated_{field}"
-            if field in confirmed_values and updated_field in all_entities:
-                del all_entities[updated_field]
-                print(f">>> [CURRENT CONFIRMATION] Cleaned up {updated_field}")
-        
-        # Promote updated fields only if not already confirmed
-        if "updated_down_payment" in all_entities and "down_payment" not in confirmed_values:
-            promoted_value = all_entities["updated_down_payment"]
-            if "down_payment" not in confirmed_entities:
-                confirmed_entities["down_payment"] = promoted_value
-                all_entities["down_payment"] = promoted_value
-                print(f">>> [CURRENT CONFIRMATION] Promoted and confirmed updated_down_payment: ${promoted_value:,}")
-            else:
-                print(f">>> [CURRENT CONFIRMATION] Skipping promotion of updated_down_payment: ${promoted_value:,} (already confirmed: ${confirmed_entities['down_payment']:,})")
-            del all_entities["updated_down_payment"]
-        
-        if "updated_property_price" in all_entities and "property_price" not in confirmed_values:
-            promoted_value = all_entities["updated_property_price"]
-            if "property_price" not in confirmed_entities:
-                confirmed_entities["property_price"] = promoted_value
-                all_entities["property_price"] = promoted_value
-                print(f">>> [CURRENT CONFIRMATION] Promoted and confirmed updated_property_price: ${promoted_value:,}")
-            else:
-                print(f">>> [CURRENT CONFIRMATION] Skipping promotion of updated_property_price: ${promoted_value:,} (already confirmed: ${confirmed_entities['property_price']:,})")
-            del all_entities["updated_property_price"]
-    
-    # Apply new information from LLM analysis (outside of confirmation context)
-    if not is_confirmation:
-        # Apply new information extracted by LLM
-        for field, value in new_information.items():
-            if value is not None and field != "user_question" and field != "needs_clarification":
-                all_entities[field] = value
-                print(f">>> [NEW INFO] Applied {field}: {value}")
-        
-        # Handle entity updates (when user changes requirements) - legacy fallback
-        if "updated_down_payment" in latest_extraction and latest_extraction["updated_down_payment"] is not None:
-            all_entities["down_payment"] = latest_extraction["updated_down_payment"]
-            print(f">>> [LEGACY] Updated down payment to: ${latest_extraction['updated_down_payment']:,}")
-        
-        if "updated_property_price" in latest_extraction and latest_extraction["updated_property_price"] is not None:
-            all_entities["property_price"] = latest_extraction["updated_property_price"]
-            print(f">>> [LEGACY] Updated property price to: ${latest_extraction['updated_property_price']:,}")
-    
-    # Ensure all confirmed entities are applied to final entities
-    for field, value in confirmed_entities.items():
-        all_entities[field] = value
-        
-    print(f">>> Final entities: {all_entities}")
-    print(f">>> Confirmed entities: {confirmed_entities}")
-    print(f">>> Latest extraction: {latest_extraction}")
-    
-    # TIMING: Entity processing checkpoint
-    entity_processing_time = time.time() - start_time
-    logger.log(f"⏱️  Entity processing completed in {entity_processing_time:.2f}s", 'INFO')
-    
-    # Check if user has a pending question that needs answering (use LLM analysis when available)
-    user_question = None
-    needs_clarification = False
-    
-    if not is_confirmation:
-        # Use LLM analysis first, fallback to extraction
-        user_question = new_information.get("user_question") or latest_extraction.get("user_question")
-        needs_clarification = new_information.get("needs_clarification", False) or latest_extraction.get("needs_clarification", False)
-    
-    # Check if all information is collected
-    missing_info_context = get_missing_information_context(all_entities)
-    
-    # Check if we have all required information
-    required_fields = ["down_payment", "property_price", "loan_purpose", "property_city", "has_valid_passport", "has_valid_visa", "can_demonstrate_income", "has_reserves"]
-    all_complete = all(field in all_entities and all_entities[field] is not None for field in required_fields)
-    
-    # Don't qualify if user has pending questions or needs clarification (unless they just confirmed)
-    if all_complete and not needs_clarification and not user_question:
-        # CRITICAL: Ensure confirmed values override everything else before qualification
-        print(f">>> [PRE-QUALIFICATION] Before override - all_entities: {all_entities}")
-        print(f">>> [PRE-QUALIFICATION] Confirmed entities: {confirmed_entities}")
-        
-        # Validate and fix entity mismatches
-        for field in ['down_payment', 'property_price']:
-            if field in confirmed_entities and field in all_entities:
-                if confirmed_entities[field] != all_entities[field]:
-                    print(f">>> [WARNING] Entity mismatch for {field}: confirmed={confirmed_entities[field]}, using={all_entities[field]}")
-                    all_entities[field] = confirmed_entities[field]  # Force correction
-                    print(f">>> [FIXED] Corrected {field} to confirmed value: {confirmed_entities[field]}")
-        
-        # Final override: ensure all confirmed entities are applied
-        for field, value in confirmed_entities.items():
-            all_entities[field] = value
-            print(f">>> [PRE-QUALIFICATION] Applied confirmed {field}: {value}")
-        
-        print(f">>> [PRE-QUALIFICATION] Final entities for qualification: {all_entities}")
-        
-        # All info collected and no pending questions - provide qualification decision
-        qualification = calculate_qualification(all_entities)
-        
-        if qualification["qualified"]:
-            return f"""Congratulations! You're pre-qualified for a foreign national mortgage.
-
-Loan amount: ${qualification['max_loan_amount']:,}
-LTV: {qualification['ltv']}
-Down payment: {qualification['down_payment_pct']}
-
-A loan officer will contact you within 2 business days to proceed."""
-        else:
-            return f"Unfortunately, you don't qualify at this time. {qualification['reason']}"
-    
-    # Enhanced prompt with question handling and entity updates
-    conversation_context = "\n".join([f"{m['role']}: {m['content']}" for m in messages[-4:]])
-    
-    # Build prompt based on current situation
-    prompt_parts = ["You are a mortgage pre-qualification assistant."]
-    
-    # Check if we're waiting for confirmation from a previous question
-    last_assistant_msg = ""
-    if assistant_messages:
-        last_assistant_msg = assistant_messages[-1]["content"]
-    
-    waiting_for_confirmation = (last_assistant_msg and "?" in last_assistant_msg and 
-                               any(phrase in last_assistant_msg.lower() for phrase in 
-                                   ["would you like", "should i", "proceed with", "confirm", "is that correct", "which option"]))
-    
-    # If user asked a question, prioritize answering it and enforce confirmation protocol
-    if user_question:
-        prompt_parts.append(f"CRITICAL: USER ASKED QUESTION: '{user_question}' - Answer the question first, then ask ONLY ONE confirmation question related to that topic. YOU MUST NOT ask about property purpose, location, passport, visa, income, or reserves until they confirm their choice. STOP after the confirmation question.")
-    
-    # If we're waiting for confirmation, handle the user's response
-    elif waiting_for_confirmation:
-        prompt_parts.append("User is responding to your confirmation question. Process their response and either update values or continue with current ones, then ask the next qualification question.")
-    
-    # If entity was updated, acknowledge the change
-    elif "updated_down_payment" in latest_extraction or "updated_property_price" in latest_extraction:
-        prompt_parts.append("User updated their requirements. Acknowledge the change and ask ONE CLEAR confirmation question. CONFIRMATION MODE: Ask ONLY for confirmation. Do NOT ask about other topics until they confirm.")
-    
-    # Add validation warning for down payment
-    has_down_payment = 'down_payment' in all_entities and all_entities['down_payment'] is not None
-    has_property_price = 'property_price' in all_entities and all_entities['property_price'] is not None
-    
-    if has_down_payment and not has_property_price:
-        prompt_parts.append("CRITICAL: User provided down payment but NO property price yet. Do NOT validate down payment percentage. Simply ask for property price next.")
-    elif has_down_payment and has_property_price:
-        down_pct = all_entities['down_payment'] / all_entities['property_price']
-        if down_pct < 0.25:
-            prompt_parts.append(f"VALIDATION: Down payment is {down_pct*100:.1f}% (need 25%). User must adjust EITHER down payment up OR property price down.")
-        else:
-            prompt_parts.append(f"VALIDATION: Down payment is {down_pct*100:.1f}% (sufficient ≥25%). Proceed to next question.")
-    
-    prompt_parts.extend([
-        f"\nCONVERSATION:\n{conversation_context}",
-        f"\nCOLLECTED INFO:\n{missing_info_context}",
-        "\nRespond helpfully and ask for the next missing information. Keep responses under 30 words."
-    ])
-    
-    prompt = "\n".join(prompt_parts)
-    
-    try:
-        # Final timeout check before expensive OpenAI call
-        if check_timeout():
-            logger.log("Timeout: Using fallback response instead of OpenAI call", 'WARNING')
-            return "I understand. What's the next piece of information you'd like to provide?"
-        
-        print(f">>> Sending to OpenAI - Model: {WORKING_MODEL}")
-        print(f">>> Prompt length: {len(prompt)}")
-        
-        log_processing_step("Making final OpenAI API call for response generation")
-        logger.log(f"Using model: {WORKING_MODEL}, prompt length: {len(prompt)}", 'INFO')
-        
-        response = client.chat.completions.create(
-            model=WORKING_MODEL,
-            messages=[
-                {"role": "system", "content": MASTER_SYSTEM_PROMPT},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=1,
-            max_completion_tokens=100
-        )
-        
-        result = response.choices[0].message.content
-        print(f">>> OpenAI raw response: '{result}'")
-        
-        if not result or not result.strip():
-            print(">>> WARNING: OpenAI returned empty response!")
-            return "I understand. What's the property price you're considering?"
-        
-        # RESPONSE VALIDATION: Apply guardrails to enforce state-aware conversation flow
-        validated_result = validate_response_against_state(result.strip(), all_entities, last_user_message, messages)
-        
-        if validated_result != result.strip():
-            print(f">>> GUARDRAIL CORRECTION: '{result.strip()}' -> '{validated_result}'")
-            logger.log(f"Response corrected by guardrails: {result.strip()} -> {validated_result}", 'INFO')
-        
-        # Log API metrics before returning
-        end_time = time.time()
-        response_time_ms = (end_time - start_time) * 1000
-        
-        log_api_metrics({
-            "message_count": len(messages),
-            "call_count": api_call_count,
-            "usage": {
-                "total_tokens": total_tokens_used,
-                "cached_tokens": cached_tokens_used
-            },
-            "response_time_ms": response_time_ms,
-            "approach": "batched" if USE_BATCHED_ANALYSIS else "legacy"
-        })
-        
-        return validated_result
-    
-    except Exception as e:
-        # Log metrics even for errors
-        end_time = time.time()
-        response_time_ms = (end_time - start_time) * 1000
-        
-        log_api_metrics({
-            "message_count": len(messages),
-            "call_count": api_call_count,
-            "usage": {
-                "total_tokens": total_tokens_used,
-                "cached_tokens": cached_tokens_used
-            },
-            "response_time_ms": response_time_ms,
-            "approach": "batched" if USE_BATCHED_ANALYSIS else "legacy",
-            "error": str(e)
-        })
-        
-        print(f"Response generation error: {e}")
-        return "Sorry, I'm having trouble processing your response. Could you please try again?"
+    # Use new unified LLM approach - no separate entity extraction
+    logger.log("[RESPONSE_SOURCE] Calling unified LLM function", 'INFO')
+    response, entities = generate_response_and_update_entities(messages, persistent_confirmed_entities or {})
+    logger.log(f"[RESPONSE_SOURCE] Unified LLM response: {response[:80]}...", 'INFO')
+    return response, entities

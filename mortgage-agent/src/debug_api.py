@@ -105,7 +105,7 @@ def add_debug_endpoints(app: FastAPI):
             log_processing_step("Starting conversation processing")
             start_process = time.time()
             
-            result = process_conversation_turn(messages)
+            result, _ = process_conversation_turn(messages)
             
             timing['total'] = time.time() - start_total
             timing['processing'] = time.time() - start_process

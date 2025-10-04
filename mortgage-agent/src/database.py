@@ -41,6 +41,7 @@ class MortgageConversation(Base):
     
     id = Column(String, primary_key=True)  # conversation_id from frontend
     messages = Column(Text, nullable=False)  # JSON-encoded message history
+    confirmed_entities = Column(Text, default='{}')  # JSON-encoded confirmed entity state
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -54,6 +55,18 @@ class MortgageConversation(Base):
     def set_messages(self, messages: List[Dict[str, str]]):
         """Store messages as JSON string"""
         self.messages = json.dumps(messages)
+        self.updated_at = datetime.utcnow()
+    
+    def get_confirmed_entities(self) -> Dict[str, Any]:
+        """Parse JSON confirmed_entities into dict"""
+        try:
+            return json.loads(self.confirmed_entities)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    
+    def set_confirmed_entities(self, entities: Dict[str, Any]):
+        """Store confirmed entities as JSON string"""
+        self.confirmed_entities = json.dumps(entities)
         self.updated_at = datetime.utcnow()
 
 async def init_database():
@@ -72,6 +85,17 @@ async def get_conversation(conversation_id: str) -> Optional[List[Dict[str, str]
             return conversation.get_messages()
         return None
 
+async def get_conversation_with_entities(conversation_id: str) -> Optional[tuple[List[Dict[str, str]], Dict[str, Any]]]:
+    """
+    Retrieve conversation messages and confirmed entities by ID.
+    Returns tuple of (messages, confirmed_entities) or None if conversation not found.
+    """
+    async with async_session() as session:
+        conversation = await session.get(MortgageConversation, conversation_id)
+        if conversation:
+            return conversation.get_messages(), conversation.get_confirmed_entities()
+        return None
+
 async def save_conversation(conversation_id: str, messages: List[Dict[str, str]]):
     """
     Save or update conversation messages.
@@ -88,6 +112,32 @@ async def save_conversation(conversation_id: str, messages: List[Dict[str, str]]
             conversation = MortgageConversation(
                 id=conversation_id,
                 messages=json.dumps(messages),
+                confirmed_entities='{}',
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            session.add(conversation)
+        
+        await session.commit()
+
+async def save_conversation_with_entities(conversation_id: str, messages: List[Dict[str, str]], confirmed_entities: Dict[str, Any]):
+    """
+    Save or update conversation messages and confirmed entities.
+    Creates new conversation if it doesn't exist.
+    """
+    async with async_session() as session:
+        conversation = await session.get(MortgageConversation, conversation_id)
+        
+        if conversation:
+            # Update existing conversation
+            conversation.set_messages(messages)
+            conversation.set_confirmed_entities(confirmed_entities)
+        else:
+            # Create new conversation
+            conversation = MortgageConversation(
+                id=conversation_id,
+                messages=json.dumps(messages),
+                confirmed_entities=json.dumps(confirmed_entities),
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow()
             )
@@ -126,6 +176,7 @@ async def cleanup_old_conversations(max_age_hours: int = 24):
 
 # In-memory fallback for backwards compatibility
 _memory_conversations: Dict[str, List[Dict[str, str]]] = {}
+_memory_entities: Dict[str, Dict[str, Any]] = {}
 
 async def get_or_create_conversation(conversation_id: str) -> List[Dict[str, str]]:
     """
@@ -157,3 +208,37 @@ async def save_conversation_safe(conversation_id: str, messages: List[Dict[str, 
         print(f"Database error in save_conversation: {e}")
         # Fall back to memory
         _memory_conversations[conversation_id] = messages
+
+async def get_or_create_conversation_with_entities(conversation_id: str) -> tuple[List[Dict[str, str]], Dict[str, Any]]:
+    """
+    Get conversation and confirmed entities from database, with fallback to memory if database fails.
+    Creates empty conversation and entities if not found.
+    """
+    try:
+        # Try database first
+        result = await get_conversation_with_entities(conversation_id)
+        if result is not None:
+            return result
+    except Exception as e:
+        print(f"Database error in get_conversation_with_entities: {e}")
+        # Fall back to memory
+        if conversation_id in _memory_conversations:
+            messages = _memory_conversations[conversation_id]
+            entities = _memory_entities.get(conversation_id, {})
+            return messages, entities
+    
+    # Return empty conversation and entities if not found anywhere
+    return [], {}
+
+async def save_conversation_with_entities_safe(conversation_id: str, messages: List[Dict[str, str]], confirmed_entities: Dict[str, Any]):
+    """
+    Save conversation and confirmed entities with fallback to memory if database fails.
+    """
+    try:
+        # Try database first
+        await save_conversation_with_entities(conversation_id, messages, confirmed_entities)
+    except Exception as e:
+        print(f"Database error in save_conversation_with_entities: {e}")
+        # Fall back to memory
+        _memory_conversations[conversation_id] = messages
+        _memory_entities[conversation_id] = confirmed_entities

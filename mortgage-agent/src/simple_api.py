@@ -18,7 +18,7 @@ import os
 from .conversation_simple import process_conversation_turn
 from .logging_utils import log_api_error
 from .debug_api import add_debug_endpoints
-from .database import init_database, get_or_create_conversation, save_conversation_safe, delete_conversation
+from .database import init_database, get_or_create_conversation, save_conversation_safe, delete_conversation, get_or_create_conversation_with_entities, save_conversation_with_entities_safe
 
 # Initialize app
 app = FastAPI(title="Mortgage Pre-Qualification - Simplified", version="3.0.0")
@@ -152,21 +152,22 @@ async def chat_endpoint(request: ChatRequest):
         print(f"User Message: {request.message}")
         print(f"{'='*80}")
         
-        # Load conversation from database (with fallback to memory)
-        messages = await get_or_create_conversation(conversation_id)
+        # Load conversation and confirmed entities from database (with fallback to memory)
+        messages, persistent_confirmed_entities = await get_or_create_conversation_with_entities(conversation_id)
         print(f"Loaded conversation with {len(messages)} existing messages")
+        print(f"Loaded persistent confirmed entities: {persistent_confirmed_entities}")
         
         # Add user message
         messages.append({"role": "user", "content": request.message})
         
-        # Process turn with simplified system
-        response = process_conversation_turn(messages, conversation_id)
+        # Process turn with simplified system, passing persistent entities
+        response, updated_confirmed_entities = process_conversation_turn(messages, conversation_id, persistent_confirmed_entities)
         
         # Add assistant response
         messages.append({"role": "assistant", "content": response})
         
-        # Save updated conversation to database (with fallback to memory)
-        await save_conversation_safe(conversation_id, messages)
+        # Save updated conversation and confirmed entities to database (with fallback to memory)
+        await save_conversation_with_entities_safe(conversation_id, messages, updated_confirmed_entities)
         print(f"✅ Conversation saved to database (total messages: {len(messages)})")
         
         # Check if conversation is complete
@@ -211,6 +212,7 @@ async def chat_endpoint(request: ChatRequest):
         messages.append({"role": "assistant", "content": recovery_response})
         await save_conversation_safe(conversation_id, messages)
         
+        print(f">>> [RESPONSE_SOURCE] ERROR RECOVERY: {recovery_response}")
         print(f">>> CONVERSATION PRESERVED: Added recovery response: {recovery_response}")
         
         return ChatResponse(

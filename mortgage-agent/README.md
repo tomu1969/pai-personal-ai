@@ -4,10 +4,13 @@ A simplified conversational AI agent for foreign national mortgage pre-qualifica
 
 ## 🎯 Current Features
 
+- **Simplified System Prompt**: 35-line prompt (down from 88) for faster responses
+- **External Prompt Management**: System prompts stored in markdown files for easy editing
 - **Universal Confirmation Protocol**: Consistent Answer → Confirm → Proceed flow
 - **Smart Entity Management**: Contextual value extraction with confidence tracking
 - **Natural Conversation Flow**: Single prompt handles both answers and questions
 - **Foreign National Specialization**: 25% down payment, visa requirements, reserves
+- **Enhanced Monitoring**: Real-time entity tracking and qualification logic visibility
 - **Web Interface**: Clean chat interface for testing
 - **Production Deployment**: Live on Render.com
 
@@ -21,8 +24,11 @@ User Message → simple_api.py → conversation_simple.py → OpenAI GPT-4o → 
 
 ### Core Files:
 - `src/simple_api.py` - FastAPI application with chat endpoints
-- `src/conversation_simple.py` - Single system prompt conversation logic
-- `src/legacy/` - Previous slot-filling and graph-based implementations (v1.0-v2.0)
+- `src/conversation_simple.py` - Single system prompt conversation logic  
+- `src/database.py` - Conversation persistence and entity storage
+- `src/enhanced_logging.py` - Real-time debugging and monitoring
+- `new_system_prompt.md` - Current simplified system prompt (active)
+- `old_system_prompt.md` - Original complex system prompt (backup)
 
 ## 📋 Pre-Qualification Questions
 
@@ -36,6 +42,56 @@ The assistant collects 8 pieces of information for foreign nationals:
 6. **Valid U.S. Visa** (B1/B2, E-2, H-1B, L-1, etc.)
 7. **Income Documentation** (bank statements, tax returns, employment letters)
 8. **Financial Reserves** (6-12 months of mortgage payments saved)
+
+## 📁 Project Structure
+
+```
+mortgage-agent/
+├── src/                      # Core application
+│   ├── simple_api.py        # FastAPI server
+│   ├── conversation_simple.py # Conversation logic
+│   ├── database.py          # Persistence layer
+│   ├── debug_api.py         # Debug endpoints
+│   ├── enhanced_logging.py  # Logging utilities
+│   └── legacy/              # Old implementations (v1.0-v2.0)
+├── static/                  # Web interface
+├── docs/                    # Documentation  
+├── legacy/                  # Archived files
+│   ├── tests/              # Old test files (60+ files)
+│   ├── diagnostics/        # Diagnostic tools
+│   └── monitoring/         # Old monitoring scripts
+├── new_system_prompt.md    # Active prompt (simplified)
+├── old_system_prompt.md    # Original prompt (backup)
+├── watch_logs.py           # Enhanced conversation monitor
+├── test_simple_api.py      # Essential API tests
+├── test_complete_flow.py   # Essential flow tests
+└── README.md
+```
+
+## 🔍 Monitoring Conversations
+
+Run the enhanced log watcher to see real-time conversation analysis:
+
+```bash
+python watch_logs.py
+```
+
+**Live Monitoring Shows:**
+- 📋 **ENTITIES:** Current entity state with values and checkmarks
+- ❓ **NEXT Q:** Which question type will be asked next
+- 🧮 **QUALIFICATION:** Pass/fail decisions with calculations  
+- 💰 **CALC:** Down payment calculations and requirements
+- 📊 **DOWN PMT %:** Real-time percentage validation (25% minimum)
+- 🔄 **ENTITY UPDATES:** What changed each conversation turn
+- ⏱️ **TIMING:** Performance metrics and response times
+
+**Example Output:**
+```
+[10:30:15] 👤 USER: I can put 120k down
+[10:30:17] 📋 ENTITIES: 💰 Down Payment: $120,000 | 🏠 Property Price: Not set
+[10:30:17] ❓ NEXT Q: 🏠 Property Price  
+[10:30:17] 🤖 ASSISTANT: What's the property price you're considering?
+```
 
 ## 🚀 Quick Start
 
@@ -189,7 +245,37 @@ Assistant: "Can you demonstrate income with bank statements or tax returns?"
 - **AI Model**: OpenAI GPT-4o (fallback from GPT-5)
 - **Frontend**: Vanilla HTML/CSS/JavaScript
 - **Deployment**: Render.com with auto-deploy
-- **Storage**: In-memory (production should use Redis/Database)
+- **Storage**: SQLite with async support (production ready)
+
+## ⚙️ Configuration
+
+### Switching System Prompts
+
+To switch between the simplified and original system prompts:
+
+1. **Edit** `src/conversation_simple.py` line 296
+2. **Change** `'new_system_prompt.md'` to `'old_system_prompt.md'`
+3. **Restart** the server
+
+```python
+# Use simplified prompt (current - faster)
+prompt_path = os.path.join(os.path.dirname(__file__), '..', 'new_system_prompt.md')
+
+# Use original complex prompt (slower but more detailed)
+prompt_path = os.path.join(os.path.dirname(__file__), '..', 'old_system_prompt.md')
+```
+
+### Performance Comparison:
+- **New prompt**: ~1.7s response time for simple "yes" answers
+- **Old prompt**: ~8s response time for simple "yes" answers
+
+### Editing System Prompts
+
+Simply edit the markdown files and restart the server:
+- `new_system_prompt.md` - 35 lines, simplified rules
+- `old_system_prompt.md` - 88 lines, comprehensive rules
+
+No code changes needed for prompt modifications!
 
 ## 🔧 Recent Fixes (September 2025)
 

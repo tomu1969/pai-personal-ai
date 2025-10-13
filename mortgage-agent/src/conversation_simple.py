@@ -509,11 +509,11 @@ def generate_response_and_update_entities(messages: List[Dict[str, str]], persis
                 "updated_entities": {
                     "type": "object",
                     "properties": {
-                        "down_payment": {"type": "number", "description": "Down payment amount in dollars"},
+                        "down_payment": {"type": "number", "description": "Down payment amount in dollars (convert percentages using property price if available)"},
                         "property_price": {"type": "number", "description": "Property price in dollars"},
                         "loan_purpose": {"type": "string", "enum": ["primary_residence", "second_home", "investment"], "description": "Property purpose"},
-                        "property_city": {"type": "string", "description": "Property city"},
-                        "property_state": {"type": "string", "description": "Property state (2-letter code)"},
+                        "property_city": {"type": "string", "description": "Property city (understand major cities like Miami, NYC, LA without state clarification)"},
+                        "property_state": {"type": "string", "description": "Property state (2-letter code, auto-fill for major cities: Miami=FL, NYC=NY, LA=CA, etc.)"},
                         "has_valid_passport": {"type": "boolean", "description": "Valid passport status"},
                         "has_valid_visa": {"type": "boolean", "description": "Valid U.S. visa status"},
                         "can_demonstrate_income": {"type": "boolean", "description": "Can provide income documentation"},
@@ -568,6 +568,8 @@ INSTRUCTIONS:
 2. Generate a natural, helpful response 
 3. Update entities ONLY if the user confirms or provides new information
 4. Handle ALL scenarios naturally:
+   - "I can do 30%" → Ask for property price first, then calculate dollar amount
+   - "miami" → Understand as "Miami, FL" (common US cities don't need state clarification)
    - "adjust downpayment" → Calculate 30% and offer specific amount
    - "what cities?" → Provide examples and ask which one
    - "yes" → Understand what they're confirming from context

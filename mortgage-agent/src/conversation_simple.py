@@ -553,9 +553,19 @@ CRITICAL: Down payment is {down_pct*100:.1f}% - BELOW 30% requirement!
 DO NOT say user qualifies. Offer to adjust down payment first."""
 
     if all_info_collected:
-        qualification_context += """
-ALL INFO COLLECTED: Present a summary and ask "Is everything correct?" 
-Wait for confirmation before declaring qualification status."""
+        # Calculate qualification using the authoritative function
+        qualification_result = calculate_qualification(persistent_entities)
+        
+        if qualification_result.get('qualified', False):
+            qualification_context += f"""
+ALL INFO COLLECTED - QUALIFICATION RESULT: PRE-QUALIFIED
+You MUST tell the user they are pre-qualified and present the summary.
+Reason: {qualification_result.get('reason', 'Met all requirements')}"""
+        else:
+            qualification_context += f"""
+ALL INFO COLLECTED - QUALIFICATION RESULT: NOT QUALIFIED
+You MUST tell the user they don't qualify at this time.
+Reason: {qualification_result.get('reason', 'Requirements not met')}"""
 
     system_prompt = f"""{MASTER_SYSTEM_PROMPT}
 
@@ -588,7 +598,7 @@ RESPONSE RULES:
 - When user provides info, acknowledge it and move to next question
 - NO confirmation needed during collection phase
 - ONLY confirm once: After all 8 pieces collected, summarize everything
-- Check 30% down payment rule BEFORE saying "qualified"
+- NEVER decide qualification yourself - use the QUALIFICATION RESULT provided above
 - Handle calculations naturally (30% down payment for foreign nationals)"""
 
     try:
@@ -968,7 +978,9 @@ def calculate_qualification(entities: Dict[str, Any]) -> Dict[str, Any]:
     if not entities.get("has_valid_visa"):
         errors.append("Valid U.S. visa required")
     if not entities.get("can_demonstrate_income"):
-        errors.append("Income documentation required")
+        if entities.get("loan_purpose") != "investment":
+            errors.append("Income documentation required (non-investment property)")
+        # For investment properties, no error - they qualify for DSCR
     if not entities.get("has_reserves"):
         errors.append("6-12 months reserves required")
     

@@ -123,7 +123,7 @@ def validate_response_against_state(response: str, all_entities: Dict[str, Any],
     if collected_fields['property_price'] and any(phrase in response_lower for phrase in ['property price', 'cost of', 'price you']):
         violations.append(f"Re-asking property price (already: ${collected_fields['property_price']:,})")
     
-    if collected_fields['loan_purpose'] and any(phrase in response_lower for phrase in ['purpose', 'property purpose', 'primary residence', 'second home', 'investment']):
+    if collected_fields['loan_purpose'] and any(phrase in response_lower for phrase in ['purpose', 'property purpose', 'second home', 'investment']):
         violations.append(f"Re-asking loan purpose (already: {collected_fields['loan_purpose']})")
     
     if (collected_fields['property_city'] and collected_fields['property_state']) and any(phrase in response_lower for phrase in ['location', 'city', 'where is', 'state']):
@@ -154,7 +154,7 @@ def validate_response_against_state(response: str, all_entities: Dict[str, Any],
     
     if is_user_exploring:
         # User is exploring options - response should ask for confirmation, not jump to next topic
-        next_topic_phrases = ['property purpose', 'what\'s the purpose', 'primary residence', 'second home', 'investment', 
+        next_topic_phrases = ['property purpose', 'what\'s the purpose', 'second home', 'investment', 
                              'location', 'city', 'state', 'passport', 'visa', 'income', 'documentation', 'reserves']
         
         has_next_topic = any(phrase in response_lower for phrase in next_topic_phrases)
@@ -175,7 +175,7 @@ def validate_response_against_state(response: str, all_entities: Dict[str, Any],
     if 'down payment' in response_lower and 'property price' in response_lower:
         # Check for inconsistent down payment requirements
         if '20%' in response_lower or '20-25%' in response_lower:
-            violations.append("Inconsistent down payment requirement (should be 25% for foreign nationals)")
+            violations.append("Inconsistent down payment requirement (should be 30% for foreign nationals)")
     
     # If violations found, generate corrected response
     if violations:
@@ -232,7 +232,7 @@ def generate_corrected_response(all_entities: Dict[str, Any], last_user_message:
         elif 'Property price: Not provided' in missing_context:
             return "What's the property price you're considering?"
         elif 'Property purpose: Not provided' in missing_context:
-            return "What's the property purpose: primary residence, second home, or investment?"
+            return "What's the property purpose: second home or investment?"
         elif 'Property city: Not provided' in missing_context or 'Property state: Not provided' in missing_context:
             return "What city and state is the property in?"
         elif 'Valid passport status: Not provided' in missing_context:
@@ -265,10 +265,10 @@ def generate_corrected_response(all_entities: Dict[str, Any], last_user_message:
         if down_payment and property_price:
             down_pct = (down_payment / property_price) * 100
             if down_pct < 25:
-                required_down = property_price * 0.25
-                return f"Your ${down_payment:,} down payment is {down_pct:.1f}% of the ${property_price:,} property. Foreign nationals need 25% minimum (${required_down:,}). Would you like to increase your down payment or lower the property price?"
+                required_down = property_price * 0.30
+                return f"Your ${down_payment:,} down payment is {down_pct:.1f}% of the ${property_price:,} property. Foreign nationals need 30% minimum (${required_down:,}). Would you like to increase your down payment or lower the property price?"
         
-        return "What's the property purpose: primary residence, second home, or investment?"
+        return "What's the property purpose: second home or investment?"
     elif not all_entities.get('property_city') or not all_entities.get('property_state'):
         # Handle user asking for location options
         if 'options' in last_user_message.lower():
@@ -375,16 +375,16 @@ def handle_down_payment_adjustment(entities: Dict[str, Any]) -> str:
     
     # Calculate current percentage and required amount
     current_percentage = (down_payment / property_price) * 100
-    required_down_payment = property_price * 0.25  # 25% minimum
+    required_down_payment = property_price * 0.30  # 30% minimum
     
-    # Only handle if currently below 25%
-    if current_percentage >= 25:
+    # Only handle if currently below 30%
+    if current_percentage >= 30:
         return None
     
     # Calculate the adjustment needed
     adjustment_needed = required_down_payment - down_payment
     
-    return f"To meet the 25% minimum for foreign nationals, you'll need ${required_down_payment:,.0f} down payment (currently ${down_payment:,.0f}). That's an increase of ${adjustment_needed:,.0f}. Would you like to proceed with ${required_down_payment:,.0f} down, or would you prefer to lower the property price?"
+    return f"To meet the 30% minimum for foreign nationals, you'll need ${required_down_payment:,.0f} down payment (currently ${down_payment:,.0f}). That's an increase of ${adjustment_needed:,.0f}. Would you like to proceed with ${required_down_payment:,.0f} down, or would you prefer to lower the property price?"
 
 
 def generate_next_question_from_context(entities: Dict[str, Any]) -> str:
@@ -420,10 +420,10 @@ def generate_next_question_from_context(entities: Dict[str, Any]) -> str:
         if down_payment and property_price:
             down_pct = (down_payment / property_price) * 100
             if down_pct < 25:
-                required_down = property_price * 0.25
-                return f"Your ${down_payment:,} down payment is {down_pct:.1f}% of the ${property_price:,} property. Foreign nationals need 25% minimum (${required_down:,}). Would you like to increase your down payment or lower the property price?"
+                required_down = property_price * 0.30
+                return f"Your ${down_payment:,} down payment is {down_pct:.1f}% of the ${property_price:,} property. Foreign nationals need 30% minimum (${required_down:,}). Would you like to increase your down payment or lower the property price?"
         
-        return "What's the property purpose: primary residence, second home, or investment?"
+        return "What's the property purpose: second home or investment?"
     elif not entities.get('property_city') or not entities.get('property_state'):
         return "What city and state is the property in?"
     elif entities.get('has_valid_passport') is None:
@@ -511,7 +511,7 @@ def generate_response_and_update_entities(messages: List[Dict[str, str]], persis
                     "properties": {
                         "down_payment": {"type": "number", "description": "Down payment amount in dollars (convert percentages using property price if available)"},
                         "property_price": {"type": "number", "description": "Property price in dollars"},
-                        "loan_purpose": {"type": "string", "enum": ["primary_residence", "second_home", "investment"], "description": "Property purpose"},
+                        "loan_purpose": {"type": "string", "enum": ["second_home", "investment"], "description": "Property purpose"},
                         "property_city": {"type": "string", "description": "Property city (understand major cities like Miami, NYC, LA without state clarification)"},
                         "property_state": {"type": "string", "description": "Property state (2-letter code, auto-fill for major cities: Miami=FL, NYC=NY, LA=CA, etc.)"},
                         "has_valid_passport": {"type": "boolean", "description": "Valid passport status"},
@@ -891,7 +891,7 @@ def get_missing_information_context(filled_entities: Dict[str, Any]) -> str:
     required_fields = [
         ("down_payment", "Down payment amount"),
         ("property_price", "Property price"),
-        ("loan_purpose", "Property purpose (primary residence, second home, or investment)"),
+        ("loan_purpose", "Property purpose (second home or investment)"),
         ("property_city", "Property city"),
         ("property_state", "Property state"),
         ("has_valid_passport", "Valid passport status"),
@@ -961,15 +961,15 @@ def calculate_qualification(entities: Dict[str, Any]) -> Dict[str, Any]:
     if property_price <= 0:
         return {"qualified": False, "reason": "Invalid property price"}
     
-    # LTV calculation (must be ≤ 75% for foreign nationals)
+    # LTV calculation (must be ≤ 70% for foreign nationals)
     ltv = (property_price - down_payment) / property_price
     down_pct = down_payment / property_price
     
-    if down_pct < 0.25:
+    if down_pct < 0.30:
         return {
             "qualified": False, 
-            "reason": f"Down payment must be ≥25%. You have {down_pct*100:.1f}%",
-            "required_down": property_price * 0.25
+            "reason": f"Down payment must be ≥30%. You have {down_pct*100:.1f}%",
+            "required_down": property_price * 0.30
         }
     
     # Documentation requirements
@@ -1260,7 +1260,7 @@ VALUE EXTRACTION FROM CONTEXT:
 QUESTION-RESPONSE MATCHING:
 - If assistant asks "property purpose" and user says "500k" → this is a confused response, extract nothing
 - If assistant asks "property price" and user says "investment" → this is a confused response, extract nothing  
-- If assistant asks "down payment" and user says "primary residence" → this is a confused response, extract nothing
+- If assistant asks "down payment" and user says "second home" → this is a confused response, extract nothing
 - Only extract values when the user's response type matches what was asked
 
 META RESPONSES (HELP REQUESTS):

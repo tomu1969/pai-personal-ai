@@ -6,7 +6,7 @@ Version 3.0.0 represents a complete architectural overhaul from the previous gra
 
 ## Key Design Philosophy
 
-**Simplicity Over Complexity**: Replace complex state machines and graph flows with a single, intelligent system prompt that handles all conversation scenarios.
+**Simplicity Over Complexity**: Replace complex state machines and graph flows with a hybrid approach combining intelligent system prompts with hardcoded question consistency.
 
 ## Architecture Comparison
 
@@ -22,13 +22,13 @@ User Message → Router → Graph Nodes → State Management → LLM → Respons
 
 ### Current Approach (v3.0.0)
 ```
-User Message → simple_api.py → conversation_simple.py → Single LLM Call → Response
+User Message → simple_api.py → conversation_simple.py → LLM + Hardcoded Questions → Response
 ```
-- Single system prompt handles everything
+- Hybrid system prompt + hardcoded questions approach
 - One LLM call per conversation turn
-- Natural conversation flow
+- Natural conversation flow with consistent question phrasing
 - Smart entity merging
-- Built-in business logic in prompt
+- Built-in business logic in prompt + hardcoded question strings
 
 ## Core Components
 
@@ -48,7 +48,7 @@ ChatRequest → process_conversation_turn() → ChatResponse
 ```
 
 ### 2. `conversation_simple.py` - Conversation Engine
-**Purpose**: Core conversation processing with single system prompt
+**Purpose**: Core conversation processing with hybrid system prompt + hardcoded questions
 
 **Key Functions**:
 
@@ -78,6 +78,12 @@ Intelligently merges entity updates:
 - Prioritizes confirmed values over extracted values
 - Prevents corruption of meaningful data
 - Handles financial field updates carefully
+
+#### `generate_next_question_from_context(entities: Dict, conversation_history: List) -> str`
+Hardcoded question generation for consistency:
+- Returns specific question strings based on missing entities
+- Ensures consistent phrasing (e.g., reserves questions include US bank requirement)
+- Overrides system prompt for critical question consistency
 
 #### `calculate_qualification(entities: Dict) -> Dict`
 Business logic for pre-qualification:
@@ -189,7 +195,7 @@ All 8 entities collected + no pending questions → Calculate qualification → 
 ### Efficiency Gains (vs v2.0.0)
 - **Single LLM Call**: Reduced from 3-5 calls per turn to 1
 - **No State Management Overhead**: Eliminated complex graph traversal
-- **Simpler Debugging**: One prompt to rule them all
+- **Hybrid Approach**: System prompt flexibility + hardcoded question consistency
 - **Faster Response Times**: Direct conversation processing
 
 ### Resource Usage
@@ -252,7 +258,7 @@ GitHub → Render Auto-Deploy → Container → FastAPI → OpenAI API
 ### Key Changes
 1. **Removed Components**: Graph nodes, routers, slot managers
 2. **Simplified State**: Single conversation history instead of complex state
-3. **Unified Logic**: All business logic in system prompt
+3. **Hybrid Logic**: Business logic in system prompt + hardcoded question strings
 4. **Enhanced Confirmation**: Universal protocol vs pattern-based
 
 ### Migration Benefits
@@ -263,4 +269,4 @@ GitHub → Render Auto-Deploy → Container → FastAPI → OpenAI API
 
 ---
 
-The v3.0.0 architecture demonstrates that complex conversational AI can be achieved through intelligent prompt engineering rather than complex system architecture, resulting in better performance, easier maintenance, and more predictable behavior.
+The v3.0.0 architecture demonstrates that complex conversational AI can be achieved through a hybrid approach combining intelligent prompt engineering with hardcoded question consistency, resulting in better performance, easier maintenance, and more predictable behavior.

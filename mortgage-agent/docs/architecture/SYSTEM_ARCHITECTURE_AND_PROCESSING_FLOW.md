@@ -100,6 +100,7 @@ This document provides a comprehensive analysis of how the mortgage agent proces
 - **Component**: `conversation_simple.py`
 - **Function**: `generate_response_and_update_entities()`
 - **Tool**: OpenAI GPT-4o with Function Calling
+- **Question Generation**: Hardcoded question strings via `generate_next_question_from_context()`
 - **Schema**: Structured entity extraction for 9 required fields:
   - `down_payment` (number)
   - `property_price` (number) 
@@ -175,12 +176,14 @@ This document provides a comprehensive analysis of how the mortgage agent proces
 ### **Critical Functions**:
 1. **`process_conversation_turn()`** - Main flow controller
 2. **`generate_response_and_update_entities()`** - LLM interface
-3. **`calculate_qualification()`** - Business logic engine
-4. **`smart_merge_entities()`** - Data integrity protection
+3. **`generate_next_question_from_context()`** - Hardcoded question generation
+4. **`calculate_qualification()`** - Business logic engine
+5. **`smart_merge_entities()`** - Data integrity protection
 
 ### **Data Flow**:
 - **Input**: User text message
 - **Extraction**: 9 structured entities via LLM Function Calling
+- **Questions**: Hardcoded strings from `generate_next_question_from_context()`
 - **Storage**: SQLite database with JSON encoding
 - **Decision**: Python business logic (`calculate_qualification`)
 - **Output**: Natural language response guided by qualification result
@@ -207,6 +210,7 @@ if not entities.get("can_demonstrate_income"):
 
 ### **Separation of Concerns**:
 - **LLM**: Natural language processing and conversation flow
+- **Hardcoded Questions**: Consistent question phrasing via `generate_next_question_from_context()`
 - **Python Logic**: Authoritative business rules and qualification decisions
 - **Database**: Persistent state management
 - **System Prompt**: Configurable business rules

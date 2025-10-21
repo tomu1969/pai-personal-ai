@@ -242,7 +242,7 @@ def generate_corrected_response(all_entities: Dict[str, Any], last_user_message:
         elif 'Income documentation capability: Not provided' in missing_context:
             return "Can you demonstrate income with bank statements or tax returns?"
         elif 'Financial reserves: Not provided' in missing_context:
-            return "Do you have 6-12 months of payments saved in reserves?"
+            return "Are you able to hold a 6-12 month financial reserve in a US bank account 6 months prior to the property close?"
         else:
             # All information collected - check qualification
             qualification = calculate_qualification(all_entities)
@@ -281,7 +281,7 @@ def generate_corrected_response(all_entities: Dict[str, Any], last_user_message:
     elif all_entities.get('can_demonstrate_income') is None:
         return "Can you demonstrate income with bank statements or tax returns?"
     elif all_entities.get('has_reserves') is None:
-        return "Do you have 6-12 months of payments saved in reserves?"
+        return "Are you able to hold a 6-12 month financial reserve in a US bank account 6 months prior to the property close?"
     else:
         # All information collected - check qualification
         qualification = calculate_qualification(all_entities)
@@ -433,7 +433,7 @@ def generate_next_question_from_context(entities: Dict[str, Any]) -> str:
     elif entities.get('can_demonstrate_income') is None:
         return "Can you demonstrate income with bank statements or tax returns?"
     elif entities.get('has_reserves') is None:
-        return "Do you have 6-12 months of payments saved in reserves?"
+        return "Are you able to hold a 6-12 month financial reserve in a US bank account 6 months prior to the property close?"
     else:
         return "Based on your information, let me check your qualification status..."
 

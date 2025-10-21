@@ -557,10 +557,11 @@ DO NOT say user qualifies. Offer to adjust down payment first."""
         qualification_result = calculate_qualification(persistent_entities)
         
         if qualification_result.get('qualified', False):
+            visa_notes = qualification_result.get('visa_notes', '')
             qualification_context += f"""
 ALL INFO COLLECTED - QUALIFICATION RESULT: PRE-QUALIFIED
 You MUST tell the user they are pre-qualified and present the summary.
-Reason: {qualification_result.get('reason', 'Met all requirements')}"""
+Reason: {qualification_result.get('reason', 'Met all requirements')}{visa_notes}"""
         else:
             qualification_context += f"""
 ALL INFO COLLECTED - QUALIFICATION RESULT: NOT QUALIFIED
@@ -975,8 +976,7 @@ def calculate_qualification(entities: Dict[str, Any]) -> Dict[str, Any]:
     # Documentation requirements
     if not entities.get("has_valid_passport"):
         errors.append("Valid passport required")
-    if not entities.get("has_valid_visa"):
-        errors.append("Valid U.S. visa required")
+    # Note: Visa is no longer required - lack of visa affects interest rate but not qualification
     if not entities.get("can_demonstrate_income"):
         if entities.get("loan_purpose") != "investment":
             errors.append("Income documentation required (non-investment property)")
@@ -991,12 +991,19 @@ def calculate_qualification(entities: Dict[str, Any]) -> Dict[str, Any]:
     loan_amount = property_price - down_payment
     max_loan_amount = int(loan_amount)
     
+    # Check if user has visa for conditional messaging
+    has_visa = entities.get("has_valid_visa", True)  # Default to True for backwards compatibility
+    visa_notes = ""
+    if not has_visa:
+        visa_notes = "\n\n**Important Notes:**\n- This pre-qualification is valid provided you are not a citizen of an OFAC-sanctioned country (Iran, North Korea, Syria, Cuba, Russia, or Crimea region)\n- A higher interest rate will apply since you don't have a U.S. visa"
+    
     return {
         "qualified": True,
         "max_loan_amount": max_loan_amount,
         "ltv": f"{ltv*100:.1f}%",
         "down_payment_pct": f"{down_pct*100:.1f}%",
-        "reason": "Pre-qualified for foreign national mortgage"
+        "reason": "Pre-qualified for foreign national mortgage",
+        "visa_notes": visa_notes
     }
 
 

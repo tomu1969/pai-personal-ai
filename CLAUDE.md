@@ -15,13 +15,13 @@ WhatsApp Device 3 (PAI Mortgage) ↔ Evolution API Instance 3 ↗ PostgreSQL Dat
                                                                 OpenAI GPT Integration
 ```
 
-## Current Status (September 2025)
+## Current Status (November 2025)
 
-✅ **Fully Operational Triple Assistant System:**
+✅ **Fully Operational Triple Assistant System with Resolved Connection Issues:**
 - **PAI Responder**: Main WhatsApp line for auto-responses
 - **PAI Assistant**: Secondary line for message history queries
 - **PAI Mortgage**: Specialized mortgage qualification and guidance assistant
-- WhatsApp integration via Evolution API v2.0.9
+- WhatsApp integration via Evolution API v2.3.6
 - Multi-instance Evolution service for triple line management
 - Real-time chat interface with Socket.io
 - Assistant configuration management
@@ -356,8 +356,8 @@ npx sequelize-cli migration:generate --name migration-name
 
 ## Evolution API Integration
 
-### Version: v2.0.9 (Docker)
-- **Container**: `atendai/evolution-api:v2.0.9`
+### Version: v2.2.3 (Docker)
+- **Container**: `atendai/evolution-api:v2.2.3`
 - **Port**: 8080
 - **Multi-Instance**: Supports triple WhatsApp connections
 - **Webhook**: Handles incoming messages from all instances
@@ -383,7 +383,7 @@ npx sequelize-cli migration:generate --name migration-name
 **2. Evolution API Authentication Resolved**:
 - Fixed API key mismatches between different Evolution instances
 - Resolved webhook configuration issues with proper "enabled" property
-- Updated webhook payload format to match Evolution API v2.0.9 requirements
+- Updated webhook payload format to match Evolution API v2.3.6 requirements
 
 **3. Enhanced Webhook Routing**:
 - Added comprehensive multi-instance webhook routing for PAI Mortgage
@@ -465,6 +465,83 @@ PAI_MORTGAGE_WEBHOOK_URL=http://localhost:3000/webhook/pai-mortgage
 
 ### Issue: Environment Variable Override (RESOLVED)
 **Solution**: Fixed OpenAI API key loading in services, proper environment variable hierarchy
+
+### Issue: "Too Many Devices" Error (RESOLVED - November 2025)
+**Problem**: WhatsApp shows "too many devices linked to this phone number" error when trying to connect Evolution API instances.
+
+**Root Causes**:
+- WhatsApp limits companion devices to 4 per phone number
+- CONFIG_SESSION_PHONE_VERSION wasn't properly configured in Docker container
+- Multiple instances appearing as same device type to WhatsApp
+- Corrupted or stale sessions counting against device limit
+
+**Solution Process**:
+1. **Update Phone Version Configuration**:
+   - Set CONFIG_SESSION_PHONE_VERSION=2.2416.9 in docker-compose.yml (not just .env file)
+   - Docker container only reads environment variables from docker-compose.yml
+   
+2. **Complete Session Reset**:
+   ```bash
+   cd /Users/tomas/Desktop/ai_pbx
+   ./scripts/clean-logout.sh --complete
+   ```
+   - Stops all services and removes Docker volumes
+   - Clears all cached session data
+   - Recreates instances with fresh state
+
+3. **Manual Device Management**:
+   - WhatsApp → Settings → Linked Devices → Remove ALL existing devices
+   - Wait 2-3 minutes after removal before connecting new instances
+   
+4. **Connect Instances Sequentially**:
+   - Connect one instance at a time with 30-second delays
+   - Prevents rapid multiple connection detection
+
+**Key Files Modified**:
+- `/docker/evolution/docker-compose.yml` - Added CONFIG_SESSION_PHONE_VERSION
+- `/scripts/clean-logout.sh` - Used for complete cleanup
+
+### Issue: Device Connected But QR Code Still Showing (RESOLVED - November 2025)
+**Problem**: WhatsApp device appears connected and linked, but frontend UI still displays QR code and shows disconnected status.
+
+**Root Cause**: Instance ID mismatch between connected device and backend configuration:
+- WhatsApp connected to `cs-monitor` instance (state: "open") 
+- Backend configured to check `aipbx` instance (state: "connecting")
+- Frontend shows QR code because it checks the wrong instance
+
+**Solution**: Redirect backend to use the actually connected instance:
+1. **Identify Connected Instance**:
+   ```bash
+   curl -H "apikey: pai_evolution_api_key_2025" http://localhost:8080/instance/fetchInstances
+   # Look for instance with connectionStatus: "open" and ownerJid populated
+   ```
+
+2. **Update Backend Configuration**:
+   ```bash
+   # In .env file, change:
+   EVOLUTION_INSTANCE_ID=cs-monitor  # (was aipbx)
+   ```
+
+3. **Restart Backend**:
+   ```bash
+   npm start  # Restart to apply configuration changes
+   ```
+
+4. **Verification**:
+   ```bash
+   curl http://localhost:3000/api/whatsapp/status
+   # Should return: {"connected": true, "state": "open", "instanceId": "cs-monitor"}
+   ```
+
+**Key Files Modified**:
+- `/.env` - Updated EVOLUTION_INSTANCE_ID to match connected instance
+- `/src/config/index.js` - Reads instanceId from environment variable
+- `/src/routes/api.js` - Uses instanceId for connection status checks
+
+**Prevention**: Ensure instances are connected to their intended purposes:
+- aipbx: Main auto-response line
+- pai-assistant: Message history queries  
+- cs-monitor: Customer service ticket monitoring
 
 ## Development Notes
 
@@ -609,7 +686,14 @@ curl -X POST http://localhost:3000/webhook/messages-upsert \
 - [ ] PAI Mortgage instance reset script available
 - [ ] OpenAI API key properly configured for all services
 
-## Recent Updates (September 2025)
+## Recent Updates (November 2025)
+
+- ✅ **"Too Many Devices" Error Resolution** (November 15, 2025): Comprehensive fix for WhatsApp device linking issues
+- ✅ **QR Code Mismatch Issue Fix** (November 15, 2025): Resolved frontend showing QR when device already connected  
+- ✅ **Phone Version Configuration Fix**: Proper CONFIG_SESSION_PHONE_VERSION setup in Docker containers
+- ✅ **Instance Connection Management**: Automated detection and redirection to correctly connected instances
+
+## Previous Updates (September 2025)
 
 - ✅ **PAI Mortgage Assistant Launch** (September 17, 2025): Fully operational mortgage qualification assistant
 - ✅ **OpenAI API Integration Fixes**: Resolved environment variable override issues
@@ -659,6 +743,26 @@ tail -f logs/combined.log | grep "PAI Mortgage"
 curl -X POST http://localhost:3000/webhook/pai-mortgage \
   -H "Content-Type: application/json" \
   -d '{"key":{"id":"test","remoteJid":"test@s.whatsapp.net","fromMe":false},"message":{"conversation":"Test mortgage query"},"pushName":"Test User"}'
+
+# Troubleshooting "Too Many Devices" Error
+# 1. Check phone version configuration
+docker exec evolution_api env | grep "CONFIG_SESSION_PHONE"
+
+# 2. Complete session cleanup (nuclear option)
+cd /Users/tomas/Desktop/ai_pbx && ./scripts/clean-logout.sh --complete
+
+# 3. Check which instances are actually connected
+curl -H "apikey: pai_evolution_api_key_2025" http://localhost:8080/instance/fetchInstances | python3 -c "import sys, json; data = json.load(sys.stdin); [print(f'{i[\"name\"]}: {i[\"connectionStatus\"]} - Owner: {i.get(\"ownerJid\", \"none\")}') for i in data]"
+
+# Troubleshooting QR Code Still Showing When Connected
+# 1. Check backend connection status
+curl http://localhost:3000/api/whatsapp/status
+
+# 2. Identify which instance is actually connected
+curl -H "apikey: pai_evolution_api_key_2025" http://localhost:8080/instance/fetchInstances | grep -A5 -B5 '"connectionStatus": "open"'
+
+# 3. Check QR page status (should show "Connected")
+curl -s http://localhost:3000/qr-responder | grep -i "connected\|status"
 ```
 
 ### Docker Management:

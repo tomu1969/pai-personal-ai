@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  # Evolution API v2.0.9 - WhatsApp Integration Platform
+  # Evolution API v2.3.6 - WhatsApp Integration Platform
   evolution-api:
-    image: atendai/evolution-api:v2.0.9
+    image: evoapicloud/evolution-api:v2.3.6
     container_name: evolution_api
     restart: unless-stopped
     ports:
@@ -18,13 +18,19 @@ services:
       - CORS_METHODS=GET,POST,PUT,DELETE
       - CORS_CREDENTIALS=true
       
-      # Database Configuration (Disabled for now)
-      - DATABASE_ENABLED=false
+      # Database Configuration (ENABLED for message storage) - v2.3.6 format
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://evolution:evolution123@postgres:5432/evolution_db?schema=public
+      - DATABASE_CONNECTION_CLIENT_NAME=evolution
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
+      - DATABASE_SAVE_MESSAGE_UPDATE=true
+      - DATABASE_SAVE_DATA_INSTANCE=true
       
-      # Redis Configuration (Use existing Redis)
-      - REDIS_ENABLED=true
-      - REDIS_URI=redis://host.docker.internal:6379
-      - REDIS_PREFIX_KEY=evo_api
+      # Redis Configuration (Use existing Redis) - TEMPORARILY DISABLED
+      - REDIS_ENABLED=false
+      # - REDIS_URI=redis://:redis123@redis:6379
+      # - REDIS_PREFIX_KEY=evo_api
       
       # Authentication
       - AUTHENTICATION_TYPE=apikey
@@ -39,6 +45,7 @@ services:
       # Instance Settings
       - CONFIG_SESSION_PHONE_CLIENT=PAI System
       - CONFIG_SESSION_PHONE_NAME=AI PBX
+      - CONFIG_SESSION_PHONE_VERSION=2.2416.9
       
       # QR Code Settings
       - QRCODE_LIMIT=30
@@ -155,3 +162,4 @@ networks:
   pai_network:
     driver: bridge
     name: pai_network
+    external: true

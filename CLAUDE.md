@@ -576,6 +576,315 @@ PAI_MORTGAGE_WEBHOOK_URL=http://localhost:3000/webhook/pai-mortgage
 - Webhook signature validation (Evolution API)
 - Database access controls
 
+### Comprehensive Logging Standards (MANDATORY for All New Development):
+
+**CRITICAL REQUIREMENT**: Every new feature, service, API endpoint, and function must include comprehensive logging for debugging, monitoring, and maintenance.
+
+#### **Logging Levels and Usage**:
+
+```javascript
+const logger = require('../utils/logger'); // Use existing logger
+
+// ERROR - Critical failures that require immediate attention
+logger.error('Database connection failed', {
+  error: error.message,
+  stack: error.stack,
+  operation: 'user_authentication',
+  userId: user?.id,
+  timestamp: new Date().toISOString()
+});
+
+// WARN - Potential issues or degraded functionality
+logger.warn('Rate limit approaching', {
+  currentRequests: 85,
+  limit: 100,
+  endpoint: '/api/whatsapp/send',
+  ip: req.ip,
+  timeWindow: '1 minute'
+});
+
+// INFO - Important business logic events and state changes
+logger.info('WhatsApp message sent successfully', {
+  messageId: response.messageId,
+  recipientPhone: phone,
+  messageType: 'text',
+  instanceId: 'aipbx',
+  processingTimeMs: Date.now() - startTime
+});
+
+// DEBUG - Detailed technical information for troubleshooting
+logger.debug('Processing user query', {
+  query: userInput,
+  intentAnalysis: result.intent,
+  confidenceScore: result.confidence,
+  processingSteps: result.steps,
+  contextId: conversation.id
+});
+```
+
+#### **Required Logging for All Components**:
+
+1. **API Endpoints - MANDATORY Logging**:
+```javascript
+router.post('/api/new-feature', async (req, res) => {
+  const startTime = Date.now();
+  const requestId = generateRequestId();
+  
+  logger.info('API endpoint called', {
+    endpoint: '/api/new-feature',
+    method: 'POST',
+    requestId,
+    ip: req.ip,
+    userAgent: req.get('User-Agent'),
+    bodySize: JSON.stringify(req.body).length,
+    timestamp: new Date().toISOString()
+  });
+
+  try {
+    // Function logic here
+    
+    logger.info('API endpoint completed successfully', {
+      endpoint: '/api/new-feature',
+      requestId,
+      processingTimeMs: Date.now() - startTime,
+      responseCode: 200
+    });
+    
+    res.json(result);
+  } catch (error) {
+    logger.error('API endpoint failed', {
+      endpoint: '/api/new-feature',
+      requestId,
+      error: error.message,
+      stack: error.stack,
+      bodyData: req.body,
+      processingTimeMs: Date.now() - startTime
+    });
+    
+    res.status(500).json({ error: 'Internal server error', requestId });
+  }
+});
+```
+
+2. **Service Functions - MANDATORY Logging**:
+```javascript
+async function processBusinessLogic(inputData) {
+  const operationId = generateId();
+  const startTime = Date.now();
+  
+  logger.debug('Starting business logic processing', {
+    operationId,
+    inputData: sanitizeForLogging(inputData),
+    functionName: 'processBusinessLogic'
+  });
+  
+  try {
+    // Step 1: Validation
+    logger.debug('Validating input data', { operationId, step: 'validation' });
+    const validationResult = await validateInput(inputData);
+    
+    // Step 2: Processing
+    logger.debug('Processing validated data', { 
+      operationId, 
+      step: 'processing',
+      validationPassed: validationResult.isValid 
+    });
+    
+    // Step 3: Result
+    const result = await performOperation(validationResult.data);
+    
+    logger.info('Business logic completed successfully', {
+      operationId,
+      processingTimeMs: Date.now() - startTime,
+      resultSummary: summarizeResult(result)
+    });
+    
+    return result;
+  } catch (error) {
+    logger.error('Business logic processing failed', {
+      operationId,
+      error: error.message,
+      stack: error.stack,
+      inputData: sanitizeForLogging(inputData),
+      processingTimeMs: Date.now() - startTime,
+      functionName: 'processBusinessLogic'
+    });
+    throw error;
+  }
+}
+```
+
+3. **Database Operations - MANDATORY Logging**:
+```javascript
+async function updateRecord(id, updateData) {
+  logger.debug('Database update operation starting', {
+    operation: 'updateRecord',
+    recordId: id,
+    fieldsToUpdate: Object.keys(updateData),
+    table: 'users'
+  });
+  
+  try {
+    const result = await User.update(updateData, { where: { id } });
+    
+    logger.info('Database record updated successfully', {
+      operation: 'updateRecord',
+      recordId: id,
+      affectedRows: result[0],
+      table: 'users'
+    });
+    
+    return result;
+  } catch (error) {
+    logger.error('Database update failed', {
+      operation: 'updateRecord',
+      recordId: id,
+      error: error.message,
+      sqlState: error.sql,
+      table: 'users'
+    });
+    throw error;
+  }
+}
+```
+
+4. **WhatsApp/External API Integration - MANDATORY Logging**:
+```javascript
+async function sendWhatsAppMessage(phone, message, instanceId) {
+  const messageId = generateMessageId();
+  
+  logger.info('Sending WhatsApp message', {
+    messageId,
+    recipientPhone: phone,
+    messageLength: message.length,
+    instanceId,
+    operation: 'whatsapp_send'
+  });
+  
+  try {
+    const response = await evolutionAPI.sendMessage({
+      phone,
+      message,
+      instanceId
+    });
+    
+    logger.info('WhatsApp message sent successfully', {
+      messageId,
+      evolutionMessageId: response.messageId,
+      instanceId,
+      deliveryStatus: response.status
+    });
+    
+    return response;
+  } catch (error) {
+    logger.error('WhatsApp message send failed', {
+      messageId,
+      error: error.message,
+      errorCode: error.code,
+      instanceId,
+      recipientPhone: phone,
+      retryAttempt: error.retryAttempt || 0
+    });
+    throw error;
+  }
+}
+```
+
+#### **Data Sanitization for Logging**:
+
+```javascript
+// NEVER log sensitive information directly
+function sanitizeForLogging(data) {
+  const sensitiveFields = ['password', 'apiKey', 'token', 'ssn', 'creditCard'];
+  
+  const sanitized = { ...data };
+  
+  sensitiveFields.forEach(field => {
+    if (sanitized[field]) {
+      sanitized[field] = `[REDACTED-${field.toUpperCase()}]`;
+    }
+  });
+  
+  // Truncate very long fields
+  Object.keys(sanitized).forEach(key => {
+    if (typeof sanitized[key] === 'string' && sanitized[key].length > 1000) {
+      sanitized[key] = sanitized[key].substring(0, 1000) + '...[TRUNCATED]';
+    }
+  });
+  
+  return sanitized;
+}
+```
+
+#### **Performance Monitoring Integration**:
+
+```javascript
+// MANDATORY: Add performance monitoring to all operations
+async function complexOperation() {
+  const metrics = {
+    startTime: Date.now(),
+    operationName: 'complexOperation',
+    operationId: generateId()
+  };
+  
+  logger.debug('Performance monitoring: Operation started', metrics);
+  
+  try {
+    // Mark checkpoints
+    const step1Result = await step1();
+    metrics.step1CompletedAt = Date.now();
+    
+    const step2Result = await step2();
+    metrics.step2CompletedAt = Date.now();
+    
+    const finalResult = await step3();
+    metrics.completedAt = Date.now();
+    
+    // Log performance summary
+    logger.info('Performance monitoring: Operation completed', {
+      ...metrics,
+      totalTimeMs: metrics.completedAt - metrics.startTime,
+      step1TimeMs: metrics.step1CompletedAt - metrics.startTime,
+      step2TimeMs: metrics.step2CompletedAt - metrics.step1CompletedAt,
+      step3TimeMs: metrics.completedAt - metrics.step2CompletedAt
+    });
+    
+    return finalResult;
+  } catch (error) {
+    logger.error('Performance monitoring: Operation failed', {
+      ...metrics,
+      failedAt: Date.now(),
+      totalTimeMs: Date.now() - metrics.startTime,
+      error: error.message
+    });
+    throw error;
+  }
+}
+```
+
+#### **Integration with Existing Logger**:
+
+The project already has a logger at `/src/utils/logger.js`. All new code MUST use this logger with the patterns above. 
+
+**Key Requirements**:
+- ✅ **Every function** must log entry, success, and error states
+- ✅ **Every API endpoint** must log request details and performance metrics  
+- ✅ **Every database operation** must log what's being changed
+- ✅ **Every external API call** must log request/response summary
+- ✅ **All sensitive data** must be sanitized before logging
+- ✅ **Performance metrics** must be captured for operations > 100ms
+- ✅ **Unique operation IDs** must be used to trace related log entries
+- ✅ **Structured logging** with consistent field names across services
+
+**Debugging Benefits**:
+- Trace any user action from frontend → backend → database → response
+- Identify performance bottlenecks with precise timing data
+- Debug webhook issues with complete request/response logs
+- Monitor system health with detailed error context
+- Track business logic flows across multiple services
+
+This logging standard is now MANDATORY for all new development. Existing code should be updated to follow these patterns when modified.
+
 ## PAI Mortgage System Management
 
 ### Primary Management Scripts
@@ -763,6 +1072,49 @@ curl -H "apikey: pai_evolution_api_key_2025" http://localhost:8080/instance/fetc
 
 # 3. Check QR page status (should show "Connected")
 curl -s http://localhost:3000/qr-responder | grep -i "connected\|status"
+
+# Log Analysis and Debugging Commands
+# Real-time log monitoring with filtering
+tail -f logs/combined.log | grep -E "(ERROR|WARN)" --color=always
+
+# Monitor specific operations
+tail -f logs/combined.log | grep -E "(WhatsApp|Evolution|webhook)" --color=always
+
+# Performance monitoring
+tail -f logs/combined.log | grep -E "processingTimeMs|Performance monitoring" --color=always
+
+# Track specific operation by ID
+tail -f logs/combined.log | grep "operationId.*abc123" --color=always
+
+# API endpoint monitoring
+tail -f logs/combined.log | grep -E "API endpoint (called|completed|failed)" --color=always
+
+# Database operation tracking
+tail -f logs/combined.log | grep -E "Database.*operation" --color=always
+
+# Find errors in last 100 lines
+tail -n 100 logs/combined.log | grep -E "(ERROR|Failed|failed)" --color=always
+
+# Search for specific user/phone number activities
+grep "573182601111" logs/combined.log | tail -20
+
+# Find slow operations (> 1000ms)
+grep -E "processingTimeMs.*[0-9]{4,}" logs/combined.log | tail -10
+
+# Search by request ID to trace complete request flow
+grep "requestId.*req_abc123" logs/combined.log
+
+# Monitor message processing pipeline
+tail -f logs/combined.log | grep -E "(Message processing|message sent|webhook.*received)" --color=always
+
+# Find authentication/connection issues
+tail -f logs/combined.log | grep -E "(authentication|connection|login|logout)" --color=always
+
+# CS Ticket System specific monitoring
+tail -f logs/combined.log | grep -E "(CS.*Ticket|ticket.*detected|Groups Manager)" --color=always
+
+# Monitor Evolution API interactions
+tail -f logs/combined.log | grep -E "Evolution API.*" --color=always
 ```
 
 ### Docker Management:

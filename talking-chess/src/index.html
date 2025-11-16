@@ -20,77 +20,110 @@
       <p class="subtitle">Play chess against an AI opponent matched to your skill level</p>
     </header>
     
+    <!-- Header Bar -->
+    <div id="header-bar">
+      <div class="player-section">
+        <span class="player-icon">👤</span>
+        <span class="player-info">
+          You: <input type="number" id="user-elo-input" min="800" max="3000" value="1500" class="elo-input">
+          <button class="elo-adjust" data-type="user" data-delta="-100">−</button>
+          <button class="elo-adjust" data-type="user" data-delta="+100">+</button>
+        </span>
+      </div>
+      
+      <div class="center-section">
+        <div class="material-advantage">
+          <span class="material-icon">⚔️</span>
+          <span id="material-status">Material: Even</span>
+        </div>
+        <div class="timer-display">
+          <span class="timer-icon">⏱️</span>
+          <span id="timer-display">00:00</span>
+        </div>
+        <div class="game-controls">
+          <button id="new-game-btn-header" class="header-button primary-button">New Game</button>
+          <button id="flip-board-btn-header" class="header-button secondary-button">Flip</button>
+        </div>
+      </div>
+      
+      <div class="ai-section">
+        <span class="ai-info">
+          <input type="number" id="ai-elo-input" min="800" max="3000" value="1650" class="elo-input">
+          <button class="strength-adjust" data-delta="-20">−</button>
+          <span id="strength-display">+10%</span>
+          <button class="strength-adjust" data-delta="+20">+</button>
+        </span>
+        <span class="ai-icon">🤖</span>
+        <span class="ai-name">ChessBot</span>
+      </div>
+    </div>
+
     <main>
-      <section id="game-section" class="hidden">
-        <div id="board-container">
-          <div id="chessboard"></div>
+      <section id="game-section">
+        <!-- Board Column -->
+        <div id="board-column">
+          <div id="board-container">
+            <div id="chessboard"></div>
+          </div>
+          
+          <div id="board-info">
+            <div id="turn-indicator" class="turn-indicator white-turn">
+              <span class="piece-icon">♔</span>
+              <span id="turn-text">White to move</span>
+            </div>
+            <div id="move-counter">Move <span id="move-number">1</span></div>
+          </div>
+          
         </div>
         
-        <div id="game-controls">
-          <div id="turn-indicator" class="turn-indicator white-turn">
-            <span class="piece-icon">♔</span>
-            <span id="turn-text">White to move</span>
+        <!-- Chat Column -->
+        <div id="chat-column">
+          <div id="chat-header">
+            <span class="chat-icon">💬</span>
+            <span class="chat-title">Chat</span>
           </div>
           
-          <div id="game-status">
-            <p id="status-text">Set up your game to start playing</p>
+          <div id="chat-messages">
+            <!-- Messages will be dynamically added here -->
           </div>
           
-          <div id="move-history">
-            <h3>Move History</h3>
-            <div id="pgn-display"></div>
-          </div>
-        </div>
-      </section>
-      
-      <section id="setup-section">
-        <div class="setup-card">
-          <h2>Game Setup</h2>
-          
-          <div class="input-group">
-            <label for="elo-input">Your ELO Rating:</label>
-            <input 
-              type="number" 
-              id="elo-input" 
-              min="800" 
-              max="3000" 
-              value="1500" 
-              placeholder="Enter your ELO (800-3000)"
-            >
-            <small class="help-text">Enter your current chess rating (800-3000)</small>
-            <div id="elo-error-message" class="error-message hidden"></div>
-            <div id="elo-category" class="elo-category">Intermediate</div>
-          </div>
-          
-          <div class="input-group">
-            <label for="strength-input">Opponent Strength:</label>
-            <div class="preset-buttons">
-              <button type="button" class="preset-btn" data-percentage="-20" data-name="Easy">Easy (-20%)</button>
-              <button type="button" class="preset-btn" data-percentage="10" data-name="Normal">Normal (+10%)</button>
-              <button type="button" class="preset-btn" data-percentage="30" data-name="Hard">Hard (+30%)</button>
-              <button type="button" class="preset-btn" data-percentage="50" data-name="Expert">Expert (+50%)</button>
+          <div id="chat-input-section">
+            <div id="quick-responses">
+              <button class="quick-response" data-message="Good move!">Good move!</button>
+              <button class="quick-response" data-message="Nice!">Nice!</button>
+              <button class="quick-response" data-message="Thinking...">Thinking...</button>
+              <button class="quick-response" data-message="Well played">Well played</button>
+              <button class="quick-response" data-message="Thanks">Thanks</button>
+              <button class="quick-response" data-message="Good game">Good game</button>
             </div>
-            <input 
-              type="range" 
-              id="strength-input" 
-              min="-50" 
-              max="100" 
-              value="10" 
-              step="5"
-            >
-            <div class="strength-display">
-              <span id="strength-percentage">+10%</span>
-              <span id="opponent-elo">Target: 1650</span>
-              <span id="recommended-indicator" class="hidden">⭐ Recommended</span>
+            
+            <div id="chat-input-container">
+              <input type="text" id="chat-input" placeholder="Type a message..." maxlength="200">
+              <button id="send-message-btn">Send</button>
             </div>
-            <div id="opponent-category" class="elo-category">Advanced</div>
-            <small class="help-text">Adjust opponent difficulty (-50% to +100%)</small>
           </div>
-          
-          <button id="start-game-btn" class="primary-button">Start Game</button>
         </div>
       </section>
     </main>
+
+    <!-- Status Bar -->
+    <div id="status-bar">
+      <div id="move-history-status">
+        <span class="status-icon">📋</span>
+        <span id="pgn-status">Ready to play</span>
+      </div>
+      
+      <div id="captured-status">
+        <span class="status-icon">⚔️</span>
+        <span>Captured: </span>
+        <span id="captured-pieces-status">None yet</span>
+      </div>
+      
+      <div id="opening-status">
+        <span class="status-icon">📖</span>
+        <span id="opening-name">Opening: Starting position</span>
+      </div>
+    </div>
     
     <footer>
       <p>&copy; 2024 Talking Chess. Built with Chess.js and Stockfish.</p>
@@ -119,6 +152,9 @@
   
   <!-- Application JavaScript -->
   <script src="elo-calculator.js"></script>
+  <script src="engine-config.js"></script>
+  <script src="stockfish-engine.js"></script>
+  <script src="chat-engine.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

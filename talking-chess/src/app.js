@@ -9,11 +9,34 @@ let board = null;
 let selectedSquare = null;
 let legalMoves = [];
 let lastMove = null;
+let engine = null;
+let isEngineInitialized = false;
+let chatEngine = null;
 let gameConfig = {
   userElo: 1500,
   strengthPercentage: 10,
   opponentElo: 1650
 };
+
+// Captured pieces and scoring
+let capturedPieces = {
+  white: [],
+  black: []
+};
+
+// Piece values for scoring (standard chess values)
+const PIECE_VALUES = {
+  'p': 1, 'n': 3, 'b': 3, 'r': 5, 'q': 9, 'k': 0
+};
+
+// Game timer
+let gameStartTime = null;
+let gameTimerInterval = null;
+let totalGameTime = 0;
+let gameTimerStarted = false;
+
+// Chat state
+let isGameStarted = false;
 
 /**
  * Initialize the application
@@ -43,11 +66,24 @@ function initializeApp() {
   // Initialize chessboard
   initializeChessBoard();
   
+  // Initialize chat engine
+  initializeChatEngine();
+  
   // Setup event listeners
   setupEventListeners();
   
   // Initialize UI
   initializeUI();
+  
+  // Initialize board as interactive
+  setBoardInteractive(true);
+  
+  // Initialize Stockfish engine and auto-start game
+  initializeEngine().then(() => {
+    autoStartGame();
+  }).catch(error => {
+    console.error('Engine initialization failed in initializeApp:', error);
+  });
   
   console.log('Talking Chess initialized successfully');
 }
@@ -152,6 +188,105 @@ function setupEventListeners() {
     startButton.addEventListener('click', startGame);
   }
   
+  // New game button (header)
+  const newGameButtonHeader = document.getElementById('new-game-btn-header');
+  if (newGameButtonHeader) {
+    newGameButtonHeader.addEventListener('click', newGame);
+  }
+
+  // Flip board button (header)
+  const flipBoardButtonHeader = document.getElementById('flip-board-btn-header');
+  if (flipBoardButtonHeader) {
+    flipBoardButtonHeader.addEventListener('click', flipBoard);
+  }
+
+  // ELO input fields
+  const userEloInput = document.getElementById('user-elo-input');
+  if (userEloInput) {
+    userEloInput.addEventListener('change', handleUserEloChange);
+    userEloInput.addEventListener('input', handleUserEloChange);
+  }
+
+  const aiEloInput = document.getElementById('ai-elo-input');
+  if (aiEloInput) {
+    aiEloInput.addEventListener('change', handleAiEloChange);
+    aiEloInput.addEventListener('input', handleAiEloChange);
+  }
+
+  // ELO adjustment buttons
+  const eloAdjustButtons = document.querySelectorAll('.elo-adjust');
+  eloAdjustButtons.forEach(btn => {
+    btn.addEventListener('click', () => adjustElo(btn.dataset.type, parseInt(btn.dataset.delta)));
+  });
+
+  // Strength adjustment buttons
+  const strengthAdjustButtons = document.querySelectorAll('.strength-adjust');
+  strengthAdjustButtons.forEach(btn => {
+    btn.addEventListener('click', () => adjustStrength(parseInt(btn.dataset.delta)));
+  });
+
+  // Tab buttons
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+
+  // Additional game control buttons
+  const resignButton = document.getElementById('resign-btn');
+  if (resignButton) {
+    resignButton.addEventListener('click', resignGame);
+  }
+
+  const drawButton = document.getElementById('offer-draw-btn');
+  if (drawButton) {
+    drawButton.addEventListener('click', offerDraw);
+  }
+
+  const flipButton = document.getElementById('flip-board-btn');
+  if (flipButton) {
+    flipButton.addEventListener('click', flipBoard);
+  }
+
+  const toggleCoordinatesButton = document.getElementById('toggle-coordinates');
+  if (toggleCoordinatesButton) {
+    toggleCoordinatesButton.addEventListener('click', toggleCoordinates);
+  }
+
+  const toggleSoundButton = document.getElementById('toggle-sound');
+  if (toggleSoundButton) {
+    toggleSoundButton.addEventListener('click', toggleSound);
+  }
+
+  // Chat event listeners
+  const sendMessageButton = document.getElementById('send-message-btn');
+  if (sendMessageButton) {
+    sendMessageButton.addEventListener('click', () => {
+      const chatInput = document.getElementById('chat-input');
+      if (chatInput) {
+        sendUserMessage(chatInput.value);
+      }
+    });
+  }
+
+  const chatInput = document.getElementById('chat-input');
+  if (chatInput) {
+    chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendUserMessage(chatInput.value);
+      }
+    });
+  }
+
+  // Quick response buttons
+  const quickResponses = document.querySelectorAll('.quick-response');
+  quickResponses.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const message = btn.dataset.message || btn.textContent;
+      sendQuickResponse(message);
+    });
+  });
+  
   console.log('Event listeners setup complete');
 }
 
@@ -165,21 +300,182 @@ function initializeUI() {
   // Update initial ELO calculation
   updateEloCalculation();
   
+  // Ensure game section is always visible (no setup screen anymore)
+  const gameSection = document.getElementById('game-section');
+  if (gameSection) {
+    gameSection.classList.remove('hidden');
+  }
+  
   // Try to load saved game state
   const gameLoaded = loadGameState();
   
   if (gameLoaded) {
-    // Show game section if we loaded a game
-    document.getElementById('setup-section').classList.add('hidden');
-    document.getElementById('game-section').classList.remove('hidden');
     console.log('Loaded saved game state');
   } else {
     // Set initial game status for new game
-    updateGameStatus('Set up your game to start playing');
+    updateGameStatus('Ready to play');
     updateTurnIndicator();
   }
   
   console.log('UI initialization complete');
+}
+
+/**
+ * Initialize chat engine
+ */
+function initializeChatEngine() {
+  try {
+    console.log('Initializing chat engine...');
+    
+    if (!window.ChatEngine) {
+      console.error('ChatEngine not available');
+      return;
+    }
+    
+    chatEngine = new window.ChatEngine();
+    console.log('Chat engine initialized successfully');
+    
+  } catch (error) {
+    console.error('Failed to initialize chat engine:', error);
+  }
+}
+
+/**
+ * Auto-start the game without setup screen
+ */
+function autoStartGame() {
+  try {
+    console.log('Auto-starting game with config:', gameConfig);
+    
+    if (!isEngineInitialized) {
+      console.log('Engine not ready, will start game when engine is initialized');
+      return;
+    }
+    
+    // Load user preferences
+    loadUserPreferences();
+    
+    // Update ELO calculation
+    updateEloCalculation();
+    
+    // Reset game state
+    game.reset();
+    board.position('start');
+    clearHighlights();
+    lastMove = null;
+    selectedSquare = null;
+    
+    // Reset captured pieces and timer
+    resetCapturedPieces();
+    resetGameTimer();
+    
+    // Update UI displays
+    updateTurnIndicator();
+    updateMoveHistory();
+    updateCapturedPiecesDisplay();
+    updateHeaderDisplays();
+    
+    // Mark game as started
+    isGameStarted = true;
+    
+    // Generate welcome message from AI
+    if (chatEngine) {
+      const greeting = chatEngine.generateGreeting(gameConfig.opponentElo);
+      displayChatMessage(greeting);
+    }
+    
+    console.log('Game auto-started successfully');
+    
+  } catch (error) {
+    console.error('Failed to auto-start game:', error);
+  }
+}
+
+/**
+ * Initialize Stockfish engine
+ */
+async function initializeEngine() {
+  try {
+    console.log('Initializing Stockfish engine...');
+    console.log('Available window properties:', Object.keys(window).filter(key => key.includes('Engine') || key.includes('Config')));
+    console.log('StockfishEngine available:', !!window.StockfishEngine);
+    console.log('EngineConfig available:', !!window.EngineConfig);
+    
+    
+    // Check if required modules are loaded
+    if (!window.StockfishEngine) {
+      console.error('StockfishEngine not loaded');
+      showEngineError('Stockfish engine module not loaded');
+      return;
+    }
+    
+    if (!window.EngineConfig) {
+      console.error('EngineConfig not loaded');
+      showEngineError('Engine configuration module not loaded');
+      return;
+    }
+    
+    console.log('Creating Stockfish engine instance...');
+    // Create engine instance
+    engine = new window.StockfishEngine();
+    
+    console.log('Initializing engine...');
+    // Initialize engine
+    await engine.init();
+    
+    isEngineInitialized = true;
+    console.log('Stockfish engine initialized successfully');
+    
+  } catch (error) {
+    console.error('Failed to initialize Stockfish engine:', error);
+    isEngineInitialized = false;
+    
+    // Show user-friendly error message
+    showEngineError('Failed to load AI opponent. You can still play against another human.');
+  }
+}
+
+/**
+ * Show engine error message
+ */
+function showEngineError(message) {
+  const aiStatus = document.getElementById('ai-status');
+  if (aiStatus) {
+    aiStatus.innerHTML = `
+      <div class="ai-indicator" style="color: var(--error-color);">
+        <span>⚠️ ${message}</span>
+      </div>
+    `;
+    aiStatus.classList.remove('hidden');
+  }
+}
+
+/**
+ * Show module loading status for debugging
+ */
+function showModuleStatus() {
+  const statusElement = document.getElementById('status-text');
+  if (statusElement) {
+    const engineConfigAvailable = !!window.EngineConfig;
+    const stockfishEngineAvailable = !!window.StockfishEngine;
+    
+    const status = `
+      Module Status: 
+      EngineConfig: ${engineConfigAvailable ? '✅' : '❌'}, 
+      StockfishEngine: ${stockfishEngineAvailable ? '✅' : '❌'}
+    `;
+    
+    statusElement.textContent = status;
+    
+    // Log additional info
+    console.log('Module loading status:', {
+      EngineConfig: engineConfigAvailable,
+      StockfishEngine: stockfishEngineAvailable,
+      windowKeys: Object.keys(window).filter(key => 
+        key.includes('Engine') || key.includes('Config')
+      )
+    });
+  }
 }
 
 /**
@@ -221,7 +517,7 @@ function updateEloCalculation() {
   gameConfig.strengthPercentage = strengthPercentage;
   gameConfig.opponentElo = stats.opponentElo;
   
-  // Update displays
+  // Update setup screen displays
   if (strengthDisplay) {
     strengthDisplay.textContent = stats.formattedPercentage;
   }
@@ -247,6 +543,28 @@ function updateEloCalculation() {
       recommendedIndicator.classList.add('hidden');
     }
   }
+
+  // Update in-game displays
+  const userEloGameDisplay = document.getElementById('user-elo-value');
+  if (userEloGameDisplay) {
+    userEloGameDisplay.textContent = userElo;
+  }
+
+  const aiEloGameDisplay = document.getElementById('ai-elo-value');
+  if (aiEloGameDisplay) {
+    aiEloGameDisplay.textContent = stats.opponentElo;
+  }
+
+  const gameStrengthDisplay = document.getElementById('strength-percentage');
+  if (gameStrengthDisplay) {
+    gameStrengthDisplay.textContent = stats.formattedPercentage;
+  }
+
+  const difficultyBadge = document.getElementById('difficulty-badge');
+  if (difficultyBadge) {
+    difficultyBadge.textContent = stats.opponentCategory;
+    difficultyBadge.className = `difficulty-badge ${stats.opponentCategory.toLowerCase()}`;
+  }
   
   // Update preset button states
   updatePresetButtons(strengthPercentage);
@@ -267,6 +585,468 @@ function selectPreset(percentage, name) {
     
     // Save user preferences
     window.EloCalculator.saveUserPreferences(gameConfig.userElo, percentage);
+  }
+}
+
+/**
+ * Handle user ELO input change
+ */
+function handleUserEloChange() {
+  const userEloInput = document.getElementById('user-elo-input');
+  if (!userEloInput) return;
+  
+  const newElo = parseInt(userEloInput.value);
+  if (newElo >= 800 && newElo <= 3000) {
+    gameConfig.userElo = newElo;
+    updateEloCalculation();
+  }
+}
+
+/**
+ * Handle AI ELO input change
+ */
+function handleAiEloChange() {
+  const aiEloInput = document.getElementById('ai-elo-input');
+  if (!aiEloInput) return;
+  
+  const newElo = parseInt(aiEloInput.value);
+  if (newElo >= 800 && newElo <= 3000) {
+    gameConfig.opponentElo = newElo;
+    // Calculate the strength percentage that would give this ELO
+    const strengthPercentage = Math.round(((newElo / gameConfig.userElo) - 1) * 100);
+    gameConfig.strengthPercentage = Math.max(-50, Math.min(100, strengthPercentage));
+    updateHeaderDisplays();
+  }
+}
+
+/**
+ * Adjust ELO rating using +/- buttons
+ */
+function adjustElo(type, delta) {
+  if (!window.EloCalculator) return;
+  
+  if (type === 'user') {
+    // Adjust user ELO
+    const currentElo = gameConfig.userElo;
+    const newElo = Math.max(800, Math.min(3000, currentElo + delta));
+    
+    // Update game config
+    gameConfig.userElo = newElo;
+    
+    // Update header input
+    const userEloInput = document.getElementById('user-elo-input');
+    if (userEloInput) {
+      userEloInput.value = newElo;
+    }
+    
+    // Recalculate opponent ELO
+    updateEloCalculation();
+  }
+}
+
+/**
+ * Adjust strength percentage using +/- buttons
+ */
+function adjustStrength(delta) {
+  if (!window.EloCalculator) return;
+  
+  const currentStrength = gameConfig.strengthPercentage;
+  const newStrength = Math.max(-50, Math.min(100, currentStrength + delta));
+  
+  // Update game config
+  gameConfig.strengthPercentage = newStrength;
+  
+  // Update setup screen input
+  const strengthInput = document.getElementById('strength-input');
+  if (strengthInput) {
+    strengthInput.value = newStrength;
+  }
+  
+  // Update in-game display
+  const strengthDisplay = document.getElementById('strength-percentage');
+  if (strengthDisplay) {
+    strengthDisplay.textContent = (newStrength >= 0 ? '+' : '') + newStrength + '%';
+  }
+  
+  // Recalculate opponent ELO
+  updateEloCalculation();
+}
+
+/**
+ * Switch between tabs in the bottom section
+ */
+function switchTab(tabName) {
+  // Remove active class from all tab buttons
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  tabButtons.forEach(btn => btn.classList.remove('active'));
+  
+  // Remove active class from all tab panels
+  const tabPanels = document.querySelectorAll('.tab-panel');
+  tabPanels.forEach(panel => panel.classList.remove('active'));
+  
+  // Add active class to clicked button
+  const activeButton = document.querySelector(`[data-tab="${tabName}"]`);
+  if (activeButton) {
+    activeButton.classList.add('active');
+  }
+  
+  // Show the corresponding panel
+  const activePanel = document.getElementById(`${tabName}-tab`);
+  if (activePanel) {
+    activePanel.classList.add('active');
+  }
+}
+
+/**
+ * Resign the current game
+ */
+function resignGame() {
+  if (!game) return;
+  
+  if (confirm('Are you sure you want to resign?')) {
+    endGame('resign', 'You resigned the game');
+  }
+}
+
+/**
+ * Offer a draw
+ */
+function offerDraw() {
+  if (!game) return;
+  
+  if (confirm('Offer a draw?')) {
+    // In a real implementation, this would be sent to opponent
+    // For now, AI automatically accepts draws
+    endGame('draw', 'Draw offered and accepted');
+  }
+}
+
+/**
+ * Flip the board orientation
+ */
+function flipBoard() {
+  if (!board) return;
+  
+  board.flip();
+}
+
+/**
+ * Toggle coordinate display
+ */
+function toggleCoordinates() {
+  const button = document.getElementById('toggle-coordinates');
+  if (!button) return;
+  
+  // This would toggle coordinate visibility
+  // For now, just toggle button text
+  const isShowing = button.textContent.includes('Hide');
+  button.innerHTML = isShowing ? 
+    '<span class="btn-icon">🔤</span>Show Coordinates' : 
+    '<span class="btn-icon">🔤</span>Hide Coordinates';
+}
+
+/**
+ * Toggle sound effects
+ */
+function toggleSound() {
+  const button = document.getElementById('toggle-sound');
+  if (!button) return;
+  
+  // This would toggle sound effects
+  // For now, just toggle button text
+  const isOn = button.textContent.includes('Off');
+  button.innerHTML = isOn ? 
+    '<span class="btn-icon">🔊</span>Sound On' : 
+    '<span class="btn-icon">🔇</span>Sound Off';
+}
+
+/**
+ * Display a chat message in the chat window
+ */
+function displayChatMessage(message) {
+  const chatMessages = document.getElementById('chat-messages');
+  if (!chatMessages || !message) return;
+  
+  const messageElement = createChatMessageElement(message);
+  chatMessages.appendChild(messageElement);
+  
+  // Auto-scroll to bottom
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+/**
+ * Create a chat message DOM element
+ */
+function createChatMessageElement(message) {
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `chat-message ${message.sender}`;
+  
+  const avatar = document.createElement('div');
+  avatar.className = 'message-avatar';
+  avatar.textContent = message.sender === 'user' ? '👤' : '🤖';
+  
+  const content = document.createElement('div');
+  content.className = 'message-content';
+  
+  const text = document.createElement('div');
+  text.className = 'message-text';
+  text.textContent = message.text;
+  
+  const timestamp = document.createElement('div');
+  timestamp.className = 'message-timestamp';
+  timestamp.textContent = formatTimestamp(message.timestamp);
+  
+  content.appendChild(text);
+  content.appendChild(timestamp);
+  messageDiv.appendChild(avatar);
+  messageDiv.appendChild(content);
+  
+  return messageDiv;
+}
+
+/**
+ * Format timestamp for display
+ */
+function formatTimestamp(date) {
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+/**
+ * Send a user message
+ */
+function sendUserMessage(text) {
+  if (!chatEngine || !text.trim()) return;
+  
+  const message = chatEngine.addMessage('user', text.trim());
+  displayChatMessage(message);
+  
+  // Clear input
+  const chatInput = document.getElementById('chat-input');
+  if (chatInput) {
+    chatInput.value = '';
+  }
+}
+
+/**
+ * Send a quick response
+ */
+function sendQuickResponse(text) {
+  sendUserMessage(text);
+}
+
+/**
+ * Display AI thinking indicator
+ */
+function showAIThinking() {
+  const chatMessages = document.getElementById('chat-messages');
+  if (!chatMessages) return;
+  
+  const thinkingDiv = document.createElement('div');
+  thinkingDiv.className = 'chat-message ai thinking';
+  thinkingDiv.id = 'ai-thinking-indicator';
+  
+  const avatar = document.createElement('div');
+  avatar.className = 'message-avatar';
+  avatar.textContent = '🤖';
+  
+  const content = document.createElement('div');
+  content.className = 'message-content';
+  
+  const indicator = document.createElement('div');
+  indicator.className = 'thinking-indicator';
+  indicator.innerHTML = 'Thinking<span class="thinking-dots"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></span>';
+  
+  content.appendChild(indicator);
+  thinkingDiv.appendChild(avatar);
+  thinkingDiv.appendChild(content);
+  chatMessages.appendChild(thinkingDiv);
+  
+  // Auto-scroll to bottom
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+/**
+ * Hide AI thinking indicator
+ */
+function hideAIThinking() {
+  const thinkingIndicator = document.getElementById('ai-thinking-indicator');
+  if (thinkingIndicator) {
+    thinkingIndicator.remove();
+  }
+}
+
+/**
+ * Update header displays with current game state
+ */
+function updateHeaderDisplays() {
+  // Update ELO input fields
+  const userEloInput = document.getElementById('user-elo-input');
+  if (userEloInput) {
+    userEloInput.value = gameConfig.userElo;
+  }
+  
+  const aiEloInput = document.getElementById('ai-elo-input');
+  if (aiEloInput) {
+    aiEloInput.value = gameConfig.opponentElo;
+  }
+  
+  const strengthDisplay = document.getElementById('strength-display');
+  if (strengthDisplay) {
+    strengthDisplay.textContent = (gameConfig.strengthPercentage >= 0 ? '+' : '') + gameConfig.strengthPercentage + '%';
+  }
+  
+  // Update material status
+  updateMaterialAdvantage();
+  
+  // Update move count
+  const moveNumber = document.getElementById('move-number');
+  if (moveNumber && game) {
+    moveNumber.textContent = Math.ceil(game.history().length / 2);
+  }
+}
+
+/**
+ * Update material advantage display
+ */
+function updateMaterialAdvantage() {
+  const materialStatus = document.getElementById('material-status');
+  if (!materialStatus || !game) return;
+  
+  const whiteScore = calculateMaterialScore('white');
+  const blackScore = calculateMaterialScore('black');
+  const advantage = whiteScore - blackScore;
+  
+  if (advantage > 0) {
+    materialStatus.textContent = `Material: White +${advantage}`;
+  } else if (advantage < 0) {
+    materialStatus.textContent = `Material: Black +${Math.abs(advantage)}`;
+  } else {
+    materialStatus.textContent = 'Material: Even';
+  }
+}
+
+/**
+ * Calculate material score for a side
+ */
+function calculateMaterialScore(color) {
+  const pieces = game.board().flat();
+  let score = 0;
+  
+  pieces.forEach(piece => {
+    if (piece && piece.color === (color === 'white' ? 'w' : 'b')) {
+      score += PIECE_VALUES[piece.type] || 0;
+    }
+  });
+  
+  return score;
+}
+
+/**
+ * Update status bar with game information
+ */
+function updateStatusBar() {
+  // Update PGN status
+  const pgnStatus = document.getElementById('pgn-status');
+  if (pgnStatus && game) {
+    const history = game.history({ verbose: true });
+    if (history.length > 0) {
+      const lastMove = history[history.length - 1];
+      pgnStatus.textContent = `${Math.ceil(history.length / 2)}.${history.length % 2 === 1 ? '' : '..'} ${lastMove.san}`;
+    } else {
+      pgnStatus.textContent = 'Ready to play';
+    }
+  }
+  
+  // Update captured pieces status
+  const capturedStatus = document.getElementById('captured-pieces-status');
+  if (capturedStatus) {
+    const whiteCaptures = capturedPieces.white;
+    const blackCaptures = capturedPieces.black;
+    
+    if (whiteCaptures.length === 0 && blackCaptures.length === 0) {
+      capturedStatus.textContent = 'None yet';
+    } else {
+      const whitePieces = whiteCaptures.map(p => getPieceSymbol(p, 'white')).join('');
+      const blackPieces = blackCaptures.map(p => getPieceSymbol(p, 'black')).join('');
+      capturedStatus.textContent = `${whitePieces} vs ${blackPieces}`;
+    }
+  }
+  
+  // Update opening name (placeholder for now)
+  const openingName = document.getElementById('opening-name');
+  if (openingName) {
+    const moveCount = game ? game.history().length : 0;
+    if (moveCount === 0) {
+      openingName.textContent = 'Opening: Starting position';
+    } else if (moveCount < 6) {
+      openingName.textContent = 'Opening: In progress';
+    } else {
+      openingName.textContent = 'Opening: Middle game';
+    }
+  }
+}
+
+/**
+ * Get piece symbol for display
+ */
+function getPieceSymbol(pieceType, color) {
+  const symbols = {
+    'p': color === 'white' ? '♙' : '♟',
+    'r': color === 'white' ? '♖' : '♜',
+    'n': color === 'white' ? '♘' : '♞',
+    'b': color === 'white' ? '♗' : '♝',
+    'q': color === 'white' ? '♕' : '♛',
+    'k': color === 'white' ? '♔' : '♚'
+  };
+  return symbols[pieceType] || '';
+}
+
+/**
+ * Handle player move for chat interaction
+ */
+function handlePlayerMove(move) {
+  if (!chatEngine || !move) return;
+  
+  // Generate opening comment for first few moves
+  if (game.history().length <= 6) {
+    const openingComment = chatEngine.generateOpeningComment(move.san);
+    if (openingComment) {
+      setTimeout(() => displayChatMessage(openingComment), 800);
+      return;
+    }
+  }
+  
+  // Check for special events
+  if (move.captured) {
+    const captureComment = chatEngine.generateEventComment('capture');
+    if (captureComment) {
+      setTimeout(() => displayChatMessage(captureComment), 800);
+      return;
+    }
+  }
+  
+  if (move.flags.includes('k') || move.flags.includes('q')) {
+    const castleComment = chatEngine.generateEventComment('castle');
+    if (castleComment) {
+      setTimeout(() => displayChatMessage(castleComment), 800);
+      return;
+    }
+  }
+  
+  if (move.promotion) {
+    const promotionComment = chatEngine.generateEventComment('promotion');
+    if (promotionComment) {
+      setTimeout(() => displayChatMessage(promotionComment), 800);
+      return;
+    }
+  }
+  
+  // Generate general move commentary occasionally
+  if (Math.random() < 0.3) { // 30% chance for general commentary
+    const moveComment = chatEngine.generateMoveComment('interesting', move.san);
+    if (moveComment) {
+      setTimeout(() => displayChatMessage(moveComment), 800);
+    }
   }
 }
 
@@ -400,6 +1180,305 @@ function loadUserPreferences() {
 }
 
 /**
+ * Convert piece type to Unicode symbol
+ */
+function getPieceSymbol(piece, color) {
+  const symbols = {
+    'p': color === 'w' ? '♙' : '♟',
+    'r': color === 'w' ? '♖' : '♜',  
+    'n': color === 'w' ? '♘' : '♞',
+    'b': color === 'w' ? '♗' : '♝',
+    'q': color === 'w' ? '♕' : '♛',
+    'k': color === 'w' ? '♔' : '♚'
+  };
+  return symbols[piece] || '';
+}
+
+/**
+ * Update captured pieces display and calculate scores
+ */
+function updateCapturedPieces() {
+  // Get current board position
+  const history = game.history({ verbose: true });
+  
+  // Reset captured pieces
+  capturedPieces.white = [];
+  capturedPieces.black = [];
+  
+  // Process all moves to find captures
+  history.forEach(move => {
+    if (move.captured) {
+      const capturingColor = move.color;
+      const capturedPiece = move.captured;
+      
+      // Add to appropriate captured array
+      if (capturingColor === 'w') {
+        capturedPieces.white.push(capturedPiece);
+      } else {
+        capturedPieces.black.push(capturedPiece);
+      }
+    }
+  });
+  
+  // Sort captured pieces by value (ascending)
+  capturedPieces.white.sort((a, b) => PIECE_VALUES[a] - PIECE_VALUES[b]);
+  capturedPieces.black.sort((a, b) => PIECE_VALUES[a] - PIECE_VALUES[b]);
+  
+  // Update display
+  updateCapturedPiecesDisplay();
+}
+
+/**
+ * Update the visual display of captured pieces
+ */
+function updateCapturedPiecesDisplay() {
+  // Update white captured pieces (captured by white)
+  const whiteCapturedContainer = document.querySelector('#captured-white .captured-pieces-container');
+  const whiteScoreElement = document.getElementById('score-white');
+  
+  if (whiteCapturedContainer) {
+    whiteCapturedContainer.innerHTML = '';
+    capturedPieces.white.forEach(piece => {
+      const pieceElement = document.createElement('span');
+      pieceElement.className = 'captured-piece';
+      pieceElement.textContent = getPieceSymbol(piece, 'b'); // Show black piece
+      pieceElement.title = getPieceFullName(piece);
+      whiteCapturedContainer.appendChild(pieceElement);
+    });
+  }
+  
+  // Update black captured pieces (captured by black)
+  const blackCapturedContainer = document.querySelector('#captured-black .captured-pieces-container');
+  const blackScoreElement = document.getElementById('score-black');
+  
+  if (blackCapturedContainer) {
+    blackCapturedContainer.innerHTML = '';
+    capturedPieces.black.forEach(piece => {
+      const pieceElement = document.createElement('span');
+      pieceElement.className = 'captured-piece';
+      pieceElement.textContent = getPieceSymbol(piece, 'w'); // Show white piece
+      pieceElement.title = getPieceFullName(piece);
+      blackCapturedContainer.appendChild(pieceElement);
+    });
+  }
+  
+  // Calculate and display scores
+  const whiteScore = capturedPieces.white.reduce((sum, piece) => sum + PIECE_VALUES[piece], 0);
+  const blackScore = capturedPieces.black.reduce((sum, piece) => sum + PIECE_VALUES[piece], 0);
+  const scoreDifference = whiteScore - blackScore;
+  
+  if (whiteScoreElement) {
+    const scoreText = scoreDifference > 0 ? `+${scoreDifference}` : scoreDifference === 0 ? '0' : `${scoreDifference}`;
+    whiteScoreElement.textContent = scoreText;
+    whiteScoreElement.className = 'score ' + (scoreDifference > 0 ? 'positive' : scoreDifference < 0 ? 'negative' : 'neutral');
+  }
+  
+  if (blackScoreElement) {
+    const scoreText = scoreDifference < 0 ? `+${Math.abs(scoreDifference)}` : scoreDifference === 0 ? '0' : `-${scoreDifference}`;
+    blackScoreElement.textContent = scoreText;
+    blackScoreElement.className = 'score ' + (scoreDifference < 0 ? 'positive' : scoreDifference > 0 ? 'negative' : 'neutral');
+  }
+}
+
+/**
+ * Get full name of piece for tooltip
+ */
+function getPieceFullName(piece) {
+  const names = {
+    'p': 'Pawn',
+    'r': 'Rook', 
+    'n': 'Knight',
+    'b': 'Bishop',
+    'q': 'Queen',
+    'k': 'King'
+  };
+  return names[piece] || '';
+}
+
+/**
+ * Reset captured pieces for new game
+ */
+function resetCapturedPieces() {
+  capturedPieces.white = [];
+  capturedPieces.black = [];
+  updateCapturedPiecesDisplay();
+}
+
+/**
+ * Start the game timer
+ */
+function startGameTimer() {
+  gameStartTime = Date.now();
+  totalGameTime = 0;
+  
+  // Clear any existing timer
+  if (gameTimerInterval) {
+    clearInterval(gameTimerInterval);
+  }
+  
+  // Update timer display every second
+  gameTimerInterval = setInterval(updateTimerDisplay, 1000);
+  
+  // Initial display
+  updateTimerDisplay();
+}
+
+/**
+ * Stop the game timer
+ */
+function stopGameTimer() {
+  if (gameTimerInterval) {
+    clearInterval(gameTimerInterval);
+    gameTimerInterval = null;
+  }
+  
+  // Calculate final time
+  if (gameStartTime) {
+    totalGameTime = Math.floor((Date.now() - gameStartTime) / 1000);
+  }
+}
+
+/**
+ * Reset the game timer
+ */
+function resetGameTimer() {
+  stopGameTimer();
+  gameStartTime = null;
+  totalGameTime = 0;
+  gameTimerStarted = false;
+  updateTimerDisplay();
+}
+
+/**
+ * Update the timer display
+ */
+function updateTimerDisplay() {
+  const timerElement = document.getElementById('timer-display');
+  if (!timerElement) return;
+  
+  let seconds;
+  if (gameStartTime && gameTimerInterval) {
+    // Game is running
+    seconds = Math.floor((Date.now() - gameStartTime) / 1000);
+  } else {
+    // Game stopped or not started
+    seconds = totalGameTime;
+  }
+  
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  
+  const formattedTime = `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  timerElement.textContent = formattedTime;
+}
+
+/**
+ * Get formatted game duration
+ */
+function getGameDuration() {
+  const seconds = totalGameTime || (gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0);
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  
+  if (minutes > 0) {
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+  return `${seconds}s`;
+}
+
+/**
+ * Start a new game with current settings
+ */
+function newGame() {
+  try {
+    console.log('Starting new game with existing config:', gameConfig);
+    
+    // Reset game state
+    game.reset();
+    board.position('start');
+    clearHighlights();
+    lastMove = null;
+    selectedSquare = null;
+    
+    // Reset captured pieces and timer
+    resetCapturedPieces();
+    resetGameTimer();
+    
+    // Reset chat
+    if (chatEngine) {
+      chatEngine.clearHistory();
+      
+      // Clear chat messages from UI
+      const chatMessages = document.getElementById('chat-messages');
+      if (chatMessages) {
+        chatMessages.innerHTML = '';
+      }
+      
+      // Generate new greeting
+      const greeting = chatEngine.generateGreeting(gameConfig.opponentElo);
+      if (greeting) {
+        setTimeout(() => displayChatMessage(greeting), 500);
+      }
+    }
+    
+    // Update UI
+    updateMoveHistory();
+    updateTurnIndicator();
+    updateHeaderDisplays();
+    updateStatusBar();
+    const difficultyName = window.EngineConfig.getDifficultyDescription(gameConfig.opponentElo);
+    updateGameStatus(`Playing against ${gameConfig.opponentElo} ELO (${difficultyName}) opponent`);
+    saveGameState();
+    
+    console.log('New game started successfully');
+    
+    // If it's black's turn (somehow), make AI move
+    if (game.turn() === 'b' && isEngineInitialized) {
+      setTimeout(makeComputerMove, 500);
+    }
+    
+  } catch (error) {
+    handleError('Failed to start new game', error);
+  }
+}
+
+/**
+ * Return to setup screen to change ELO/difficulty settings
+ */
+function backToSetup() {
+  try {
+    console.log('Returning to setup screen');
+    
+    // Clear any saved game state so we don't auto-load it
+    localStorage.removeItem('chess-game-state');
+    
+    // Hide game section, show setup
+    document.getElementById('game-section').classList.add('hidden');
+    document.getElementById('setup-section').classList.remove('hidden');
+    
+    // Update setup section with current values
+    const eloInput = document.getElementById('elo-input');
+    const strengthInput = document.getElementById('strength-input');
+    
+    if (eloInput && gameConfig.userElo) {
+      eloInput.value = gameConfig.userElo;
+    }
+    
+    if (strengthInput && gameConfig.strengthPercentage !== undefined) {
+      strengthInput.value = gameConfig.strengthPercentage;
+    }
+    
+    // Update displays
+    updateEloCalculation();
+    
+    console.log('Returned to setup screen successfully');
+    
+  } catch (error) {
+    handleError('Failed to return to setup', error);
+  }
+}
+
+/**
  * Start a new game
  */
 function startGame() {
@@ -418,6 +1497,10 @@ function startGame() {
     lastMove = null;
     selectedSquare = null;
     
+    // Reset captured pieces and timer
+    resetCapturedPieces();
+    resetGameTimer();
+    
     // Show game section, hide setup
     document.getElementById('setup-section').classList.add('hidden');
     document.getElementById('game-section').classList.remove('hidden');
@@ -425,7 +1508,8 @@ function startGame() {
     // Update UI
     updateMoveHistory();
     updateTurnIndicator();
-    updateGameStatus(`Playing against ${gameConfig.opponentElo} ELO opponent`);
+    const difficultyName = window.EngineConfig.getDifficultyDescription(gameConfig.opponentElo);
+    updateGameStatus(`Playing against ${gameConfig.opponentElo} ELO (${difficultyName}) opponent`);
     saveGameState();
     
     console.log('Game started successfully');
@@ -451,6 +1535,9 @@ function updateGameStatus(message) {
 function onDragStart(source, piece, position, orientation) {
   // Only allow moves if it's the player's turn and game is active
   if (game.game_over()) return false;
+  
+  // Don't allow moves if board is disabled (AI is thinking)
+  if (window.boardInteractive === false) return false;
   
   // Only allow player to move their pieces (white pieces)
   if (piece.search(/^b/) !== -1) return false;
@@ -489,11 +1576,25 @@ function onDrop(source, target) {
   // Store last move for highlighting
   lastMove = { from: source, to: target };
   
+  // Start timer on first move
+  if (!gameTimerStarted) {
+    startGameTimer();
+    gameTimerStarted = true;
+  }
+  
   // Update UI
   updateMoveHistory();
   updateTurnIndicator();
   updateGameStatus();
+  updateCapturedPieces();
+  updateHeaderDisplays();
+  updateStatusBar();
   saveGameState();
+  
+  // Handle chat for player move
+  if (chatEngine && isGameStarted) {
+    handlePlayerMove(move);
+  }
   
   // Check for game over
   if (game.game_over()) {
@@ -505,6 +1606,19 @@ function onDrop(source, target) {
     // Show check if king is in check
     if (game.in_check()) {
       highlightCheck();
+      
+      // AI comment on check
+      if (chatEngine && isGameStarted) {
+        const checkMessage = chatEngine.generateEventComment('check');
+        if (checkMessage) {
+          setTimeout(() => displayChatMessage(checkMessage), 1000);
+        }
+      }
+    }
+    
+    // If it's black's turn and engine is available, make AI move
+    if (game.turn() === 'b' && isEngineInitialized) {
+      setTimeout(makeComputerMove, 500); // Small delay for better UX
     }
   }
   
@@ -596,10 +1710,11 @@ function handleGameOver() {
     statusText.textContent = status;
   }
   
-  // Clear highlights
+  // Stop timer and clear highlights
+  stopGameTimer();
   clearHighlights();
   
-  console.log('Game over:', status);
+  console.log('Game over:', status, '- Duration:', getGameDuration());
 }
 
 /**
@@ -776,6 +1891,169 @@ function loadGameState() {
   }
   
   return false;
+}
+
+/**
+ * Make computer move using Stockfish engine
+ */
+async function makeComputerMove() {
+  if (!isEngineInitialized || !engine) {
+    console.log('Engine not available for computer move');
+    return;
+  }
+  
+  if (game.turn() !== 'b') {
+    console.log('Not black\'s turn, skipping computer move');
+    return;
+  }
+  
+  try {
+    console.log('Computer is thinking...');
+    
+    // Show AI thinking in chat
+    if (chatEngine && isGameStarted) {
+      showAIThinking();
+    }
+    
+    // Disable board interactions during AI turn
+    setBoardInteractive(false);
+    
+    // Get engine configuration based on target ELO
+    const engineConfig = window.EngineConfig.getRandomizedEngineConfig(gameConfig.opponentElo);
+    const difficultyName = window.EngineConfig.getDifficultyDescription(gameConfig.opponentElo);
+    
+    console.log(`🤖 AI Thinking: ${gameConfig.opponentElo} ELO (${difficultyName})`);
+    console.log(`⚙️ Engine settings: Skill=${engineConfig.skillLevel}, Depth=${engineConfig.depth}, Time=${engineConfig.moveTime}ms`);
+    console.log('📊 Full config:', engineConfig);
+    
+    // Get current position
+    const fen = game.fen();
+    
+    // Request best move from engine
+    const move = await engine.getBestMove(fen, engineConfig, gameConfig.opponentElo);
+    
+    if (!move || move === '(none)') {
+      throw new Error('Engine returned no move');
+    }
+    
+    console.log('Engine suggests move:', move);
+    
+    // Convert UCI move to chess.js move format
+    const engineMove = parseUCIMove(move);
+    
+    // Make the move
+    const result = game.move(engineMove);
+    
+    if (!result) {
+      throw new Error(`Invalid engine move: ${move}`);
+    }
+    
+    console.log('Computer played:', result.san);
+    
+    // Update board position
+    board.position(game.fen());
+    
+    // Store last move for highlighting
+    lastMove = { from: result.from, to: result.to };
+    
+    // Update UI
+    updateMoveHistory();
+    updateTurnIndicator();
+    updateGameStatus();
+    updateCapturedPieces();
+    updateHeaderDisplays();
+    updateStatusBar();
+    saveGameState();
+    
+    // Hide AI thinking and re-enable board
+    if (chatEngine && isGameStarted) {
+      hideAIThinking();
+      
+      // Generate AI move commentary
+      setTimeout(() => {
+        const moveComment = chatEngine.generateMoveComment('good', result.san);
+        if (moveComment) {
+          displayChatMessage(moveComment);
+        }
+      }, 500);
+    }
+    
+    setBoardInteractive(true);
+    
+    // Highlight the computer's move
+    clearHighlights();
+    highlightLastMove(lastMove);
+    
+    // Check for game over
+    if (game.game_over()) {
+      setTimeout(handleGameOver, 500);
+    } else if (game.in_check()) {
+      highlightCheck();
+    }
+    
+  } catch (error) {
+    console.error('Computer move failed:', error);
+    
+    // Re-enable board and hide thinking indicator
+    setBoardInteractive(true);
+    showAIThinking(false);
+    
+    // Show error message
+    showEngineError('AI opponent encountered an error. Game continues in human vs human mode.');
+  }
+}
+
+/**
+ * Parse UCI move notation to chess.js move object
+ * @param {string} uciMove - Move in UCI format (e.g., 'e2e4', 'e7e8q')
+ * @returns {Object|string} Move object or string for chess.js
+ */
+function parseUCIMove(uciMove) {
+  if (!uciMove || uciMove.length < 4) {
+    throw new Error('Invalid UCI move format');
+  }
+  
+  const from = uciMove.slice(0, 2);
+  const to = uciMove.slice(2, 4);
+  const promotion = uciMove.length > 4 ? uciMove.slice(4) : null;
+  
+  const move = { from, to };
+  if (promotion) {
+    move.promotion = promotion;
+  }
+  
+  return move;
+}
+
+/**
+ * Show/hide AI thinking indicator
+ * @param {boolean} show - Whether to show the thinking indicator
+ */
+function showAIThinking(show) {
+  const aiStatus = document.getElementById('ai-status');
+  if (!aiStatus) return;
+  
+  if (show) {
+    aiStatus.innerHTML = `
+      <div class="ai-indicator">
+        <div class="thinking-spinner"></div>
+        <span>AI thinking...</span>
+      </div>
+    `;
+    aiStatus.classList.remove('hidden');
+  } else {
+    aiStatus.classList.add('hidden');
+  }
+}
+
+/**
+ * Enable/disable board interactions
+ * @param {boolean} interactive - Whether the board should be interactive
+ */
+function setBoardInteractive(interactive) {
+  // This would ideally disable chessboard.js interactions
+  // For now, we'll just track the state and check it in onDragStart
+  window.boardInteractive = interactive;
 }
 
 /**

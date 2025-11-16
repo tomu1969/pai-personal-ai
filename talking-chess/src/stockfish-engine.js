@@ -160,11 +160,10 @@ class StockfishEngine {
     // Set skill level (0-20, where 20 is maximum strength)
     this.sendCommand(`setoption name Skill Level value ${config.skillLevel}`);
     
-    // Set UCI Elo for strength limiting if targetElo is provided
+    // Note: UCI_Elo is not supported by Stockfish.js web worker version
+    // Strength limiting is handled through Skill Level and search time/depth instead
     if (targetElo) {
-      const eloValue = Math.max(800, Math.min(3000, targetElo));
-      console.log(`Setting UCI_Elo to ${eloValue} (target: ${targetElo})`);
-      this.sendCommand(`setoption name UCI_Elo value ${eloValue}`);
+      console.log(`🎯 Target ELO: ${targetElo} (using skill level ${config.skillLevel} instead of UCI_Elo)`);
     }
     
     // Prepare for new game

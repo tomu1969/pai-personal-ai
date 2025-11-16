@@ -1703,24 +1703,24 @@ router.post('/cs/groups/process-history', async (req, res) => {
 
     // Load required modules
     const historyFetcher = require('../../ai-cs/services/history-fetcher');
-    const csWebhookController = require('../../ai-cs/controllers/cs-webhook');
     const groupsManager = require('../../ai-cs/modules/groups-manager');
-    const csOrchestrator = require('../../ai-cs/index');
 
-    // Initialize CS orchestrator if not already initialized
-    if (!csOrchestrator.isInitialized()) {
-      logger.info('Initializing CS orchestrator for history processing...');
-      const initResult = await csOrchestrator.initialize();
-      if (!initResult.success) {
-        return res.status(500).json({
-          success: false,
-          error: 'Failed to initialize CS orchestrator',
-          details: initResult.error,
-          timestamp: new Date().toISOString()
-        });
-      }
-      logger.info('CS orchestrator initialized successfully');
+    // Initialize Groups Manager directly (skip CS orchestrator to avoid Google Sheets dependency)
+    logger.info('Initializing Groups Manager for history processing...');
+    const { sequelize } = require('../models');
+    const initResult = await groupsManager.initialize(sequelize);
+    
+    if (!initResult.success) {
+      logger.error('Groups Manager initialization failed', { error: initResult.error });
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to initialize Groups Manager',
+        details: initResult.error,
+        timestamp: new Date().toISOString()
+      });
     }
+    
+    logger.info('Groups Manager initialized successfully');
 
     // Get all monitored groups
     logger.info('Fetching monitored groups...');
@@ -1752,13 +1752,24 @@ router.post('/cs/groups/process-history', async (req, res) => {
       monitoredGroupsCount: monitoredGroups.length
     });
 
-    // Fetch historical messages from all monitored groups
+    // Check if force sync is requested
+    const forceSync = req.body.forceSync === true || req.query.forceSync === 'true';
+    
+    logger.info('Fetching historical messages from monitored groups', {
+      monitoredGroupsCount: monitoredGroups.length,
+      forceSync
+    });
+
+    // Fetch historical messages from all monitored groups with force sync capability
     const historyResult = await historyFetcher.fetchAllGroupsHistory(
       monitoredGroups.map(group => ({
         groupId: group.groupId,
         groupName: group.groupName
       })),
-      { limit: 500 } // Limit per group to avoid overwhelming the system
+      { 
+        limit: 500, // Limit per group to avoid overwhelming the system
+        forceSync: forceSync // Enable force sync from WhatsApp
+      }
     );
 
     if (!historyResult.success) {
@@ -1770,77 +1781,66 @@ router.post('/cs/groups/process-history', async (req, res) => {
       });
     }
 
-    // Process messages through the existing bulk processing pipeline
-    let totalTicketsCreated = 0;
-    let totalDuplicatesSkipped = 0;
-    let processingErrors = [];
-
-    for (const groupResult of historyResult.groupResults) {
-      if (groupResult.success && groupResult.messages.length > 0) {
-        try {
-          logger.info(`Processing ${groupResult.messages.length} messages for group: ${groupResult.groupName}`);
-
-          // Transform messages to the format expected by processBulkMessages
-          const formattedMessages = groupResult.messages.map(msg => ({
-            timestamp: msg.timestamp,
-            sender: msg.senderName,
-            content: msg.textContent
-          }));
-
-          // Process through bulk processing pipeline
-          const processingResult = await csWebhookController.processBulkMessages({
-            messages: formattedMessages,
-            groupId: groupResult.groupId,
-            groupName: groupResult.groupName,
-            sourceType: 'history',
-            instanceId: process.env.CS_INSTANCE_ID || 'cs-ticket-monitor'
-          });
-
-          if (processingResult.success) {
-            totalTicketsCreated += processingResult.ticketsCreated || 0;
-            totalDuplicatesSkipped += processingResult.duplicatesSkipped || 0;
-            
-            // Update group result with ticket information
-            groupResult.ticketsFound = processingResult.ticketsCreated || 0;
-            
-            logger.info(`Group processing completed: ${groupResult.groupName}`, {
-              messagesProcessed: formattedMessages.length,
-              ticketsCreated: processingResult.ticketsCreated || 0
-            });
-          } else {
-            const errorMsg = `Failed to process messages for group ${groupResult.groupName}: ${processingResult.error}`;
-            processingErrors.push(errorMsg);
-            groupResult.ticketsFound = 0;
+    // Cache fetched messages locally for future use
+    let totalCachedMessages = 0;
+    const CSMessageCache = sequelize.models.CSMessageCache;
+    
+    if (CSMessageCache) {
+      try {
+        logger.info('Caching fetched messages locally...');
+        
+        for (const groupResult of historyResult.groupResults) {
+          if (groupResult.success && groupResult.messages.length > 0) {
+            try {
+              const cacheResults = await CSMessageCache.bulkCache(
+                groupResult.messages, 
+                process.env.CS_INSTANCE_ID || 'cs-monitor'
+              );
+              
+              const newCacheEntries = cacheResults.filter(r => r.created).length;
+              totalCachedMessages += newCacheEntries;
+              
+              logger.info(`Cached ${newCacheEntries} new messages for group: ${groupResult.groupName}`);
+              
+            } catch (cacheError) {
+              logger.warn(`Failed to cache messages for group ${groupResult.groupName}`, {
+                error: cacheError.message
+              });
+            }
           }
-
-        } catch (processingError) {
-          const errorMsg = `Exception processing group ${groupResult.groupName}: ${processingError.message}`;
-          processingErrors.push(errorMsg);
-          groupResult.ticketsFound = 0;
-          
-          logger.error('Exception during group message processing', {
-            groupName: groupResult.groupName,
-            error: processingError.message
-          });
         }
-      } else {
-        groupResult.ticketsFound = 0;
+        
+        logger.info(`Message caching completed: ${totalCachedMessages} new messages cached`);
+        
+      } catch (cacheError) {
+        logger.error('Message caching failed', {
+          error: cacheError.message
+        });
+        // Don't fail the entire process if caching fails
       }
     }
 
-    // Combine all errors
-    const allErrors = [...historyResult.errors, ...processingErrors];
+    // Return results without ticket processing (since that requires CS orchestrator)
+    logger.info('History fetch completed successfully', {
+      groupsProcessed: historyResult.groupsProcessed,
+      totalMessages: historyResult.totalMessages,
+      messagesCached: totalCachedMessages,
+      errors: historyResult.errors.length
+    });
 
     const finalResult = {
       success: true,
-      message: 'History processing completed',
+      message: forceSync 
+        ? 'History fetch completed with force sync from WhatsApp' 
+        : 'History fetch completed (database with WhatsApp fallback)',
       groupsProcessed: historyResult.groupsProcessed,
       totalMessages: historyResult.totalMessages,
-      ticketsCreated: totalTicketsCreated,
-      duplicatesSkipped: totalDuplicatesSkipped,
-      errors: allErrors.length,
-      errorMessages: allErrors,
+      messagesCached: totalCachedMessages,
+      errors: historyResult.errors.length,
+      errorMessages: historyResult.errors,
       groupResults: historyResult.groupResults,
+      syncMethod: forceSync ? 'force_sync' : 'database_fallback',
+      note: 'Messages fetched successfully. Ticket processing disabled to avoid CS orchestrator dependency.',
       timestamp: new Date().toISOString()
     };
 
@@ -1941,5 +1941,6 @@ router.post('/cs/groups/discover', async (req, res) => {
     });
   }
 });
+
 
 module.exports = router;

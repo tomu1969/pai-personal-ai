@@ -658,11 +658,19 @@ router.get('/qr-cs', async (req, res) => {
             <h4>🕒 Automatic History Processing</h4>
             <p style="color: #666; margin-bottom: 20px;">Automatically fetch and process all conversation history from monitored WhatsApp groups to extract tickets and add them to Google Sheets.</p>
             
-            <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px;">
+            <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
                 <button id="processHistoryBtn" class="btn-primary" style="padding: 12px 25px; font-size: 16px;">
-                    🚀 Process All Group History
+                    💾 Process Group History
                 </button>
-                <span id="historyStatus" style="font-weight: bold; color: #666;"></span>
+                <button id="forceSyncBtn" class="btn btn-warning" style="padding: 12px 25px; font-size: 16px; background: #ff9800; color: white; border: none; border-radius: 4px;">
+                    🔄 Force Sync from WhatsApp
+                </button>
+                <span id="historyStatus" style="font-weight: bold; color: #666; flex: 1;"></span>
+            </div>
+            
+            <div style="background: #f0f8ff; padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 0.9em;">
+                <strong>💾 Process Group History:</strong> Tries database first, falls back to WhatsApp sync if no messages found.<br>
+                <strong>🔄 Force Sync:</strong> Directly fetches recent messages from WhatsApp (slower but more comprehensive).
             </div>
             
             <div id="historyResults" style="display: none; margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 4px;">
@@ -928,11 +936,12 @@ router.get('/qr-cs', async (req, res) => {
                     });
                     
                     if (!initData.success) {
-                        showError('Failed to initialize CS system: ' + initData.error);
-                        return;
+                        console.warn('⚠️ CS system initialization failed, but will continue to load groups:', initData.error);
+                        showWarning('CS system initialization failed, but group monitoring will still work: ' + initData.error);
+                        // Don't return - continue to load groups anyway
+                    } else {
+                        console.log('✅ CS System initialized successfully');
                     }
-                    
-                    console.log('✅ CS System initialized successfully');
                 } else {
                     console.log('✅ CS System already ready');
                 }
@@ -1641,6 +1650,10 @@ router.get('/qr-cs', async (req, res) => {
             showMessage(message, '#dc3545');
         }
         
+        function showWarning(message) {
+            showMessage(message, '#ff9800');
+        }
+        
         function showLoading(message) {
             showMessage(message, '#007bff');
         }
@@ -1733,16 +1746,22 @@ router.get('/qr-cs', async (req, res) => {
         async function initializeHistoryProcessing() {
             console.log('🚀 Initializing history processing functionality...');
             
-            // Add event listener
+            // Add event listeners for history processing buttons
             const processHistoryBtn = document.getElementById('processHistoryBtn');
+            const forceSyncBtn = document.getElementById('forceSyncBtn');
             
             if (processHistoryBtn) {
-                processHistoryBtn.addEventListener('click', handleHistoryProcessing);
+                processHistoryBtn.addEventListener('click', () => handleHistoryProcessing(false));
                 console.log('✅ Process history button event listener added');
+            }
+            
+            if (forceSyncBtn) {
+                forceSyncBtn.addEventListener('click', () => handleHistoryProcessing(true));
+                console.log('✅ Force sync button event listener added');
             }
         }
 
-        async function handleHistoryProcessing() {
+        async function handleHistoryProcessing(forceSync = false) {
             if (historyProcessingInProgress) {
                 showError('History processing already in progress. Please wait...');
                 return;
@@ -1752,18 +1771,32 @@ router.get('/qr-cs', async (req, res) => {
             const resultsDiv = document.getElementById('historyResults');
 
             historyProcessingInProgress = true;
-            statusSpan.textContent = '🔄 Fetching group history...';
+            
+            // Update status based on sync method
+            if (forceSync) {
+                statusSpan.textContent = '🔄 Force syncing messages from WhatsApp...';
+            } else {
+                statusSpan.textContent = '🔄 Fetching group history...';
+            }
             statusSpan.style.color = '#ff9800';
 
             try {
-                console.log('🔄 Starting automatic history processing...');
+                console.log('🔄 Starting history processing...', { forceSync });
                 
-                // Call the new API endpoint to process all group history
+                // Show intermediate progress
+                if (forceSync) {
+                    statusSpan.textContent = '🔄 Syncing live messages from WhatsApp (may take longer)...';
+                }
+                
+                // Call the API endpoint with force sync option
                 const response = await fetch('/api/cs/groups/process-history', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                    }
+                    },
+                    body: JSON.stringify({
+                        forceSync: forceSync
+                    })
                 });
 
                 const result = await response.json();
@@ -1774,7 +1807,23 @@ router.get('/qr-cs', async (req, res) => {
 
                 // Show results
                 displayHistoryResults(result);
-                statusSpan.textContent = \`✅ Processed \${result.totalMessages || 0} messages from \${result.groupsProcessed || 0} groups, found \${result.ticketsCreated || 0} tickets\`;
+                
+                // Enhanced status message with sync method and caching info
+                let statusMessage = \`✅ Processed \${result.totalMessages || 0} messages from \${result.groupsProcessed || 0} groups\`;
+                
+                if (result.messagesCached && result.messagesCached > 0) {
+                    statusMessage += \`, cached \${result.messagesCached} new messages\`;
+                }
+                
+                if (result.ticketsCreated) {
+                    statusMessage += \`, found \${result.ticketsCreated} tickets\`;
+                }
+                
+                if (result.syncMethod === 'force_sync') {
+                    statusMessage += ' (synced from WhatsApp)';
+                }
+                
+                statusSpan.textContent = statusMessage;
                 statusSpan.style.color = '#4caf50';
 
                 console.log('✅ History processing completed:', result);
@@ -1793,24 +1842,40 @@ router.get('/qr-cs', async (req, res) => {
             const resultsDiv = document.getElementById('historyResults');
             if (!resultsDiv) return;
 
+            // Show sync method information
+            const syncMethodIcon = result.syncMethod === 'force_sync' ? '🔄' : '💾';
+            const syncMethodText = result.syncMethod === 'force_sync' ? 'WhatsApp Force Sync' : 'Database + Fallback';
+            
             let html = \`
                 <h5>📊 History Processing Results</h5>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 15px 0;">
+                
+                <div style="background: #e8f4f8; padding: 10px; border-radius: 8px; margin-bottom: 15px; text-align: center;">
+                    <strong>\${syncMethodIcon} Sync Method: \${syncMethodText}</strong>
+                    \${result.messagesCached ? \`<br><small>💾 \${result.messagesCached} new messages cached locally</small>\` : ''}
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin: 15px 0;">
                     <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; text-align: center;">
                         <div style="font-size: 24px; font-weight: bold; color: #2e7d32;">\${result.groupsProcessed || 0}</div>
-                        <div style="color: #666;">Groups Processed</div>
+                        <div style="color: #666; font-size: 0.9em;">Groups Processed</div>
                     </div>
                     <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; text-align: center;">
                         <div style="font-size: 24px; font-weight: bold; color: #1976d2;">\${result.totalMessages || 0}</div>
-                        <div style="color: #666;">Messages Fetched</div>
+                        <div style="color: #666; font-size: 0.9em;">Messages Fetched</div>
                     </div>
+                    \${result.messagesCached ? \`
+                        <div style="background: #f0f8ff; padding: 15px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold; color: #1565c0;">\${result.messagesCached}</div>
+                            <div style="color: #666; font-size: 0.9em;">Messages Cached</div>
+                        </div>
+                    \` : ''}
                     <div style="background: #f3e5f5; padding: 15px; border-radius: 8px; text-align: center;">
                         <div style="font-size: 24px; font-weight: bold; color: #7b1fa2;">\${result.ticketsCreated || 0}</div>
-                        <div style="color: #666;">Tickets Created</div>
+                        <div style="color: #666; font-size: 0.9em;">Tickets Created</div>
                     </div>
                     <div style="background: #fff3e0; padding: 15px; border-radius: 8px; text-align: center;">
                         <div style="font-size: 24px; font-weight: bold; color: #f57c00;">\${result.duplicatesSkipped || 0}</div>
-                        <div style="color: #666;">Duplicates Skipped</div>
+                        <div style="color: #666; font-size: 0.9em;">Duplicates Skipped</div>
                     </div>
                 </div>
             \`;

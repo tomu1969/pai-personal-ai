@@ -184,10 +184,227 @@ class HistoryFetcher {
   }
 
   /**
+   * Force sync messages directly from WhatsApp for a specific group
+   * Uses alternative Evolution API endpoints to fetch live messages
+   * 
+   * @param {string} groupId - WhatsApp group ID (remoteJid)
+   * @param {Object} options - Additional options
+   * @param {number} options.limit - Maximum number of messages to fetch (default: 500)
+   * @returns {Promise<Object>} Messages data from WhatsApp
+   */
+  async forceSyncGroupMessages(groupId, options = {}) {
+    try {
+      const { limit = 500 } = options;
+
+      logger.info('Force syncing group messages directly from WhatsApp', {
+        groupId,
+        instanceId: this.instanceId,
+        limit
+      });
+
+      // Try multiple Evolution API endpoints for fetching messages
+      const endpoints = [
+        // Method 1: Use the same findMessages endpoint but with more aggressive parameters
+        {
+          method: 'POST',
+          url: `${this.evolutionApiUrl}/chat/findMessages/${this.instanceId}`,
+          data: {
+            where: {
+              key: {
+                remoteJid: groupId
+              }
+            },
+            limit: limit,
+            offset: 0
+          }
+        },
+        // Method 2: Try to get all messages without date filtering
+        {
+          method: 'POST',
+          url: `${this.evolutionApiUrl}/chat/findMessages/${this.instanceId}`,
+          data: {
+            where: {
+              key: {
+                remoteJid: groupId
+              },
+              messageTimestamp: {
+                $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() // Last 30 days
+              }
+            },
+            limit: limit,
+            offset: 0
+          }
+        },
+        // Method 3: Try with minimal filtering
+        {
+          method: 'POST',
+          url: `${this.evolutionApiUrl}/chat/findMessages/${this.instanceId}`,
+          data: {
+            where: {
+              key: {
+                remoteJid: groupId
+              }
+            },
+            limit: Math.min(limit * 2, 1000), // Try with larger limit
+            offset: 0
+          }
+        }
+      ];
+
+      let lastError = null;
+      
+      for (const endpoint of endpoints) {
+        try {
+          logger.debug(`Trying endpoint: ${endpoint.url}`, {
+            method: endpoint.method,
+            groupId
+          });
+
+          const response = await axios({
+            method: endpoint.method,
+            url: endpoint.url,
+            data: endpoint.data,
+            headers: {
+              'apikey': this.evolutionApiKey,
+              'Content-Type': 'application/json'
+            },
+            timeout: 45000 // Longer timeout for WhatsApp sync
+          });
+
+          const messagesData = response.data;
+          
+          // Handle different response formats
+          let messages = [];
+          if (Array.isArray(messagesData)) {
+            messages = messagesData;
+          } else if (messagesData.messages) {
+            messages = messagesData.messages;
+          } else if (messagesData.data) {
+            messages = messagesData.data;
+          }
+
+          logger.info('Force sync successful', {
+            groupId,
+            endpoint: endpoint.url,
+            messagesFound: messages.length
+          });
+
+          return {
+            success: true,
+            messages: messages,
+            total: messages.length,
+            method: 'force_sync',
+            endpoint: endpoint.url
+          };
+
+        } catch (endpointError) {
+          lastError = endpointError;
+          logger.warn(`Endpoint failed: ${endpoint.url}`, {
+            error: endpointError.message,
+            groupId
+          });
+          continue; // Try next endpoint
+        }
+      }
+
+      // All endpoints failed
+      throw lastError || new Error('All sync endpoints failed');
+
+    } catch (error) {
+      logger.error('Force sync failed for group', {
+        groupId,
+        instanceId: this.instanceId,
+        error: error.message,
+        stack: error.stack
+      });
+
+      return {
+        success: false,
+        error: error.message,
+        messages: [],
+        total: 0,
+        method: 'force_sync'
+      };
+    }
+  }
+
+  /**
+   * Fetch messages with fallback strategy: try database first, then force sync
+   * 
+   * @param {string} groupId - WhatsApp group ID (remoteJid)
+   * @param {Object} options - Additional options
+   * @param {number} options.limit - Maximum number of messages to fetch
+   * @param {boolean} options.forceSync - Skip database and force sync from WhatsApp
+   * @returns {Promise<Object>} Messages data
+   */
+  async fetchGroupMessagesWithFallback(groupId, options = {}) {
+    const { forceSync = false, limit = 500 } = options;
+
+    try {
+      // If not forcing sync, try database first
+      if (!forceSync) {
+        logger.info('Attempting database fetch first', { groupId });
+        const dbResult = await this.fetchGroupMessages(groupId, { limit });
+        
+        if (dbResult.success && dbResult.messages.length > 0) {
+          logger.info('Database fetch successful', {
+            groupId,
+            messagesFound: dbResult.messages.length
+          });
+          return { ...dbResult, method: 'database' };
+        }
+        
+        logger.info('Database fetch returned no messages, trying force sync', {
+          groupId,
+          dbSuccess: dbResult.success,
+          dbMessages: dbResult.messages.length
+        });
+      }
+
+      // Fallback to force sync from WhatsApp
+      logger.info('Attempting force sync from WhatsApp', { groupId });
+      const syncResult = await this.forceSyncGroupMessages(groupId, { limit });
+      
+      if (syncResult.success) {
+        logger.info('Force sync completed', {
+          groupId,
+          messagesFound: syncResult.messages.length,
+          success: syncResult.success
+        });
+        return syncResult;
+      }
+
+      // Force sync failed
+      return {
+        success: false,
+        error: syncResult.error || 'Force sync failed',
+        messages: [],
+        total: 0,
+        method: 'force_sync_failed'
+      };
+
+    } catch (error) {
+      logger.error('Fallback fetch strategy failed', {
+        groupId,
+        error: error.message
+      });
+
+      return {
+        success: false,
+        error: error.message,
+        messages: [],
+        total: 0,
+        method: 'error'
+      };
+    }
+  }
+
+  /**
    * Fetch and transform messages from multiple groups
    * 
    * @param {Array} groups - Array of group objects with groupId and groupName
    * @param {Object} options - Additional options
+   * @param {boolean} options.forceSync - Force sync from WhatsApp instead of database
    * @returns {Promise<Object>} Combined results from all groups
    */
   async fetchAllGroupsHistory(groups, options = {}) {
@@ -209,14 +426,17 @@ class HistoryFetcher {
       for (const group of groups) {
         try {
           logger.info(`Fetching history for group: ${group.groupName}`, {
-            groupId: group.groupId
+            groupId: group.groupId,
+            forceSync: options.forceSync
           });
 
-          const fetchResult = await this.fetchGroupMessages(group.groupId, options);
+          // Use fallback strategy: database first, then force sync
+          const fetchResult = await this.fetchGroupMessagesWithFallback(group.groupId, options);
           
           if (fetchResult.success) {
-            // Transform messages to our format
-            const transformedMessages = fetchResult.messages.map(msg => 
+            // Transform messages to our format (handle empty or missing messages array)
+            const messages = Array.isArray(fetchResult.messages) ? fetchResult.messages : [];
+            const transformedMessages = messages.map(msg => 
               this.transformMessage(msg, group.groupId, group.groupName)
             );
 

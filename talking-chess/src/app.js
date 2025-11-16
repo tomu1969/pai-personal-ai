@@ -141,6 +141,8 @@ function initializeChessBoard() {
       onDragStart: onDragStart,
       onDrop: onDrop,
       onSnapEnd: onSnapEnd,
+      // Temporarily disable onSquareClick to isolate drag/drop flashing
+      // onSquareClick: onSquareClick,
       pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
     };
     
@@ -1533,14 +1535,30 @@ function updateGameStatus(message) {
  * Handle drag start events
  */
 function onDragStart(source, piece, position, orientation) {
+  console.log('onDragStart called:', source, piece, 'game.turn():', game.turn(), 'boardInteractive:', window.boardInteractive);
+  
   // Only allow moves if it's the player's turn and game is active
-  if (game.game_over()) return false;
+  if (game.game_over()) {
+    console.log('onDragStart: game over, returning false');
+    return false;
+  }
   
   // Don't allow moves if board is disabled (AI is thinking)
-  if (window.boardInteractive === false) return false;
+  if (window.boardInteractive === false) {
+    console.log('onDragStart: board not interactive, returning false');
+    return false;
+  }
   
   // Only allow player to move their pieces (white pieces)
-  if (piece.search(/^b/) !== -1) return false;
+  if (piece.search(/^b/) !== -1) {
+    console.log('onDragStart: black piece, returning false');
+    return false;
+  }
+  
+  // If clicking on a different piece, clear previous highlights
+  if (selectedSquare && selectedSquare !== source) {
+    clearHighlights();
+  }
   
   // Highlight selected square
   highlightSquare(source);
@@ -1557,21 +1575,44 @@ function onDragStart(source, piece, position, orientation) {
  * Handle piece drop events
  */
 function onDrop(source, target) {
-  // Clear highlights
-  clearHighlights();
+  console.log('onDrop called:', source, target, 'boardInteractive:', window.boardInteractive);
   
-  // See if the move is legal
+  // Early return for invalid drag attempts to prevent any processing
+  if (game.game_over() || window.boardInteractive === false) {
+    console.log('onDrop: invalid state, returning snapback');
+    return 'snapback';
+  }
+  
+  // Get the piece at source to check if it's a valid piece to move
+  const piece = game.get(source);
+  if (!piece || piece.color !== 'w') {
+    console.log('onDrop: invalid piece or not white, returning snapback');
+    return 'snapback';
+  }
+  
+  // Check if this is just a click-release (same square)
+  if (source === target) {
+    console.log('onDrop: click-release case, setting flag');
+    // Mark this as a click-release case for onSnapEnd to handle
+    window.wasClickRelease = true;
+    return; // Don't return 'snapback' to avoid chessboard.js redraw
+  }
+  
+  // See if the move is legal FIRST before clearing highlights
   const move = game.move({
     from: source,
     to: target,
     promotion: 'q' // Always promote to queen for now
   });
   
-  // Illegal move
+  // Illegal move - don't clear highlights, just snapback
   if (move === null) {
     selectedSquare = null;
     return 'snapback';
   }
+  
+  // Legal move - now clear highlights since we're committing to the move
+  clearHighlights();
   
   // Store last move for highlighting
   lastMove = { from: source, to: target };
@@ -1629,7 +1670,92 @@ function onDrop(source, target) {
  * Handle snap end events
  */
 function onSnapEnd() {
-  board.position(game.fen());
+  console.log('onSnapEnd called, wasClickRelease:', window.wasClickRelease);
+  
+  // Check if this was a click-release case
+  if (window.wasClickRelease) {
+    clearHighlights();
+    selectedSquare = null;
+    window.wasClickRelease = false;
+  }
+  // Animation complete - no need to redraw board as it's already in sync
+  // Removing board.position() call to prevent piece flashing
+}
+
+/**
+ * Handle clicks on empty squares
+ */
+function onSquareClick(square) {
+  // If there's a selected piece and clicking on an empty square
+  if (selectedSquare) {
+    // Check if this is a legal move
+    const move = game.move({
+      from: selectedSquare,
+      to: square,
+      promotion: 'q'
+    });
+    
+    if (move) {
+      // Legal move - execute it
+      clearHighlights();
+      lastMove = { from: selectedSquare, to: square };
+      selectedSquare = null;
+      
+      // Start timer on first move
+      if (!gameTimerStarted) {
+        startGameTimer();
+        gameTimerStarted = true;
+      }
+      
+      // Update UI
+      updateMoveHistory();
+      updateTurnIndicator();
+      updateGameStatus();
+      updateCapturedPieces();
+      updateHeaderDisplays();
+      updateStatusBar();
+      saveGameState();
+      
+      // Handle chat for player move
+      if (chatEngine && isGameStarted) {
+        handlePlayerMove(move);
+      }
+      
+      // Check for game over
+      if (game.game_over()) {
+        setTimeout(handleGameOver, 250);
+      } else {
+        // Highlight the last move
+        highlightLastMove(lastMove);
+        
+        // Show check if king is in check
+        if (game.in_check()) {
+          highlightCheck();
+          
+          // AI comment on check
+          if (chatEngine && isGameStarted) {
+            const checkMessage = chatEngine.generateEventComment('check');
+            if (checkMessage) {
+              setTimeout(() => displayChatMessage(checkMessage), 1000);
+            }
+          }
+        }
+        
+        // Make computer move after a short delay
+        if (!game.game_over()) {
+          setTimeout(makeComputerMove, 500);
+        }
+      }
+      
+      // Animate the move smoothly instead of redrawing
+      board.move(`${selectedSquare}-${square}`);
+      
+    } else {
+      // Invalid move or empty square click - clear selection
+      clearHighlights();
+      selectedSquare = null;
+    }
+  }
 }
 
 /**
@@ -1929,8 +2055,77 @@ async function makeComputerMove() {
     // Get current position
     const fen = game.fen();
     
-    // Request best move from engine
-    const move = await engine.getBestMove(fen, engineConfig, gameConfig.opponentElo);
+    // Request best move from engine with timeout protection
+    const timeout = engineConfig.moveTime + 10000; // Add 10 second buffer to engine timeout
+    
+    let move;
+    try {
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Engine timeout')), timeout)
+      );
+      
+      // Race between engine move and timeout
+      move = await Promise.race([
+        engine.getBestMove(fen, engineConfig, gameConfig.opponentElo),
+        timeoutPromise
+      ]);
+      
+    } catch (timeoutError) {
+      console.warn('Engine timeout, making random legal move:', timeoutError.message);
+      // Make a random legal move as fallback
+      const legalMoves = game.moves();
+      if (legalMoves.length === 0) {
+        throw new Error('No legal moves available');
+      }
+      const randomMove = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+      const fallbackResult = game.move(randomMove);
+      if (!fallbackResult) {
+        throw new Error('Failed to make timeout fallback move');
+      }
+      console.log('Computer played (timeout fallback):', fallbackResult.san);
+      
+      // Animate the fallback move smoothly without flashing
+      // Handle special moves that might need full position update
+      if (fallbackResult.flags.includes('c') || fallbackResult.flags.includes('e') || fallbackResult.flags.includes('p')) {
+        // Castling, en passant, or promotion - use position update for accuracy
+        board.position(game.fen());
+      } else {
+        // Regular move - use smooth animation
+        board.move(`${fallbackResult.from}-${fallbackResult.to}`);
+      }
+      lastMove = { from: fallbackResult.from, to: fallbackResult.to };
+      updateMoveHistory();
+      updateTurnIndicator();
+      updateGameStatus();
+      updateCapturedPieces();
+      updateHeaderDisplays();
+      updateStatusBar();
+      saveGameState();
+      
+      setBoardInteractive(true);
+      hideAIThinking();
+      
+      if (chatEngine && isGameStarted) {
+        setTimeout(() => {
+          const moveComment = chatEngine.generateMoveComment('interesting', fallbackResult.san);
+          if (moveComment) {
+            displayChatMessage(moveComment);
+          }
+        }, 500);
+      }
+      
+      clearHighlights();
+      highlightLastMove(lastMove);
+      
+      if (game.game_over()) {
+        setTimeout(handleGameOver, 500);
+      } else if (game.in_check()) {
+        highlightCheck();
+      }
+      
+      return; // Exit early since we handled the move
+    }
     
     if (!move || move === '(none)') {
       throw new Error('Engine returned no move');
@@ -1941,17 +2136,41 @@ async function makeComputerMove() {
     // Convert UCI move to chess.js move format
     const engineMove = parseUCIMove(move);
     
-    // Make the move
-    const result = game.move(engineMove);
+    // Validate the move before executing it
+    const legalMoves = game.moves({ verbose: true });
+    const moveString = typeof engineMove === 'string' ? engineMove : 
+                      `${engineMove.from}${engineMove.to}${engineMove.promotion || ''}`;
     
-    if (!result) {
-      throw new Error(`Invalid engine move: ${move}`);
+    // Check if the move is in legal moves
+    const isLegalMove = legalMoves.some(legalMove => {
+      const legalMoveString = `${legalMove.from}${legalMove.to}${legalMove.promotion || ''}`;
+      return legalMoveString === moveString;
+    });
+    
+    let result;
+    if (!isLegalMove) {
+      console.warn(`Engine suggested illegal move: ${move}. Making random legal move instead.`);
+      // Make a random legal move as fallback
+      const randomLegalMove = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+      result = game.move(randomLegalMove);
+      if (!result) {
+        throw new Error('Failed to make fallback move');
+      }
+      console.log('Computer played (fallback):', result.san);
+    } else {
+      // Make the move
+      result = game.move(engineMove);
+      
+      if (!result) {
+        throw new Error(`Invalid engine move: ${move}`);
+      }
+      console.log('Computer played:', result.san);
     }
     
-    console.log('Computer played:', result.san);
-    
-    // Update board position
-    board.position(game.fen());
+    // Always use smooth animation for now to test if this fixes flashing
+    // TODO: Re-enable special move handling after testing
+    console.log('Move flags:', result.flags, 'From:', result.from, 'To:', result.to);
+    board.move(`${result.from}-${result.to}`);
     
     // Store last move for highlighting
     lastMove = { from: result.from, to: result.to };
@@ -1980,8 +2199,7 @@ async function makeComputerMove() {
     
     setBoardInteractive(true);
     
-    // Highlight the computer's move
-    clearHighlights();
+    // Highlight the computer's move (don't clear first to avoid flashing)
     highlightLastMove(lastMove);
     
     // Check for game over
@@ -1994,12 +2212,27 @@ async function makeComputerMove() {
   } catch (error) {
     console.error('Computer move failed:', error);
     
-    // Re-enable board and hide thinking indicator
+    // Ensure board is always restored to playable state
     setBoardInteractive(true);
-    showAIThinking(false);
+    hideAIThinking();
     
-    // Show error message
-    showEngineError('AI opponent encountered an error. Game continues in human vs human mode.');
+    // Clear any visual indicators
+    clearHighlights();
+    
+    // Update UI to reflect current state
+    updateTurnIndicator();
+    updateStatusBar();
+    
+    // Show error message but keep the game playable
+    showEngineError('AI opponent encountered an error. Game continues - your turn.');
+    
+    // Add fallback chat message if chat engine is available
+    if (chatEngine && isGameStarted) {
+      setTimeout(() => {
+        const errorMessage = chatEngine.addMessage('ai', 'Oops! I had a thinking error. Your turn to move!');
+        displayChatMessage(errorMessage);
+      }, 1000);
+    }
   }
 }
 

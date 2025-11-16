@@ -1,0 +1,163 @@
+version: '3.8'
+
+services:
+  # Evolution API v2.0.9 - WhatsApp Integration Platform
+  evolution-api:
+    image: atendai/evolution-api:v2.0.9
+    container_name: evolution_api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"  # Evolution API port
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_store:/evolution/store
+    environment:
+      # Server Configuration
+      - SERVER_URL=http://localhost:8080
+      - CORS_ORIGIN=*
+      - CORS_METHODS=GET,POST,PUT,DELETE
+      - CORS_CREDENTIALS=true
+      
+      # Database Configuration (ENABLED for message storage)
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://evolution:mypassword123@evolution-postgres:5432/evolution_db?schema=public
+      - DATABASE_CONNECTION_CLIENT_NAME=evolution
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
+      - DATABASE_SAVE_MESSAGE_UPDATE=true
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      
+      # Redis Configuration (Use existing Redis)
+      - REDIS_ENABLED=true
+      - REDIS_URI=redis://host.docker.internal:6379
+      - REDIS_PREFIX_KEY=evo_api
+      
+      # Authentication
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=pai_evolution_api_key_2025
+      - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
+      
+      # Webhook Configuration
+      - WEBHOOK_GLOBAL_URL=http://host.docker.internal:3000/webhook
+      - WEBHOOK_GLOBAL_ENABLED=true
+      - WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS=false
+      
+      # Instance Settings
+      - CONFIG_SESSION_PHONE_CLIENT=PAI System
+      - CONFIG_SESSION_PHONE_NAME=AI PBX
+      
+      # QR Code Settings
+      - QRCODE_LIMIT=30
+      
+      # Retry Mechanism Configuration (Improve Reliability)
+      - WEBHOOK_REQUEST_TIMEOUT_MS=60000
+      - WEBHOOK_RETRY_MAX_ATTEMPTS=5
+      - WEBHOOK_RETRY_INITIAL_DELAY_SECONDS=2
+      - WEBHOOK_RETRY_MAX_DELAY_SECONDS=30
+      - WEBHOOK_RETRY_USE_EXPONENTIAL_BACKOFF=true
+      - WEBHOOK_RETRY_JITTER_FACTOR=0.2
+      - WEBHOOK_RETRY_NON_RETRYABLE_STATUS_CODES=400,401,403,404,422
+      
+      # Instance Management
+      - DEL_INSTANCE=false
+      
+      # Logs
+      - LOG_LEVEL=ERROR
+      - LOG_COLOR=true
+      - LOG_BAILEYS=error
+      
+    networks:
+      - pai_network
+    depends_on:
+      - postgres
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres_evolution
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: evolution_db
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: evolution123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - pai_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and sessions
+  redis:
+    image: redis:7-alpine
+    container_name: redis_evolution
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    command: redis-server --appendonly yes --requirepass redis123
+    volumes:
+      - redis_data:/data
+    networks:
+      - pai_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis123", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # pgAdmin for database management (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin_evolution
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@pai.local
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_DISABLE_POSTFIX: true
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - pai_network
+    depends_on:
+      - postgres
+    profiles:
+      - tools  # Only start with --profile tools
+
+# Volumes for persistent data
+volumes:
+  evolution_instances:
+    driver: local
+    name: pai_evolution_instances
+  evolution_store:
+    driver: local
+    name: pai_evolution_store
+  postgres_data:
+    driver: local
+    name: pai_postgres_data
+  redis_data:
+    driver: local
+    name: pai_redis_data
+  pgadmin_data:
+    driver: local
+    name: pai_pgadmin_data
+
+# Network for service communication
+networks:
+  pai_network:
+    driver: bridge
+    name: pai_network

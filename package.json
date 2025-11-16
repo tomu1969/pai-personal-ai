@@ -27,7 +27,13 @@
     "pai:status": "./scripts/pai-mortgage-manager.sh --status",
     "pai:start": "./scripts/pai-mortgage-manager.sh --start",
     "pai:test": "./scripts/pai-mortgage-manager.sh --test",
+    "logout": "./scripts/clean-logout.sh",
+    "logout:complete": "./scripts/clean-logout.sh --complete",
     "pai:stop": "./scripts/stop-pai-mortgage-system.sh",
+    "logs": "./scripts/monitor-logs.sh",
+    "logs:cs": "./scripts/monitor-cs-logs.sh",
+    "logs:live": "./scripts/live-monitor.sh",
+    "logs:filter": "./scripts/monitor-logs.sh",
     "pai:restart": "./scripts/restart-pai-mortgage-system.sh"
   },
   "keywords": [
@@ -49,6 +55,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
+    "googleapis": "^164.1.0",
     "helmet": "^7.0.0",
     "joi": "^17.9.2",
     "morgan": "^1.10.0",

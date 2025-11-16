@@ -46,7 +46,10 @@ class SystemInitializerService {
       // Step 3: Configure webhooks for all instances
       await this.configureAllWebhooks();
 
-      // Step 4: Validate system readiness
+      // Step 4: Initialize CS Ticket System
+      await this.initializeCSTicketSystem();
+
+      // Step 5: Validate system readiness
       await this.validateSystemReadiness();
 
       this.initialized = true;
@@ -73,7 +76,7 @@ class SystemInitializerService {
    * Ensure all Evolution API instances exist
    */
   async ensureAllInstancesExist() {
-    const instances = ['main', 'pai-assistant', 'pai-mortgage'];
+    const instances = ['main', 'pai-assistant', 'cs-ticket-monitor'];
     
     for (const alias of instances) {
       try {
@@ -106,7 +109,7 @@ class SystemInitializerService {
    * Configure webhooks for all instances
    */
   async configureAllWebhooks() {
-    const instances = ['main', 'pai-assistant', 'pai-mortgage'];
+    const instances = ['main', 'pai-assistant', 'cs-ticket-monitor'];
     
     for (const alias of instances) {
       try {
@@ -165,7 +168,7 @@ class SystemInitializerService {
   async validateSystemReadiness() {
     logger.info('Validating system readiness...');
     
-    const instances = ['main', 'pai-assistant', 'pai-mortgage'];
+    const instances = ['main', 'pai-assistant', 'cs-ticket-monitor'];
     const readinessChecks = [];
     
     for (const alias of instances) {
@@ -210,7 +213,7 @@ class SystemInitializerService {
    */
   async healthCheck() {
     try {
-      const instances = ['main', 'pai-assistant', 'pai-mortgage'];
+      const instances = ['main', 'pai-assistant', 'cs-ticket-monitor'];
       const health = {};
       
       for (const alias of instances) {
@@ -268,6 +271,54 @@ class SystemInitializerService {
         error: error.message
       });
       throw error;
+    }
+  }
+
+  /**
+   * Initialize CS Ticket System
+   * Sets up the orchestrator and all CS modules
+   */
+  async initializeCSTicketSystem() {
+    try {
+      logger.info('Initializing CS Ticket System...');
+
+      // Check if CS environment variables are configured
+      const csSheetId = process.env.CS_SHEET_ID;
+      const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+
+      if (!csSheetId || csSheetId === 'your_google_sheet_id_here') {
+        logger.warn('CS_SHEET_ID not configured - CS Ticket System will not be initialized');
+        return;
+      }
+
+      if (!serviceAccountKey || serviceAccountKey.includes('your-project')) {
+        logger.warn('GOOGLE_SERVICE_ACCOUNT_KEY not configured - CS Ticket System will not be initialized');
+        return;
+      }
+
+      // Initialize CS orchestrator
+      const csOrchestrator = require('../../../ai-cs/index');
+      const initResult = await csOrchestrator.initialize();
+
+      if (initResult.success) {
+        logger.info('CS Ticket System initialized successfully', {
+          instanceId: initResult.instanceId,
+          services: initResult.services,
+          startTime: initResult.startTime
+        });
+      } else {
+        logger.error('CS Ticket System initialization failed', {
+          error: initResult.error
+        });
+        // Don't throw error to allow system to continue without CS
+      }
+
+    } catch (error) {
+      logger.error('Failed to initialize CS Ticket System', {
+        error: error.message,
+        stack: error.stack
+      });
+      // Don't throw error to allow system to continue without CS
     }
   }
 }

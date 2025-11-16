@@ -134,4 +134,4 @@ config/secrets.js
 .prettiercache
 
 # Docker
-.dockerignore
+.dockerignoreai-cs/Google Sheets API Key*.json

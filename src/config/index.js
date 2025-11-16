@@ -15,9 +15,9 @@ const config = {
     // PAI Assistant instance configuration
     paiAssistantInstanceId: process.env.PAI_ASSISTANT_INSTANCE_ID || 'pai-assistant',
     paiAssistantWebhookUrl: process.env.PAI_ASSISTANT_WEBHOOK_URL || `http://${process.env.HOST || 'localhost'}:${process.env.PORT || 3000}/webhook/pai-assistant`,
-    // PAI Mortgage instance configuration
-    paiMortgageInstanceId: process.env.PAI_MORTGAGE_INSTANCE_ID || 'pai-mortgage-fresh',
-    paiMortgageWebhookUrl: process.env.PAI_MORTGAGE_WEBHOOK_URL || `http://${process.env.HOST || 'localhost'}:${process.env.PORT || 3000}/webhook/pai-mortgage`,
+    // CS Ticket Monitor instance configuration
+    csInstanceId: process.env.CS_INSTANCE_ID || 'cs-monitor',
+    csWebhookUrl: process.env.CS_WEBHOOK_URL || `http://${process.env.HOST || 'localhost'}:${process.env.PORT || 3000}/webhook/cs-tickets`,
   },
   openai: {
     apiKey: process.env.OPENAI_API_KEY,

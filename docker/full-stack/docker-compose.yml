@@ -75,9 +75,9 @@ services:
       - ai-pbx-backend
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
-  # Evolution API v2.0.9 - WhatsApp Integration Platform
+  # Evolution API v2.3.6 - WhatsApp Integration Platform
   evolution-api:
-    image: atendai/evolution-api:v2.0.9
+    image: evoapicloud/evolution-api:v2.3.6
     container_name: evolution_api
     restart: unless-stopped
     ports:

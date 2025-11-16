@@ -653,6 +653,26 @@ router.get('/qr-cs', async (req, res) => {
             </button>
         </div>
 
+        <!-- History Processing Section -->
+        <div class="history-processing-section" style="margin-top: 30px; background: #e8f5e8; border: 1px solid #4caf50; border-radius: 8px; padding: 20px;">
+            <h4>🕒 Automatic History Processing</h4>
+            <p style="color: #666; margin-bottom: 20px;">Automatically fetch and process all conversation history from monitored WhatsApp groups to extract tickets and add them to Google Sheets.</p>
+            
+            <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px;">
+                <button id="processHistoryBtn" class="btn-primary" style="padding: 12px 25px; font-size: 16px;">
+                    🚀 Process All Group History
+                </button>
+                <span id="historyStatus" style="font-weight: bold; color: #666;"></span>
+            </div>
+            
+            <div id="historyResults" style="display: none; margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 4px;">
+                <h5>📊 Processing Results:</h5>
+                <div id="historyResultsContent">
+                    <!-- Results will appear here -->
+                </div>
+            </div>
+        </div>
+
         <!-- Add Groups Section -->
         <div class="add-groups-section" style="margin-top: 30px;">
             <h4>➕ Add Groups to Monitor</h4>
@@ -719,6 +739,7 @@ router.get('/qr-cs', async (req, res) => {
         let searchResults = [];
         let totalGroupsCount = 0;
         let searchCache = new Map(); // Cache for search results
+        
         
         // Error tracking for CSP violations
         window.addEventListener('error', function(e) {
@@ -1705,6 +1726,132 @@ router.get('/qr-cs', async (req, res) => {
                 showError('Failed to sync WhatsApp groups: ' + error.message);
             }
         }
+
+        // History Processing Functionality
+        let historyProcessingInProgress = false;
+
+        async function initializeHistoryProcessing() {
+            console.log('🚀 Initializing history processing functionality...');
+            
+            // Add event listener
+            const processHistoryBtn = document.getElementById('processHistoryBtn');
+            
+            if (processHistoryBtn) {
+                processHistoryBtn.addEventListener('click', handleHistoryProcessing);
+                console.log('✅ Process history button event listener added');
+            }
+        }
+
+        async function handleHistoryProcessing() {
+            if (historyProcessingInProgress) {
+                showError('History processing already in progress. Please wait...');
+                return;
+            }
+
+            const statusSpan = document.getElementById('historyStatus');
+            const resultsDiv = document.getElementById('historyResults');
+
+            historyProcessingInProgress = true;
+            statusSpan.textContent = '🔄 Fetching group history...';
+            statusSpan.style.color = '#ff9800';
+
+            try {
+                console.log('🔄 Starting automatic history processing...');
+                
+                // Call the new API endpoint to process all group history
+                const response = await fetch('/api/cs/groups/process-history', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'History processing failed');
+                }
+
+                // Show results
+                displayHistoryResults(result);
+                statusSpan.textContent = \`✅ Processed \${result.totalMessages || 0} messages from \${result.groupsProcessed || 0} groups, found \${result.ticketsCreated || 0} tickets\`;
+                statusSpan.style.color = '#4caf50';
+
+                console.log('✅ History processing completed:', result);
+
+            } catch (error) {
+                console.error('💥 History processing error:', error);
+                statusSpan.textContent = \`❌ Error: \${error.message}\`;
+                statusSpan.style.color = '#f44336';
+                showError(\`History processing failed: \${error.message}\`);
+            } finally {
+                historyProcessingInProgress = false;
+            }
+        }
+
+        function displayHistoryResults(result) {
+            const resultsDiv = document.getElementById('historyResults');
+            if (!resultsDiv) return;
+
+            let html = \`
+                <h5>📊 History Processing Results</h5>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 15px 0;">
+                    <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #2e7d32;">\${result.groupsProcessed || 0}</div>
+                        <div style="color: #666;">Groups Processed</div>
+                    </div>
+                    <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #1976d2;">\${result.totalMessages || 0}</div>
+                        <div style="color: #666;">Messages Fetched</div>
+                    </div>
+                    <div style="background: #f3e5f5; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #7b1fa2;">\${result.ticketsCreated || 0}</div>
+                        <div style="color: #666;">Tickets Created</div>
+                    </div>
+                    <div style="background: #fff3e0; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #f57c00;">\${result.duplicatesSkipped || 0}</div>
+                        <div style="color: #666;">Duplicates Skipped</div>
+                    </div>
+                </div>
+            \`;
+
+            if (result.groupResults && result.groupResults.length > 0) {
+                html += \`
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                        <h6 style="color: #495057; margin: 0 0 10px 0;">📊 Per-Group Results</h6>
+                        <div style="max-height: 200px; overflow-y: auto;">
+                            \${result.groupResults.map(group => \`
+                                <div style="background: white; padding: 10px; margin: 5px 0; border-radius: 4px; border-left: 3px solid #007bff;">
+                                    <div style="font-weight: bold; color: #007bff;">\${group.groupName}</div>
+                                    <div style="color: #666; font-size: 0.9em;">\${group.messagesProcessed} messages, \${group.ticketsFound} tickets</div>
+                                </div>
+                            \`).join('')}
+                        </div>
+                    </div>
+                \`;
+            }
+
+            if (result.errors && result.errors.length > 0) {
+                html += \`
+                    <div style="background: #ffebee; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                        <h6 style="color: #c62828; margin: 0 0 10px 0;">⚠️ Processing Errors (\${result.errors.length})</h6>
+                        <ul style="margin: 0; padding-left: 20px; color: #666;">
+                            \${result.errors.slice(0, 5).map(error => \`<li>\${error}</li>\`).join('')}
+                            \${result.errors.length > 5 ? \`<li><em>... and \${result.errors.length - 5} more</em></li>\` : ''}
+                        </ul>
+                    </div>
+                \`;
+            }
+
+            resultsDiv.innerHTML = html;
+            resultsDiv.style.display = 'block';
+        }
+
+        // Initialize history processing when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📄 DOM loaded, initializing history processing...');
+            setTimeout(initializeHistoryProcessing, 1000); // Small delay to ensure other init is complete
+        });
     </script>
 </body>
 </html>`;

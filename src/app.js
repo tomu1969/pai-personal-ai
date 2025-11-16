@@ -19,6 +19,7 @@ const qrPageRoutes = require('./routes/qr-page');
 const qrAssistantRoutes = require('./routes/qr-assistant');
 const qrResponderRoutes = require('./routes/qr-responder');
 const qrMortgageRoutes = require('./routes/qr-mortgage');
+const qrCSRoutes = require('./routes/qr-cs');
 
 const app = express();
 
@@ -30,7 +31,8 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-      'script-src': ["'self'", "'unsafe-inline'"]
+      'script-src': ["'self'", "'unsafe-inline'", "'unsafe-hashes'"],
+      'script-src-attr': ["'unsafe-inline'"]
     }
   }
 }));
@@ -101,6 +103,7 @@ app.use('/', qrPageRoutes);
 app.use('/', qrAssistantRoutes);
 app.use('/', qrResponderRoutes);
 app.use('/', qrMortgageRoutes);
+app.use('/', qrCSRoutes);
 
 app.get('/health', async (req, res) => {
   try {

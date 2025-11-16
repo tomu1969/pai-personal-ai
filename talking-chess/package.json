@@ -1,0 +1,57 @@
+{
+  "name": "talking-chess",
+  "version": "1.0.0",
+  "description": "A chess game with ELO-based opponent matching and future voice integration",
+  "main": "src/index.html",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "start": "http-server src -p 3333 -o",
+    "dev": "http-server src -p 3333",
+    "lint": "eslint src/**/*.js tests/**/*.js"
+  },
+  "keywords": [
+    "chess",
+    "elo",
+    "stockfish",
+    "ai",
+    "game"
+  ],
+  "author": "Talking Chess Team",
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "jsdom": "^22.1.0",
+    "http-server": "^14.1.1",
+    "eslint": "^8.57.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/**/*.min.js"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": ["text", "lcov", "html"],
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "verbose": true
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-org/talking-chess.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/talking-chess/issues"
+  },
+  "homepage": "https://github.com/your-org/talking-chess#readme"
+}

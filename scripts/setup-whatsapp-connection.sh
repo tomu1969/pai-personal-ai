@@ -21,7 +21,7 @@ cat > docker-compose.whatsapp.yml << EOF
 version: '3.8'
 services:
   evolution-api:
-    image: atendai/evolution-api:v2.1.1
+    image: evoapicloud/evolution-api:v2.3.6
     container_name: whatsapp-evolution
     ports:
       - "8080:8080"

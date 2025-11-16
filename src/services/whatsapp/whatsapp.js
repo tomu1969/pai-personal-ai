@@ -178,9 +178,11 @@ class WhatsAppService {
   async setWebhook(webhookUrl, events = ['messages.upsert']) {
     try {
       const payload = {
-        enabled: true,
-        url: webhookUrl,
-        events,
+        webhook: {
+          enabled: true,
+          url: webhookUrl,
+          events,
+        }
       };
 
       const response = await this.client.post(
@@ -463,40 +465,94 @@ class WhatsAppService {
   }
 
   /**
-   * Fetch all chats from Evolution API
+   * Fetch all chats from Evolution API v2.3.6 (includes both individual chats and groups)
    * @returns {Promise<Array>} List of chats
    */
   async fetchAllChats() {
     try {
-      // Try different endpoints based on Evolution API version
+      logger.debug('Fetching all chats from Evolution API v2.3.6', {
+        instanceId: this.instanceId,
+      });
+
+      // Try different endpoints based on Evolution API version with correct HTTP methods
       const endpoints = [
-        `/chat/findChats/${this.instanceId}`,
-        `/chat/fetchChats/${this.instanceId}`,
-        `/chats/${this.instanceId}`,
+        { path: `/chat/findChats/${this.instanceId}`, method: 'GET' },
+        { path: `/chat/fetchChats/${this.instanceId}`, method: 'GET' },
+        { path: `/chats/${this.instanceId}`, method: 'GET' },
       ];
 
       for (const endpoint of endpoints) {
         try {
-          const response = await this.client.get(endpoint);
-          if (response.data) {
-            logger.debug('Fetched all chats from Evolution API', {
-              endpoint,
-              chatCount: response.data?.length || 0,
+          const response = await this.client.get(endpoint.path);
+          if (response.data && Array.isArray(response.data)) {
+            logger.info('Successfully fetched chats from Evolution API', {
+              endpoint: endpoint.path,
+              totalChats: response.data.length,
+              groupCount: response.data.filter(chat => chat.id && chat.id.endsWith('@g.us')).length,
+              individualCount: response.data.filter(chat => chat.id && !chat.id.endsWith('@g.us')).length,
+              instanceId: this.instanceId,
             });
-            return response.data || [];
+            return response.data;
           }
         } catch (err) {
-          // Try next endpoint
+          logger.debug('Endpoint failed, trying next', {
+            endpoint: endpoint.path,
+            error: err.message,
+            statusCode: err.response?.status,
+          });
           continue;
         }
       }
 
       // If all endpoints fail, return empty array
-      logger.warn('Could not fetch chats from any Evolution API endpoint');
+      logger.warn('Could not fetch chats from any Evolution API endpoint', {
+        instanceId: this.instanceId,
+        triedEndpoints: endpoints.map(e => e.path),
+      });
       return [];
     } catch (error) {
       logger.error('Failed to fetch chats from Evolution API', {
         error: error.message,
+        instanceId: this.instanceId,
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Fetch all WhatsApp groups from Evolution API v2.3.6
+   * @returns {Promise<Array>} List of groups
+   */
+  async fetchAllGroups() {
+    try {
+      logger.debug('Fetching all groups from Evolution API v2.3.6', {
+        instanceId: this.instanceId,
+      });
+
+      // Use the correct v2.3.6 endpoint for fetching groups
+      const response = await this.client.get(`/group/fetchAllGroups/${this.instanceId}`, {
+        params: {
+          getParticipants: false // We only need group info, not participants for better performance
+        }
+      });
+
+      if (response.data && Array.isArray(response.data)) {
+        logger.info('Successfully fetched groups from Evolution API', {
+          groupCount: response.data.length,
+          instanceId: this.instanceId,
+        });
+        return response.data;
+      }
+
+      logger.warn('No groups data received from Evolution API', {
+        instanceId: this.instanceId,
+      });
+      return [];
+    } catch (error) {
+      logger.error('Failed to fetch groups from Evolution API', {
+        error: error.message,
+        statusCode: error.response?.status,
+        instanceId: this.instanceId,
       });
       return [];
     }
@@ -546,23 +602,40 @@ class WhatsAppService {
   }
 
   /**
-   * Fetch group name from Evolution API chat list
+   * Fetch group name from Evolution API v2.3.6 using dedicated groups endpoint
    * @param {string} groupId - Group ID with @g.us suffix
    * @returns {Promise<string>} Group name or null
    */
   async fetchGroupName(groupId) {
     try {
-      // For now, since Evolution API v2 doesn't expose group metadata easily,
-      // we'll need to rely on storing group names when we sync chats
-      // or when we receive messages with group information
+      logger.debug('Fetching group name for groupId', { groupId });
 
-      // Try to get from cached chats first
+      // First try the dedicated groups endpoint (v2.3.6)
+      try {
+        const groups = await this.fetchAllGroups();
+        const group = groups.find((g) => g.id === groupId);
+
+        if (group && (group.subject || group.name)) {
+          const groupName = group.subject || group.name;
+          logger.debug('Found group name from fetchAllGroups endpoint', {
+            groupId,
+            groupName,
+          });
+          return groupName;
+        }
+      } catch (groupsError) {
+        logger.debug('fetchAllGroups failed, trying chats endpoint', {
+          error: groupsError.message,
+        });
+      }
+
+      // Fallback to chat list if groups endpoint fails
       const chats = await this.fetchAllChats();
       const groupChat = chats.find((chat) => chat.id === groupId);
 
       if (groupChat && (groupChat.name || groupChat.subject)) {
         const groupName = groupChat.name || groupChat.subject;
-        logger.debug('Found group name from chat list', {
+        logger.debug('Found group name from chat list fallback', {
           groupId,
           groupName,
         });

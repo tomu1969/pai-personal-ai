@@ -70,15 +70,17 @@ class EvolutionMultiInstanceService {
         assistantType: 'pai-assistant'
       });
 
-      // Register PAI Mortgage instance
-      await this.registerInstance('pai-mortgage', {
-        instanceId: config.evolution.paiMortgageInstanceId || 'pai-mortgage-v2',
+
+      // Register CS Ticket Monitor instance
+      await this.registerInstance('cs-ticket-monitor', {
+        instanceId: process.env.CS_INSTANCE_ID || 'cs-monitor',
         apiUrl: config.evolution.apiUrl,
         apiKey: config.evolution.apiKey,
-        webhookUrl: config.evolution.paiMortgageWebhookUrl || `${config.server.host}:${config.server.port}/webhook/pai-mortgage`,
-        webhookPath: '/webhook/pai-mortgage',
-        description: 'PAI Mortgage - Mortgage Qualification Line',
-        assistantType: 'pai-mortgage'
+        webhookUrl: process.env.CS_WEBHOOK_URL || `${config.server.host}:${config.server.port}/webhook/cs-tickets`,
+        webhookPath: '/webhook/cs-tickets',
+        description: 'CS Ticket Monitor - WhatsApp Group Monitoring',
+        assistantType: 'cs-ticket-monitor',
+        ignoreGroups: false  // CRITICAL: Enable group message reception
       });
 
       this.initialized = true;

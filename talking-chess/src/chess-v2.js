@@ -346,6 +346,28 @@ function renderBoard() {
       }
     }
   }
+  
+  // Draw coordinates (letters and numbers)
+  ctx.font = "12px Arial";
+  ctx.fillStyle = "#999";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  // Draw file letters (a-h) at bottom
+  for (let file = 0; file < 8; file++) {
+    const fileChar = String.fromCharCode(97 + (isFlipped ? 7 - file : file));
+    const x = file * SQUARE_SIZE + SQUARE_SIZE / 2;
+    const y = BOARD_SIZE - 5;
+    ctx.fillText(fileChar, x, y);
+  }
+
+  // Draw rank numbers (1-8) on left
+  for (let rank = 0; rank < 8; rank++) {
+    const rankNum = isFlipped ? rank + 1 : 8 - rank;
+    const x = 5;
+    const y = rank * SQUARE_SIZE + SQUARE_SIZE / 2;
+    ctx.fillText(rankNum, x, y);
+  }
 }
 
 // Draw a chess piece
@@ -663,3 +685,10 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 console.log('📜 Chess V2 script loaded successfully');
+
+// Make game and engine globally accessible for chat integration
+window.game = game;
+window.engine = engine;
+window.makeMove = makeMove;
+
+console.log('🔗 Global references created for chat integration');

@@ -11,6 +11,8 @@ class StockfishEngine {
     this.pendingCallbacks = new Map();
     this.messageId = 0;
     this.currentConfig = null;
+    this.evaluationCallbacks = new Set();
+    this.currentEvaluation = null;
   }
 
   /**
@@ -128,8 +130,10 @@ class StockfishEngine {
     
     // Engine info (evaluation, depth, etc.)
     if (message.startsWith('info')) {
-      // Could parse evaluation info here for UI display
-      // For now, just log it
+      const evaluation = this.parseEvaluation(message);
+      if (evaluation && this.shouldBroadcastChange(this.currentEvaluation, evaluation)) {
+        this.broadcastEvaluation(evaluation);
+      }
       return;
     }
   }
@@ -294,6 +298,98 @@ class StockfishEngine {
   }
 
   /**
+   * Subscribe to evaluation updates
+   * @param {Function} callback - Callback function to call with evaluations
+   * @returns {Function} Unsubscribe function
+   */
+  subscribeToEvaluation(callback) {
+    this.evaluationCallbacks.add(callback);
+    return () => this.evaluationCallbacks.delete(callback);
+  }
+
+  /**
+   * Broadcast evaluation to all subscribers
+   * @param {Object} evaluation - Evaluation object
+   */
+  broadcastEvaluation(evaluation) {
+    this.currentEvaluation = evaluation;
+    this.evaluationCallbacks.forEach(callback => {
+      try {
+        callback(evaluation);
+      } catch (error) {
+        console.error('Error in evaluation callback:', error);
+      }
+    });
+  }
+
+  /**
+   * Parse UCI evaluation string into structured object
+   * @param {string} uciString - UCI info string
+   * @returns {Object|null} Evaluation object or null if no score
+   */
+  parseEvaluation(uciString) {
+    const scoreMatch = uciString.match(/score cp (-?\d+)/);
+    const mateMatch = uciString.match(/score mate (-?\d+)/);
+    const pvMatch = uciString.match(/pv (.+)$/);
+    const depthMatch = uciString.match(/depth (\d+)/);
+    
+    if (scoreMatch) {
+      return {
+        score: parseInt(scoreMatch[1]) / 100, // Convert centipawns to pawns
+        bestMove: pvMatch ? pvMatch[1].split(' ')[0] : null,
+        depth: depthMatch ? parseInt(depthMatch[1]) : 0,
+        mate: null
+      };
+    }
+    
+    if (mateMatch) {
+      return {
+        score: null, // No centipawn score for mate
+        bestMove: pvMatch ? pvMatch[1].split(' ')[0] : null,
+        depth: depthMatch ? parseInt(depthMatch[1]) : 0,
+        mate: parseInt(mateMatch[1])
+      };
+    }
+    
+    return null;
+  }
+
+  /**
+   * Convert centipawns to decimal score
+   * @param {number} centipawns - Centipawn value
+   * @returns {number} Decimal score
+   */
+  centipawnsToScore(centipawns) {
+    return centipawns / 100;
+  }
+
+  /**
+   * Determine if evaluation change is significant enough to broadcast
+   * @param {Object|null} oldEval - Previous evaluation
+   * @param {Object} newEval - New evaluation
+   * @returns {boolean} True if should broadcast
+   */
+  shouldBroadcastChange(oldEval, newEval) {
+    // Always broadcast first evaluation
+    if (!oldEval) return true;
+    
+    // Always broadcast if score type changes (mate vs centipawn)
+    if ((oldEval.mate !== null) !== (newEval.mate !== null)) return true;
+    
+    // For centipawn scores, broadcast if change is >= 0.1 pawns
+    if (oldEval.score !== null && newEval.score !== null) {
+      return Math.abs(newEval.score - oldEval.score) >= 0.1;
+    }
+    
+    // For mate scores, always broadcast changes
+    if (oldEval.mate !== null && newEval.mate !== null) {
+      return oldEval.mate !== newEval.mate;
+    }
+    
+    return false;
+  }
+
+  /**
    * Cleanup engine resources
    */
   destroy() {
@@ -308,6 +404,7 @@ class StockfishEngine {
     
     this.isReady = false;
     this.pendingCallbacks.clear();
+    this.evaluationCallbacks.clear();
   }
 }
 

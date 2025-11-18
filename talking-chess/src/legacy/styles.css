@@ -192,6 +192,13 @@ header .subtitle {
   border: 1px solid var(--border-color);
   cursor: pointer;
   transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.btn-icon {
+  font-size: 0.875rem;
 }
 
 .header-button.primary-button {
@@ -525,57 +532,68 @@ footer {
   display: none !important;
 }
 
-/* Chess Board Visual Enhancements */
-.square-highlight {
-  background-color: rgba(255, 255, 0, 0.4) !important;
-  box-shadow: inset 0 0 3px rgba(255, 255, 0, 0.8);
+/* Chess Board Visual Enhancements - ALL DISABLED TO PREVENT FLASHING */
+
+/* 
+All visual effects disabled to eliminate flashing issues:
+- Square highlights
+- Legal move indicators  
+- Last move highlighting
+- Check indicators
+- All transitions and animations
+*/
+
+/* COMPLETE VISUAL EFFECT ELIMINATION */
+#chessboard,
+#chessboard *,
+#chessboard .square-55d63,
+#chessboard .piece-417db,
+#chessboard img {
+  transition: none !important;
+  animation: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
 }
 
-.square-legal-move {
-  background-color: rgba(0, 255, 0, 0.3) !important;
-  position: relative;
+/* Prevent any flashing during board updates */
+#chessboard {
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+  animation-delay: 0s !important;
+  transition-delay: 0s !important;
 }
 
-.square-legal-move::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 20px;
-  height: 20px;
-  background: rgba(0, 128, 0, 0.6);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-
-.square-legal-move.occupied::after {
-  width: 100%;
-  height: 100%;
-  border-radius: 0;
-  background: none;
-  border: 3px solid rgba(220, 38, 38, 0.8);
-  box-sizing: border-box;
-}
-
-.square-last-move {
-  background-color: rgba(59, 130, 246, 0.4) !important;
-  box-shadow: inset 0 0 3px rgba(59, 130, 246, 0.8);
-}
-
+/* Remove all ChessBoard.js highlighting classes */
+.highlight-white,
+.highlight-black,
+.square-highlight,
+.square-legal-move,
+.square-last-move,
 .square-in-check {
-  background-color: rgba(220, 38, 38, 0.5) !important;
-  box-shadow: inset 0 0 5px rgba(220, 38, 38, 0.9);
-  animation: check-pulse 1s infinite;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  outline: none !important;
 }
 
-@keyframes check-pulse {
-  0%, 100% { 
-    box-shadow: inset 0 0 5px rgba(220, 38, 38, 0.9); 
-  }
-  50% { 
-    box-shadow: inset 0 0 10px rgba(220, 38, 38, 1); 
-  }
+/* check-pulse animation removed to prevent flashing */
+
+/* Board disabled state - transition removed to prevent flashing */
+.board-disabled {
+  opacity: 0.8;
+  pointer-events: none;
+  /* transition removed to prevent flashing */
+}
+
+/* Highlight toggle disabled state */
+.highlights-disabled {
+  opacity: 0.6;
+}
+
+.highlights-disabled .btn-icon {
+  opacity: 0.5;
 }
 
 /* Responsive Design */

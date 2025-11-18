@@ -18,6 +18,11 @@ let gameConfig = {
   opponentElo: 1650
 };
 
+// Highlight toggle state
+let highlightsEnabled = true;
+let isAnimating = false;
+let animationDebounceTimer = null;
+
 // Captured pieces and scoring
 let capturedPieces = {
   white: [],
@@ -135,20 +140,97 @@ function initializeChessGame() {
  */
 function initializeChessBoard() {
   try {
+    // Clear any existing board first
+    const boardElement = document.getElementById('chessboard');
+    if (boardElement) {
+      boardElement.innerHTML = ''; // Clear any existing content
+    }
+    
+    // Destroy existing board if it exists
+    if (window.board && typeof window.board.destroy === 'function') {
+      try {
+        window.board.destroy();
+      } catch (e) {
+        console.log('Note: Could not destroy existing board:', e.message);
+      }
+    }
+    
     const boardConfig = {
       position: 'start',
       draggable: true,
-      onDragStart: onDragStart,
-      onDrop: onDrop,
-      onSnapEnd: onSnapEnd,
-      // Temporarily disable onSquareClick to isolate drag/drop flashing
-      // onSquareClick: onSquareClick,
+      moveSpeed: 0,
+      snapSpeed: 0,
+      onDragStart: function(source, piece, position, orientation) {
+        console.log('🎯 Drag start:', source, piece);
+        
+        // Only allow white pieces to be moved
+        if (piece.search(/^w/) === -1) {
+          return false;
+        }
+        
+        // Game checks
+        if (game.game_over()) return false;
+        if (game.turn() !== 'w') return false;
+        
+        selectedSquare = source;
+        return true;
+      },
+      onDrop: function(source, target, piece, newPos, oldPos, orientation) {
+        console.log('🎯 Drop attempt:', source, '→', target);
+        
+        // Attempt the move
+        const move = game.move({
+          from: source,
+          to: target,
+          promotion: 'q'
+        });
+        
+        if (move === null) {
+          console.log('❌ Invalid move');
+          return 'snapback';
+        }
+        
+        console.log('✅ Move made:', move.san);
+        selectedSquare = null;
+        
+        // Update UI
+        updateMoveHistory();
+        updateTurnIndicator();
+        updateGameStatus();
+        updateCapturedPieces();
+        updateHeaderDisplays();
+        updateStatusBar();
+        saveGameState();
+        
+        // Start timer
+        if (!gameTimerStarted) {
+          startGameTimer();
+          gameTimerStarted = true;
+        }
+        
+        // Chat
+        if (chatEngine && isGameStarted) {
+          handlePlayerMove(move);
+        }
+        
+        // Check game over
+        if (game.game_over()) {
+          handleGameOver();
+        } else if (!game.game_over()) {
+          setTimeout(makeComputerMove, 250);
+        }
+        
+        return;
+      },
       pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
     };
     
-    // Use correct ChessBoard constructor (capital C and B)
+    console.log('🏁 Initializing ChessBoard with config:', boardConfig);
     board = ChessBoard('chessboard', boardConfig);
-    console.log('Chessboard initialized');
+    window.board = board; // Store globally for cleanup
+    console.log('✅ Chessboard initialized successfully:', board);
+    
+    console.log('✅ Chessboard using drag-and-drop for piece movement');
     
     // Resize board to fit container
     window.addEventListener('resize', function() {
@@ -158,6 +240,39 @@ function initializeChessBoard() {
   } catch (error) {
     console.error('Chessboard initialization error:', error);
     throw new Error('Failed to initialize chessboard: ' + error.message);
+  }
+}
+
+/**
+ * Calculate which chess square was clicked based on mouse coordinates
+ */
+function calculateSquareFromCoordinates(event, boardElement) {
+  try {
+    const rect = boardElement.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    
+    // Calculate which square based on board position
+    const squareSize = rect.width / 8; // 8x8 board
+    
+    const file = Math.floor(x / squareSize);
+    const rank = Math.floor(y / squareSize);
+    
+    // Convert to chess notation (a-h, 1-8)
+    if (file >= 0 && file < 8 && rank >= 0 && rank < 8) {
+      const fileChar = String.fromCharCode(97 + file); // 97 = 'a'
+      const rankNum = 8 - rank; // Flip rank (board is displayed top-to-bottom)
+      
+      const square = fileChar + rankNum;
+      console.log('🟦 Calculated square from coordinates:', square, 'at', x, y);
+      return square;
+    }
+    
+    console.log('🟦 Click outside valid board area:', x, y);
+    return null;
+  } catch (error) {
+    console.log('🟦 Error calculating square from coordinates:', error);
+    return null;
   }
 }
 
@@ -200,6 +315,12 @@ function setupEventListeners() {
   const flipBoardButtonHeader = document.getElementById('flip-board-btn-header');
   if (flipBoardButtonHeader) {
     flipBoardButtonHeader.addEventListener('click', flipBoard);
+  }
+
+  // Highlight toggle button
+  const toggleHighlightsButton = document.getElementById('toggle-highlights-btn');
+  if (toggleHighlightsButton) {
+    toggleHighlightsButton.addEventListener('click', toggleHighlights);
   }
 
   // ELO input fields
@@ -299,6 +420,9 @@ function initializeUI() {
   // Load user preferences if available
   loadUserPreferences();
   
+  // Load highlight preference
+  loadHighlightPreference();
+  
   // Update initial ELO calculation
   updateEloCalculation();
   
@@ -307,6 +431,9 @@ function initializeUI() {
   if (gameSection) {
     gameSection.classList.remove('hidden');
   }
+  
+  // Set initial highlights state
+  updateHighlightsClass();
   
   // Try to load saved game state
   const gameLoaded = loadGameState();
@@ -363,7 +490,6 @@ function autoStartGame() {
     // Reset game state
     game.reset();
     board.position('start');
-    clearHighlights();
     lastMove = null;
     selectedSquare = null;
     
@@ -1167,18 +1293,107 @@ function loadUserPreferences() {
   const preferences = window.EloCalculator.loadUserPreferences();
   if (!preferences) return;
   
-  const eloInput = document.getElementById('elo-input');
+  const eloInput = document.getElementById('user-elo-input') || document.getElementById('elo-input');
   const strengthInput = document.getElementById('strength-input');
   
-  if (eloInput && preferences.userElo) {
-    eloInput.value = preferences.userElo;
+  // Update gameConfig to match loaded preferences
+  if (preferences.userElo) {
+    gameConfig.userElo = preferences.userElo;
+    if (eloInput) {
+      eloInput.value = preferences.userElo;
+    }
   }
   
-  if (strengthInput && preferences.strengthPercentage !== undefined) {
-    strengthInput.value = preferences.strengthPercentage;
+  if (preferences.strengthPercentage !== undefined) {
+    gameConfig.strengthPercentage = preferences.strengthPercentage;
+    if (strengthInput) {
+      strengthInput.value = preferences.strengthPercentage;
+    }
   }
+  
+  // Update opponent ELO based on user ELO
+  updateEloCalculation();
   
   console.log('Loaded user preferences:', preferences);
+  console.log('Updated gameConfig:', gameConfig);
+}
+
+/**
+ * Load highlight preference from localStorage
+ */
+function loadHighlightPreference() {
+  try {
+    const saved = localStorage.getItem('chess-highlights-enabled');
+    if (saved !== null) {
+      highlightsEnabled = JSON.parse(saved);
+      console.log('Loaded highlight preference:', highlightsEnabled);
+    }
+  } catch (error) {
+    console.warn('Failed to load highlight preference:', error);
+    highlightsEnabled = true; // Default to enabled
+  }
+  updateHighlightButton();
+}
+
+/**
+ * Save highlight preference to localStorage
+ */
+function saveHighlightPreference() {
+  try {
+    localStorage.setItem('chess-highlights-enabled', JSON.stringify(highlightsEnabled));
+  } catch (error) {
+    console.warn('Failed to save highlight preference:', error);
+  }
+}
+
+/**
+ * Toggle highlights on/off
+ */
+function toggleHighlights() {
+  console.log('🎯 Toggling highlights from', highlightsEnabled, 'to', !highlightsEnabled);
+  highlightsEnabled = !highlightsEnabled;
+  saveHighlightPreference();
+  updateHighlightButton();
+  updateHighlightsClass();
+  
+  // Clear highlights if disabling
+  if (!highlightsEnabled) {
+    console.log('🎯 Clearing highlights because highlights disabled');
+  } else if (selectedSquare) {
+    // Re-show highlights if re-enabling and a square is selected
+    console.log('🎯 Re-showing highlights for selected square:', selectedSquare);
+    highlightSquare(selectedSquare);
+    if (legalMoves.length > 0) {
+      highlightLegalMoves(legalMoves);
+    }
+  }
+}
+
+/**
+ * Update highlight toggle button text and state
+ */
+function updateHighlightButton() {
+  const button = document.getElementById('toggle-highlights-btn');
+  const text = document.getElementById('highlight-toggle-text');
+  
+  if (button && text) {
+    text.textContent = highlightsEnabled ? 'Highlights On' : 'Highlights Off';
+    button.className = highlightsEnabled ? 
+      'header-button secondary-button' : 
+      'header-button secondary-button highlights-disabled';
+    button.title = highlightsEnabled ? 
+      'Click to disable move highlights' : 
+      'Click to enable move highlights';
+  }
+}
+
+/**
+ * Update highlights class on board container
+ */
+function updateHighlightsClass() {
+  console.log('🎯 updateHighlightsClass() called - DISABLED to prevent any class changes');
+  // Completely disabled to prevent any CSS class changes that could cause flashing
+  return;
 }
 
 /**
@@ -1398,7 +1613,6 @@ function newGame() {
     // Reset game state
     game.reset();
     board.position('start');
-    clearHighlights();
     lastMove = null;
     selectedSquare = null;
     
@@ -1495,7 +1709,6 @@ function startGame() {
     // Reset game state
     game.reset();
     board.position('start');
-    clearHighlights();
     lastMove = null;
     selectedSquare = null;
     
@@ -1531,232 +1744,13 @@ function updateGameStatus(message) {
   }
 }
 
-/**
- * Handle drag start events
- */
-function onDragStart(source, piece, position, orientation) {
-  console.log('onDragStart called:', source, piece, 'game.turn():', game.turn(), 'boardInteractive:', window.boardInteractive);
-  
-  // Only allow moves if it's the player's turn and game is active
-  if (game.game_over()) {
-    console.log('onDragStart: game over, returning false');
-    return false;
-  }
-  
-  // Don't allow moves if board is disabled (AI is thinking)
-  if (window.boardInteractive === false) {
-    console.log('onDragStart: board not interactive, returning false');
-    return false;
-  }
-  
-  // Only allow player to move their pieces (white pieces)
-  if (piece.search(/^b/) !== -1) {
-    console.log('onDragStart: black piece, returning false');
-    return false;
-  }
-  
-  // If clicking on a different piece, clear previous highlights
-  if (selectedSquare && selectedSquare !== source) {
-    clearHighlights();
-  }
-  
-  // Highlight selected square
-  highlightSquare(source);
-  selectedSquare = source;
-  
-  // Get legal moves for this piece and highlight them
-  legalMoves = game.moves({ square: source, verbose: true });
-  highlightLegalMoves(legalMoves);
-  
-  return true;
-}
+// Drag and drop handlers removed - using click-only system
 
-/**
- * Handle piece drop events
- */
-function onDrop(source, target) {
-  console.log('onDrop called:', source, target, 'boardInteractive:', window.boardInteractive);
-  
-  // Early return for invalid drag attempts to prevent any processing
-  if (game.game_over() || window.boardInteractive === false) {
-    console.log('onDrop: invalid state, returning snapback');
-    return 'snapback';
-  }
-  
-  // Get the piece at source to check if it's a valid piece to move
-  const piece = game.get(source);
-  if (!piece || piece.color !== 'w') {
-    console.log('onDrop: invalid piece or not white, returning snapback');
-    return 'snapback';
-  }
-  
-  // Check if this is just a click-release (same square)
-  if (source === target) {
-    console.log('onDrop: click-release case, setting flag');
-    // Mark this as a click-release case for onSnapEnd to handle
-    window.wasClickRelease = true;
-    return; // Don't return 'snapback' to avoid chessboard.js redraw
-  }
-  
-  // See if the move is legal FIRST before clearing highlights
-  const move = game.move({
-    from: source,
-    to: target,
-    promotion: 'q' // Always promote to queen for now
-  });
-  
-  // Illegal move - don't clear highlights, just snapback
-  if (move === null) {
-    selectedSquare = null;
-    return 'snapback';
-  }
-  
-  // Legal move - now clear highlights since we're committing to the move
-  clearHighlights();
-  
-  // Store last move for highlighting
-  lastMove = { from: source, to: target };
-  
-  // Start timer on first move
-  if (!gameTimerStarted) {
-    startGameTimer();
-    gameTimerStarted = true;
-  }
-  
-  // Update UI
-  updateMoveHistory();
-  updateTurnIndicator();
-  updateGameStatus();
-  updateCapturedPieces();
-  updateHeaderDisplays();
-  updateStatusBar();
-  saveGameState();
-  
-  // Handle chat for player move
-  if (chatEngine && isGameStarted) {
-    handlePlayerMove(move);
-  }
-  
-  // Check for game over
-  if (game.game_over()) {
-    setTimeout(handleGameOver, 250);
-  } else {
-    // Highlight the last move
-    highlightLastMove(lastMove);
-    
-    // Show check if king is in check
-    if (game.in_check()) {
-      highlightCheck();
-      
-      // AI comment on check
-      if (chatEngine && isGameStarted) {
-        const checkMessage = chatEngine.generateEventComment('check');
-        if (checkMessage) {
-          setTimeout(() => displayChatMessage(checkMessage), 1000);
-        }
-      }
-    }
-    
-    // If it's black's turn and engine is available, make AI move
-    if (game.turn() === 'b' && isEngineInitialized) {
-      setTimeout(makeComputerMove, 500); // Small delay for better UX
-    }
-  }
-  
-  selectedSquare = null;
-}
+// onDrop function removed - using click-only system
 
-/**
- * Handle snap end events
- */
-function onSnapEnd() {
-  console.log('onSnapEnd called, wasClickRelease:', window.wasClickRelease);
-  
-  // Check if this was a click-release case
-  if (window.wasClickRelease) {
-    clearHighlights();
-    selectedSquare = null;
-    window.wasClickRelease = false;
-  }
-  // Animation complete - no need to redraw board as it's already in sync
-  // Removing board.position() call to prevent piece flashing
-}
+// onSnapEnd function removed - using click-only system
 
-/**
- * Handle clicks on empty squares
- */
-function onSquareClick(square) {
-  // If there's a selected piece and clicking on an empty square
-  if (selectedSquare) {
-    // Check if this is a legal move
-    const move = game.move({
-      from: selectedSquare,
-      to: square,
-      promotion: 'q'
-    });
-    
-    if (move) {
-      // Legal move - execute it
-      clearHighlights();
-      lastMove = { from: selectedSquare, to: square };
-      selectedSquare = null;
-      
-      // Start timer on first move
-      if (!gameTimerStarted) {
-        startGameTimer();
-        gameTimerStarted = true;
-      }
-      
-      // Update UI
-      updateMoveHistory();
-      updateTurnIndicator();
-      updateGameStatus();
-      updateCapturedPieces();
-      updateHeaderDisplays();
-      updateStatusBar();
-      saveGameState();
-      
-      // Handle chat for player move
-      if (chatEngine && isGameStarted) {
-        handlePlayerMove(move);
-      }
-      
-      // Check for game over
-      if (game.game_over()) {
-        setTimeout(handleGameOver, 250);
-      } else {
-        // Highlight the last move
-        highlightLastMove(lastMove);
-        
-        // Show check if king is in check
-        if (game.in_check()) {
-          highlightCheck();
-          
-          // AI comment on check
-          if (chatEngine && isGameStarted) {
-            const checkMessage = chatEngine.generateEventComment('check');
-            if (checkMessage) {
-              setTimeout(() => displayChatMessage(checkMessage), 1000);
-            }
-          }
-        }
-        
-        // Make computer move after a short delay
-        if (!game.game_over()) {
-          setTimeout(makeComputerMove, 500);
-        }
-      }
-      
-      // Animate the move smoothly instead of redrawing
-      board.move(`${selectedSquare}-${square}`);
-      
-    } else {
-      // Invalid move or empty square click - clear selection
-      clearHighlights();
-      selectedSquare = null;
-    }
-  }
-}
+// REMOVED - Using drag and drop instead of clicks
 
 /**
  * Update move history display with improved formatting
@@ -1855,12 +1849,13 @@ function updateTurnIndicator() {
   
   const currentTurn = game.turn();
   
+  // CSS class changes DISABLED to prevent flashing
+  console.log('🎮 Turn indicator visual updates DISABLED to prevent flashing');
+  
   if (currentTurn === 'w') {
-    turnIndicator.className = 'turn-indicator white-turn';
     turnText.textContent = 'White to move';
     pieceIcon.textContent = '♔';
   } else {
-    turnIndicator.className = 'turn-indicator black-turn';
     turnText.textContent = 'Black to move';
     pieceIcon.textContent = '♚';
   }
@@ -1875,11 +1870,10 @@ function updateGameStatus() {
   
   if (!statusElement || !statusText) return;
   
-  // Reset classes
-  statusElement.className = 'game-status';
+  // All CSS class changes DISABLED to prevent flashing
+  console.log('🎮 Game status visual updates DISABLED to prevent flashing');
   
   if (game.in_check()) {
-    statusElement.classList.add('check');
     statusText.textContent = `${game.turn() === 'w' ? 'White' : 'Black'} is in check!`;
   } else if (game.game_over()) {
     // This will be handled by handleGameOver
@@ -1893,74 +1887,45 @@ function updateGameStatus() {
  * Highlight a square
  */
 function highlightSquare(square) {
-  const squareEl = document.querySelector(`[data-square="${square}"]`);
-  if (squareEl) {
-    squareEl.classList.add('square-highlight');
-  }
+  console.log('🟠 highlightSquare() called for:', square, '- DISABLED to prevent flashing');
+  // Completely disabled to prevent flashing
+  return;
 }
 
 /**
  * Highlight legal moves
  */
 function highlightLegalMoves(moves) {
-  moves.forEach(move => {
-    const squareEl = document.querySelector(`[data-square="${move.to}"]`);
-    if (squareEl) {
-      squareEl.classList.add('square-legal-move');
-      
-      // Add special class for captures
-      if (move.captured) {
-        squareEl.classList.add('occupied');
-      }
-    }
-  });
+  console.log('🟣 highlightLegalMoves() called with', moves.length, 'moves - DISABLED to prevent flashing');
+  // Completely disabled to prevent flashing
+  return;
 }
 
 /**
  * Highlight the last move made
  */
 function highlightLastMove(move) {
-  if (!move) return;
-  
-  const fromSquare = document.querySelector(`[data-square="${move.from}"]`);
-  const toSquare = document.querySelector(`[data-square="${move.to}"]`);
-  
-  if (fromSquare) fromSquare.classList.add('square-last-move');
-  if (toSquare) toSquare.classList.add('square-last-move');
+  console.log('🔵 highlightLastMove() called - DISABLED to prevent flashing');
+  // Completely disabled to prevent flashing
+  return;
 }
 
 /**
  * Highlight king in check
  */
 function highlightCheck() {
-  const turn = game.turn();
-  const king = turn === 'w' ? 'wK' : 'bK';
-  
-  // Find the king's square
-  const position = game.board();
-  for (let rank = 0; rank < 8; rank++) {
-    for (let file = 0; file < 8; file++) {
-      const piece = position[rank][file];
-      if (piece && piece.type === 'k' && piece.color === turn) {
-        const square = String.fromCharCode(97 + file) + (8 - rank);
-        const squareEl = document.querySelector(`[data-square="${square}"]`);
-        if (squareEl) {
-          squareEl.classList.add('square-in-check');
-        }
-        break;
-      }
-    }
-  }
+  console.log('🟦 highlightCheck() called - DISABLED to prevent flashing');
+  // Completely disabled to prevent flashing
+  return;
 }
 
 /**
  * Clear all highlights
  */
 function clearHighlights() {
-  document.querySelectorAll('.square-highlight, .square-legal-move, .square-last-move, .square-in-check')
-    .forEach(square => {
-      square.classList.remove('square-highlight', 'square-legal-move', 'square-last-move', 'square-in-check', 'occupied');
-    });
+  console.log('🔵 clearHighlights() called - DISABLED (no highlights to clear)');
+  // Completely disabled since we're not using highlights anymore
+  return;
 }
 
 /**
@@ -2023,18 +1988,20 @@ function loadGameState() {
  * Make computer move using Stockfish engine
  */
 async function makeComputerMove() {
+  console.log('🤖 makeComputerMove called - engine initialized:', isEngineInitialized, 'game turn:', game.turn());
+  
   if (!isEngineInitialized || !engine) {
-    console.log('Engine not available for computer move');
+    console.log('🤖 Engine not available for computer move');
     return;
   }
   
   if (game.turn() !== 'b') {
-    console.log('Not black\'s turn, skipping computer move');
+    console.log('🤖 Not black\'s turn, skipping computer move');
     return;
   }
   
   try {
-    console.log('Computer is thinking...');
+    console.log('🤖 Computer is thinking...');
     
     // Show AI thinking in chat
     if (chatEngine && isGameStarted) {
@@ -2043,6 +2010,7 @@ async function makeComputerMove() {
     
     // Disable board interactions during AI turn
     setBoardInteractive(false);
+    console.log('🤖 Board interaction disabled for AI turn');
     
     // Get engine configuration based on target ELO
     const engineConfig = window.EngineConfig.getRandomizedEngineConfig(gameConfig.opponentElo);
@@ -2085,15 +2053,8 @@ async function makeComputerMove() {
       }
       console.log('Computer played (timeout fallback):', fallbackResult.san);
       
-      // Animate the fallback move smoothly without flashing
-      // Handle special moves that might need full position update
-      if (fallbackResult.flags.includes('c') || fallbackResult.flags.includes('e') || fallbackResult.flags.includes('p')) {
-        // Castling, en passant, or promotion - use position update for accuracy
-        board.position(game.fen());
-      } else {
-        // Regular move - use smooth animation
-        board.move(`${fallbackResult.from}-${fallbackResult.to}`);
-      }
+      // Update board position immediately (no animations)
+      board.position(game.fen());
       lastMove = { from: fallbackResult.from, to: fallbackResult.to };
       updateMoveHistory();
       updateTurnIndicator();
@@ -2115,13 +2076,9 @@ async function makeComputerMove() {
         }, 500);
       }
       
-      clearHighlights();
-      highlightLastMove(lastMove);
-      
+      // No visual highlighting - just check game state
       if (game.game_over()) {
         setTimeout(handleGameOver, 500);
-      } else if (game.in_check()) {
-        highlightCheck();
       }
       
       return; // Exit early since we handled the move
@@ -2167,10 +2124,16 @@ async function makeComputerMove() {
       console.log('Computer played:', result.san);
     }
     
-    // Always use smooth animation for now to test if this fixes flashing
-    // TODO: Re-enable special move handling after testing
-    console.log('Move flags:', result.flags, 'From:', result.from, 'To:', result.to);
-    board.move(`${result.from}-${result.to}`);
+    // Use optimized move animation to prevent flashing
+    console.log('🎯 Computer move flags:', result.flags, 'From:', result.from, 'To:', result.to);
+    
+    // Mark animation start
+    isAnimating = true;
+    
+    // ALL MOVES: Use immediate board position update (no animations or delays)
+    console.log('🎯 Computer move - using immediate board update (no animations)');
+    board.position(game.fen());
+    isAnimating = false;
     
     // Store last move for highlighting
     lastMove = { from: result.from, to: result.to };
@@ -2197,27 +2160,34 @@ async function makeComputerMove() {
       }, 500);
     }
     
+    // Critical: Always re-enable board after computer move
     setBoardInteractive(true);
+    console.log('🤖 Computer move complete, board re-enabled');
     
-    // Highlight the computer's move (don't clear first to avoid flashing)
-    highlightLastMove(lastMove);
-    
-    // Check for game over
+    // No visual highlighting - just check game state
     if (game.game_over()) {
       setTimeout(handleGameOver, 500);
-    } else if (game.in_check()) {
-      highlightCheck();
     }
     
   } catch (error) {
-    console.error('Computer move failed:', error);
+    console.error('🤖 Computer move failed:', error);
     
-    // Ensure board is always restored to playable state
-    setBoardInteractive(true);
-    hideAIThinking();
+    // Critical: Always restore board state regardless of what went wrong
+    try {
+      setBoardInteractive(true);
+      isAnimating = false;
+      console.log('🤖 Board interaction restored after error');
+    } catch (restoreError) {
+      console.error('🤖 Failed to restore board interaction:', restoreError);
+    }
     
-    // Clear any visual indicators
-    clearHighlights();
+    try {
+      hideAIThinking();
+    } catch (hideError) {
+      console.error('🤖 Failed to hide AI thinking:', hideError);
+    }
+    
+    // No visual effects to clear
     
     // Update UI to reflect current state
     updateTurnIndicator();
@@ -2286,7 +2256,14 @@ function showAIThinking(show) {
 function setBoardInteractive(interactive) {
   // This would ideally disable chessboard.js interactions
   // For now, we'll just track the state and check it in onDragStart
+  const previousState = window.boardInteractive;
   window.boardInteractive = interactive;
+  
+  console.log('🎮 Board interaction changed from', previousState, 'to', interactive);
+  
+  // Visual feedback DISABLED to prevent flashing
+  console.log('🎮 Visual feedback for board state DISABLED to prevent flashing');
+  // No CSS class changes to prevent any visual effects
 }
 
 /**

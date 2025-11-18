@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Talking Chess V2</title>
+  <meta name="description" content="Clean chess game with instant moves">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <style>
+    /* Clean, minimal styling */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: white;
+      padding: 20px;
+    }
+
+    .app {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+      color: #4CAF50;
+    }
+
+    .game-container {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .board-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #chess-canvas {
+      border: 2px solid #4CAF50;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .game-info {
+      margin-top: 15px;
+      text-align: center;
+    }
+
+    .status {
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 10px;
+    }
+
+    .btn {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .btn:hover {
+      background: #45a049;
+    }
+
+    .btn.secondary {
+      background: #666;
+    }
+
+    .btn.secondary:hover {
+      background: #777;
+    }
+
+    .sidebar {
+      min-width: 300px;
+    }
+
+    .panel {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .panel h3 {
+      margin-bottom: 15px;
+      color: #4CAF50;
+    }
+
+    .elo-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .elo-input {
+      width: 80px;
+      padding: 5px;
+      border: 1px solid #666;
+      border-radius: 4px;
+      background: #1a1a2e;
+      color: white;
+      text-align: center;
+    }
+
+    .move-history {
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .ai-status {
+      font-style: italic;
+      color: #4CAF50;
+      margin-top: 10px;
+    }
+
+    .thinking {
+      color: #ff9800;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+
+    /* Toast notification styles */
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #333;
+      color: white;
+      padding: 12px 16px;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateX(100%);
+      transition: all 0.3s ease;
+      z-index: 1000;
+      max-width: 250px;
+      font-size: 0.875rem;
+    }
+
+    .toast.show {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(0);
+    }
+
+    .toast-content {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <h1>Talking Chess V2</h1>
+      <p>Clean, fast chess with instant moves</p>
+    </div>
+
+    <div class="game-container">
+      <div class="board-section">
+        <canvas id="chess-canvas" width="480" height="480"></canvas>
+        <div class="game-info">
+          <div class="status" id="game-status">White to move</div>
+          <div class="controls">
+            <button class="btn" onclick="newGame()">New Game</button>
+            <button class="btn secondary" onclick="flipBoard()">Flip Board</button>
+            <button class="btn secondary" onclick="undoMove()">Undo</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar">
+        <div class="panel">
+          <h3>AI Difficulty</h3>
+          <div class="elo-controls">
+            <label>AI ELO:</label>
+            <button class="btn secondary" onclick="adjustElo('ai', -100)">-</button>
+            <input type="number" class="elo-input" id="ai-elo" value="1650" min="800" max="3000">
+            <button class="btn secondary" onclick="adjustElo('ai', 100)">+</button>
+          </div>
+          <div class="ai-status" id="ai-status">Ready</div>
+          <div class="ai-details" id="ai-details" style="font-size: 0.8rem; color: #999; margin-top: 8px;">
+            Skill: 10/20 (50%) | Advanced
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Move History</h3>
+          <div class="move-history" id="move-history">
+            Game started. Make your first move!
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast">
+    <div class="toast-content">
+      <span id="toast-message"></span>
+    </div>
+  </div>
+
+  <!-- Chess.js for game logic -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  
+  <!-- Engine dependencies -->
+  <script src="engine-config.js"></script>
+  <script src="stockfish-engine.js"></script>
+  
+  <!-- Our clean chess implementation -->
+  <script src="chess-v2.js?v=5"></script>
+</body>
+</html>

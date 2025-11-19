@@ -311,11 +311,15 @@ class ChessMentorIntegration {
       const legalMoves = this.gameStateCapture.getLegalMoves();
       const chatHistory = this.chatHistory.getRecentHistory(this.config.maxChatHistory);
       
+      // Get current AI ELO from the UI (same value used for chess engine difficulty)
+      const aiEloElement = document.getElementById('ai-elo');
+      const currentAiElo = aiEloElement ? parseInt(aiEloElement.value) || 1500 : 1500;
+      
       const gameContext = {
         fen: gameState.fen,
         pgn: gameState.pgn,
         lastMove: gameState.lastMove,
-        userElo: this.config.userElo,
+        userElo: currentAiElo,  // Use AI's ELO setting as user's skill level for Irina
         personaName: this.config.personaName,
         engineEval: evaluation,
         legalMoves: legalMoves,

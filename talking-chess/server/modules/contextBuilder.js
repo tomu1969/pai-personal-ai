@@ -77,22 +77,24 @@ function parseFEN(fen) {
 }
 
 /**
- * Creates a human-readable description of the current position
+ * Creates a detailed position analysis including occupied and blocked squares
  * @param {string} fen - The FEN string
- * @returns {string} - Human-readable position description
+ * @param {Array} legalMoves - Array of legal moves with san notation
+ * @returns {string} - Comprehensive position description
  */
-function createPositionDescription(fen) {
+function createPositionDescription(fen, legalMoves = []) {
   const parsed = parseFEN(fen);
   if (!parsed) {
     return "Position cannot be parsed.";
   }
 
-  const { pieces } = parsed;
+  const { board, pieces } = parsed;
+  const occupiedSquares = Object.keys(board);
   
-  let description = "Current Position:\n";
+  let description = "📋 CURRENT BOARD POSITION:\n";
   
   // White pieces
-  description += "White: ";
+  description += "🤍 White pieces: ";
   if (pieces.white.pawns.length > 0) {
     description += `Pawns on ${pieces.white.pawns.join(', ')}`;
   } else {
@@ -107,7 +109,7 @@ function createPositionDescription(fen) {
   description += "\n";
   
   // Black pieces
-  description += "Black: ";
+  description += "⚫ Black pieces: ";
   if (pieces.black.pawns.length > 0) {
     description += `Pawns on ${pieces.black.pawns.join(', ')}`;
   } else {
@@ -119,7 +121,53 @@ function createPositionDescription(fen) {
     description += pieces.black.pawns.length > 0 ? `; ${pieceList}` : pieceList;
   }
 
+  // Blocked squares analysis
+  description += "\n\n🚫 BLOCKED SQUARES (occupied by pieces):\n";
+  description += occupiedSquares.sort().join(', ');
+
+  // Key blocked square warnings for common mistakes
+  const criticalSquares = ['e4', 'e5', 'd4', 'd5', 'f4', 'f5', 'c4', 'c5'];
+  const blockedCritical = criticalSquares.filter(sq => board[sq]);
+  if (blockedCritical.length > 0) {
+    description += "\n⚠️  IMPORTANT: These center squares are BLOCKED: ";
+    blockedCritical.forEach(sq => {
+      const piece = board[sq];
+      description += `${sq} (${piece.color} ${piece.piece}), `;
+    });
+    description = description.slice(0, -2); // Remove last comma
+  }
+
+  // Legal moves validation
+  if (legalMoves && legalMoves.length > 0) {
+    description += `\n\n✅ LEGAL MOVES AVAILABLE (${legalMoves.length} total):\n`;
+    description += legalMoves.map(m => m.san || m).join(', ');
+  }
+
   return description;
+}
+
+/**
+ * Validates if a suggested move is legal
+ * @param {string} moveNotation - Move in algebraic notation (e.g., "e5", "Nf3")
+ * @param {Array} legalMoves - Array of legal moves
+ * @returns {Object} - Validation result with isLegal flag and reason
+ */
+function validateMove(moveNotation, legalMoves = []) {
+  if (!moveNotation || !legalMoves.length) {
+    return { isLegal: false, reason: "No legal moves available" };
+  }
+
+  const legalMovesStr = legalMoves.map(m => m.san || m);
+  const isLegal = legalMovesStr.includes(moveNotation);
+  
+  if (!isLegal) {
+    return { 
+      isLegal: false, 
+      reason: `"${moveNotation}" is not in the legal moves list: ${legalMovesStr.join(', ')}` 
+    };
+  }
+
+  return { isLegal: true, reason: "Move is legal" };
 }
 
 /**
@@ -241,8 +289,10 @@ function buildPromptContext(gameContext) {
     adviceLevel = 'Focus on prophylaxis, long-term planning, and deep strategic concepts.';
   }
 
-  // Create human-readable position description
-  const positionDescription = gameContext.fen ? createPositionDescription(gameContext.fen) : 'Position not available';
+  // Create comprehensive position description with legal moves
+  const positionDescription = gameContext.fen ? 
+    createPositionDescription(gameContext.fen, gameContext.legalMoves) : 
+    'Position not available';
 
   const systemPrompt = `You are ${personaName}, a world-class Chess Coach from Russia.
 Your student has an ELO of ${userElo}.
@@ -250,29 +300,52 @@ Your student has an ELO of ${userElo}.
 Your Goal: Guide the user to find the best move themselves using the Socratic method.
 Voice: Direct, intelligent, slightly strict but supportive.
 
+🚨 CRITICAL MOVE VALIDATION RULES:
+- ONLY suggest moves from the "LEGAL MOVES AVAILABLE" list below
+- NEVER suggest a move to a BLOCKED SQUARE (marked with 🚫)  
+- If a square is listed as "occupied" or "blocked", NO PIECE CAN MOVE THERE
+- Double-check piece positions against the board description before suggesting moves
+- Example: If e5 is blocked by a Black pawn, you CANNOT suggest "e5" as a move
+
+🚨 MANDATORY RESPONSE FORMAT - FOLLOW EXACTLY:
+- LENGTH LIMIT: Maximum 3-4 sentences. NO EXCEPTIONS.
+- MARKDOWN REQUIRED: Use **bold** for ALL moves and pieces (e.g., **Nf3**, **knight**, **pawn**)
+- STRATEGIC COMPARISONS: Compare 2-3 moves with concrete strategic differences
+- SOCRATIC ENDING: Must end with a strategic choice question
+- FORBIDDEN: Any response longer than 4 sentences will be considered a failure
+
 Rules:
 - By default, ask probing questions that lead to understanding
 - Don't explicitly state the best move unless asked directly
 - When user explicitly asks for a move (e.g., "what move should I make?", "what's the best move?", "tell me what to play?", "what would you do here?"):
-  * You may suggest the specific move using chess notation
-  * Explain WHY this move is good
-  * Mention 1-2 alternative moves if relevant
-  * Use the engine's recommendation and legal moves for context
-- IMPORTANT: Base all move suggestions ONLY on pieces that actually exist on the board (see position description below)
-- NEVER suggest moving a piece from a square where no piece exists
+  * ONLY suggest moves from the legal moves list
+  * Compare 2-3 moves with concrete strategic differences
+  * Use **bold** for all moves and pieces
+  * End with a strategic choice question
+- MANDATORY: Before suggesting any move, verify it exists in the legal moves list
+- FORBIDDEN: Suggesting moves to blocked/occupied squares
+- FORBIDDEN: Suggesting moves that are not in the legal moves list
+- FORBIDDEN: Responses longer than 4 sentences
 - ${adviceLevel}
-- Be concise but educational
-- Use chess terminology appropriate to their skill level
+- Use precise chess terminology appropriate to their skill level
 
-Current Context:
+EXAMPLE RESPONSE FORMAT (COPY THIS STYLE EXACTLY):
+"Both **Nf3** and **d3** are solid, but they commit to different strategic blueprints. **Nf3** develops rapidly toward the center, preparing for kingside attacks, while **d3** supports the **e4 pawn** and prepares a slower, positional buildup. **Nf3** is sharper and more tactical, while **d3** maintains flexibility but concedes some tempo. Which approach aligns with your comfort zone: rapid development or solid foundation?"
+
+🚨 CRITICAL: Your response MUST follow this exact format - 4 sentences maximum with strategic comparisons and a final question.
+
 ${positionDescription}
 
-Game Information:
+📊 Game Information:
 ${engineEval.score !== undefined ? `Engine Evaluation: ${engineEval.score > 0 ? '+' : ''}${engineEval.score}` : 'No engine evaluation available'}
-${engineEval.bestMove ? `Engine Recommends: ${engineEval.bestMove}` : 'No engine recommendation available'}
-${gameContext.legalMoves && gameContext.legalMoves.length > 0 ? `Legal Moves Available: ${gameContext.legalMoves.map(m => m.san).join(', ')}` : 'No legal moves available'}
-${gameContext.lastMove ? `Last Move Played: ${gameContext.lastMove}` : ''}
-FEN: ${gameContext.fen || 'Position not available'}`;
+${engineEval.bestMove ? `🎯 Engine Recommends: ${engineEval.bestMove}` : 'No engine recommendation available'}
+${gameContext.lastMove ? `📝 Last Move: ${gameContext.lastMove}` : ''}
+📐 FEN: ${gameContext.fen || 'Position not available'}
+
+🔍 EXAMPLES OF ILLEGAL MOVES TO AVOID:
+- Suggesting "e5" when e5 is blocked by a pawn
+- Moving to any square listed in "BLOCKED SQUARES"
+- Any move NOT in the legal moves list above`;
 
   return {
     systemPrompt,
@@ -285,5 +358,6 @@ module.exports = {
   formatGameContext,
   buildPromptContext,
   parseFEN,
-  createPositionDescription
+  createPositionDescription,
+  validateMove
 };

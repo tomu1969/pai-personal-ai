@@ -56,6 +56,42 @@ class GameStateCapture {
   }
 
   /**
+   * Get all legal moves in the current position
+   * @returns {Array} Array of legal moves with from, to, san notation
+   */
+  getLegalMoves() {
+    console.log('[GAMESTATE] 🎯 Getting legal moves...');
+    
+    const globalScope = typeof window !== 'undefined' ? window : global;
+    const gameAvailable = typeof globalScope.game === 'object' && globalScope.game !== null;
+    
+    if (!gameAvailable) {
+      console.log('[GAMESTATE] ⚠️ Game object not available - returning empty moves array');
+      return [];
+    }
+
+    try {
+      const game = globalScope.game;
+      const moves = game.moves({ verbose: true });
+      
+      const legalMoves = moves.map(move => ({
+        from: move.from,
+        to: move.to,
+        san: move.san,
+        piece: move.piece,
+        captured: move.captured || null,
+        promotion: move.promotion || null
+      }));
+      
+      console.log('[GAMESTATE] 🎯 Legal moves captured:', legalMoves.length, 'moves');
+      return legalMoves;
+    } catch (error) {
+      console.error('[GAMESTATE] ❌ Error getting legal moves:', error);
+      return [];
+    }
+  }
+
+  /**
    * Get engine evaluation from global engine object
    * @returns {Object} Engine evaluation
    */

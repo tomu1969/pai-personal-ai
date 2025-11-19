@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Talking Chess - Loading...</title>
+  <meta name="description" content="A modern chess game with AI mentor Irina">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta http-equiv="refresh" content="0; url=chess-v2.html">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+    .loading {
+      max-width: 400px;
+    }
+    .loading h1 {
+      color: #4CAF50;
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+    .loading p {
+      color: #ccc;
+      font-size: 1.1rem;
+    }
+    .spinner {
+      border: 3px solid #333;
+      border-top: 3px solid #4CAF50;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="loading">
+    <h1>🎯 Talking Chess</h1>
+    <div class="spinner"></div>
+    <p>Loading your chess experience with AI mentor Irina...</p>
+    <p><small>If you're not redirected automatically, <a href="chess-v2.html" style="color: #4CAF50;">click here</a></small></p>
+  </div>
+</body>
+</html>

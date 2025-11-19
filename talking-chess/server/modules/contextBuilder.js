@@ -4,6 +4,125 @@
  */
 
 /**
+ * Parses FEN notation to extract piece positions
+ * @param {string} fen - The FEN string to parse
+ * @returns {Object} - Object containing piece positions and board state
+ */
+function parseFEN(fen) {
+  if (!fen || typeof fen !== 'string') {
+    return null;
+  }
+
+  const parts = fen.trim().split(' ');
+  if (parts.length < 1) {
+    return null;
+  }
+
+  const [position] = parts;
+  const ranks = position.split('/');
+  
+  if (ranks.length !== 8) {
+    return null;
+  }
+
+  const board = {};
+  const pieces = {
+    white: { pawns: [], pieces: [] },
+    black: { pawns: [], pieces: [] }
+  };
+
+  // Map piece symbols to names
+  const pieceNames = {
+    'p': 'pawn', 'r': 'rook', 'n': 'knight', 'b': 'bishop', 'q': 'queen', 'k': 'king',
+    'P': 'pawn', 'R': 'rook', 'N': 'knight', 'B': 'bishop', 'Q': 'queen', 'K': 'king'
+  };
+
+  for (let rankIndex = 0; rankIndex < 8; rankIndex++) {
+    const rank = ranks[rankIndex];
+    let fileIndex = 0;
+    
+    for (let charIndex = 0; charIndex < rank.length; charIndex++) {
+      const char = rank[charIndex];
+      
+      if (char >= '1' && char <= '8') {
+        // Empty squares
+        fileIndex += parseInt(char);
+      } else if (pieceNames[char]) {
+        // Piece found
+        const file = String.fromCharCode(97 + fileIndex); // a-h
+        const rankNum = 8 - rankIndex; // 8-1
+        const square = file + rankNum;
+        
+        const isWhite = char === char.toUpperCase();
+        const pieceName = pieceNames[char];
+        
+        board[square] = {
+          piece: pieceName,
+          color: isWhite ? 'white' : 'black',
+          symbol: char
+        };
+        
+        if (pieceName === 'pawn') {
+          pieces[isWhite ? 'white' : 'black'].pawns.push(square);
+        } else {
+          pieces[isWhite ? 'white' : 'black'].pieces.push({ piece: pieceName, square });
+        }
+        
+        fileIndex++;
+      }
+    }
+  }
+
+  return { board, pieces };
+}
+
+/**
+ * Creates a human-readable description of the current position
+ * @param {string} fen - The FEN string
+ * @returns {string} - Human-readable position description
+ */
+function createPositionDescription(fen) {
+  const parsed = parseFEN(fen);
+  if (!parsed) {
+    return "Position cannot be parsed.";
+  }
+
+  const { pieces } = parsed;
+  
+  let description = "Current Position:\n";
+  
+  // White pieces
+  description += "White: ";
+  if (pieces.white.pawns.length > 0) {
+    description += `Pawns on ${pieces.white.pawns.join(', ')}`;
+  } else {
+    description += "No pawns";
+  }
+  
+  if (pieces.white.pieces.length > 0) {
+    const pieceList = pieces.white.pieces.map(p => `${p.piece} on ${p.square}`).join(', ');
+    description += pieces.white.pawns.length > 0 ? `; ${pieceList}` : pieceList;
+  }
+  
+  description += "\n";
+  
+  // Black pieces
+  description += "Black: ";
+  if (pieces.black.pawns.length > 0) {
+    description += `Pawns on ${pieces.black.pawns.join(', ')}`;
+  } else {
+    description += "No pawns";
+  }
+  
+  if (pieces.black.pieces.length > 0) {
+    const pieceList = pieces.black.pieces.map(p => `${p.piece} on ${p.square}`).join(', ');
+    description += pieces.black.pawns.length > 0 ? `; ${pieceList}` : pieceList;
+  }
+
+  return description;
+}
+
+/**
  * Validates FEN (Forsyth-Edwards Notation) string format
  * @param {string} fen - The FEN string to validate
  * @returns {boolean} - True if valid FEN format
@@ -122,6 +241,9 @@ function buildPromptContext(gameContext) {
     adviceLevel = 'Focus on prophylaxis, long-term planning, and deep strategic concepts.';
   }
 
+  // Create human-readable position description
+  const positionDescription = gameContext.fen ? createPositionDescription(gameContext.fen) : 'Position not available';
+
   const systemPrompt = `You are ${personaName}, a world-class Chess Coach from Russia.
 Your student has an ELO of ${userElo}.
 
@@ -129,17 +251,28 @@ Your Goal: Guide the user to find the best move themselves using the Socratic me
 Voice: Direct, intelligent, slightly strict but supportive.
 
 Rules:
+- By default, ask probing questions that lead to understanding
 - Don't explicitly state the best move unless asked directly
-- Ask probing questions that lead to understanding
+- When user explicitly asks for a move (e.g., "what move should I make?", "what's the best move?", "tell me what to play?", "what would you do here?"):
+  * You may suggest the specific move using chess notation
+  * Explain WHY this move is good
+  * Mention 1-2 alternative moves if relevant
+  * Use the engine's recommendation and legal moves for context
+- IMPORTANT: Base all move suggestions ONLY on pieces that actually exist on the board (see position description below)
+- NEVER suggest moving a piece from a square where no piece exists
 - ${adviceLevel}
 - Be concise but educational
 - Use chess terminology appropriate to their skill level
 
 Current Context:
+${positionDescription}
+
+Game Information:
 ${engineEval.score !== undefined ? `Engine Evaluation: ${engineEval.score > 0 ? '+' : ''}${engineEval.score}` : 'No engine evaluation available'}
-${engineEval.bestMove ? `Engine Best Move: ${engineEval.bestMove}` : 'No best move available'}
-${gameContext.fen ? `Position: ${gameContext.fen}` : ''}
-${gameContext.lastMove ? `Last Move: ${gameContext.lastMove}` : ''}`;
+${engineEval.bestMove ? `Engine Recommends: ${engineEval.bestMove}` : 'No engine recommendation available'}
+${gameContext.legalMoves && gameContext.legalMoves.length > 0 ? `Legal Moves Available: ${gameContext.legalMoves.map(m => m.san).join(', ')}` : 'No legal moves available'}
+${gameContext.lastMove ? `Last Move Played: ${gameContext.lastMove}` : ''}
+FEN: ${gameContext.fen || 'Position not available'}`;
 
   return {
     systemPrompt,
@@ -150,5 +283,7 @@ ${gameContext.lastMove ? `Last Move: ${gameContext.lastMove}` : ''}`;
 module.exports = {
   validateFEN,
   formatGameContext,
-  buildPromptContext
+  buildPromptContext,
+  parseFEN,
+  createPositionDescription
 };

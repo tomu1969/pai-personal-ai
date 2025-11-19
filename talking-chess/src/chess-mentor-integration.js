@@ -308,6 +308,7 @@ class ChessMentorIntegration {
       // Build game context for AI
       const gameState = this.gameStateCapture.captureCurrentState();
       const evaluation = this.gameStateCapture.getEngineEvaluation();
+      const legalMoves = this.gameStateCapture.getLegalMoves();
       const chatHistory = this.chatHistory.getRecentHistory(this.config.maxChatHistory);
       
       const gameContext = {
@@ -317,6 +318,7 @@ class ChessMentorIntegration {
         userElo: this.config.userElo,
         personaName: this.config.personaName,
         engineEval: evaluation,
+        legalMoves: legalMoves,
         chatHistory: chatHistory,
         userMessage: message
       };

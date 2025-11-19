@@ -9,6 +9,8 @@
     "test:coverage": "jest --coverage",
     "start": "http-server src -p 3333 -o",
     "dev": "http-server src -p 3333",
+    "server": "cd server && node index.js",
+    "start:both": "concurrently \"npm run start\" \"npm run server\"",
     "lint": "eslint src/**/*.js tests/**/*.js"
   },
   "keywords": [

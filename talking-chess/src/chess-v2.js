@@ -173,7 +173,7 @@ function makeMove(from, to) {
     // Check if game is over
     if (game.game_over()) {
       handleGameOver();
-      return;
+      return move; // Return move object for success indication
     }
     
     // Switch to AI turn
@@ -187,8 +187,11 @@ function makeMove(from, to) {
       console.log('🤖 2 seconds elapsed, making AI move now');
       makeComputerMove();
     }, 2000);
+    
+    return move; // Return move object for success indication
   } else {
     console.log('❌ Illegal move attempted');
+    return false; // Return false for failed moves
   }
 }
 

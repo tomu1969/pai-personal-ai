@@ -468,25 +468,64 @@
     </div>
   </div>
 
+  <!-- Script Loading Error Handler -->
+  <script>
+    window.scriptLoadErrors = [];
+    window.scriptLoadStatus = {};
+    
+    function handleScriptError(scriptName) {
+      console.error(`❌ Script load failed: ${scriptName}`);
+      window.scriptLoadErrors.push(scriptName);
+      window.scriptLoadStatus[scriptName] = false;
+    }
+    
+    function handleScriptSuccess(scriptName) {
+      console.log(`✅ Script loaded successfully: ${scriptName}`);
+      window.scriptLoadStatus[scriptName] = true;
+    }
+  </script>
+
   <!-- Chess.js for game logic -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js" 
+          onerror="handleScriptError('chess.js')" 
+          onload="handleScriptSuccess('chess.js')"></script>
   
   <!-- Engine dependencies -->
-  <script src="engine-config.js"></script>
-  <script src="stockfish-engine.js"></script>
+  <script src="engine-config.js" 
+          onerror="handleScriptError('engine-config.js')" 
+          onload="handleScriptSuccess('engine-config.js')"></script>
+  <script src="stockfish-engine.js" 
+          onerror="handleScriptError('stockfish-engine.js')" 
+          onload="handleScriptSuccess('stockfish-engine.js')"></script>
   
-  <!-- Chat interface components -->
-  <script src="chat-history.js"></script>
-  <script src="chat-container.js"></script>
-  <script src="chat-wrapper.js"></script>
-  <script src="game-state-capture.js"></script>
-  <script src="game-triggers.js"></script>
-  <script src="chess-mentor-integration.js"></script>
+  <!-- Chat interface components (optional for basic functionality) -->
+  <script src="chat-history.js" 
+          onerror="handleScriptError('chat-history.js')" 
+          onload="handleScriptSuccess('chat-history.js')"></script>
+  <script src="chat-container.js" 
+          onerror="handleScriptError('chat-container.js')" 
+          onload="handleScriptSuccess('chat-container.js')"></script>
+  <script src="chat-wrapper.js" 
+          onerror="handleScriptError('chat-wrapper.js')" 
+          onload="handleScriptSuccess('chat-wrapper.js')"></script>
+  <script src="game-state-capture.js" 
+          onerror="handleScriptError('game-state-capture.js')" 
+          onload="handleScriptSuccess('game-state-capture.js')"></script>
+  <script src="game-triggers.js" 
+          onerror="handleScriptError('game-triggers.js')" 
+          onload="handleScriptSuccess('game-triggers.js')"></script>
+  <script src="chess-mentor-integration.js" 
+          onerror="handleScriptError('chess-mentor-integration.js')" 
+          onload="handleScriptSuccess('chess-mentor-integration.js')"></script>
   
   <!-- Our clean chess implementation -->
-  <script src="chess-v2.js?v=5"></script>
+  <script src="chess-v2.js?v=6" 
+          onerror="handleScriptError('chess-v2.js')" 
+          onload="handleScriptSuccess('chess-v2.js')"></script>
   
   <!-- Main app initialization -->
-  <script src="app.js"></script>
+  <script src="app.js" 
+          onerror="handleScriptError('app.js')" 
+          onload="handleScriptSuccess('app.js')"></script>
 </body>
 </html>

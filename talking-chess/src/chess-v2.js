@@ -56,13 +56,16 @@ document.addEventListener('DOMContentLoaded', async function() {
     canvas = document.getElementById('chess-canvas');
     ctx = canvas.getContext('2d');
     
-    // Initialize Stockfish engine
-    engine = new StockfishEngine();
-    await engine.init();
-    console.log('✅ Stockfish engine initialized');
-    
-    // Set up canvas click handler
+    // Set up canvas click handler immediately - game works without engine
     canvas.addEventListener('click', handleBoardClick);
+    
+    // Enable basic game functionality first
+    isPlayerTurn = true;
+    console.log('✅ Basic chess functionality enabled');
+    
+    // Initialize engine with timeout and fallback
+    console.log('⏳ Initializing Stockfish engine with timeout...');
+    await initializeEngineWithTimeout();
     
     // Initial render (with small delay for images to load)
     setTimeout(() => {
@@ -72,14 +75,71 @@ document.addEventListener('DOMContentLoaded', async function() {
       // Set initial AI status based on starting ELO
       const initialElo = parseInt(document.getElementById('ai-elo').value) || 1650;
       adjustElo('ai', 0); // This will set the correct status display
+      
+      // Display system status
+      displaySystemStatus();
     }, 500);
     
     console.log('🎮 Chess V2 initialized successfully');
   } catch (error) {
     console.error('❌ Initialization failed:', error);
-    alert('Failed to initialize chess game: ' + error.message);
+    // Don't alert - just log the error and continue with basic functionality
+    console.log('⚠️ Continuing with basic chess functionality...');
   }
 });
+
+// Initialize engine with timeout to prevent blocking
+async function initializeEngineWithTimeout() {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      console.warn('⚠️ Engine initialization timed out - using fallback mode');
+      engine = null;
+      resolve(false);
+    }, 5000); // 5 second timeout
+    
+    (async () => {
+      try {
+        engine = new StockfishEngine();
+        await engine.init();
+        clearTimeout(timeout);
+        console.log('✅ Stockfish engine initialized successfully');
+        resolve(true);
+      } catch (error) {
+        clearTimeout(timeout);
+        console.warn('⚠️ Engine initialization failed:', error.message);
+        console.log('⚠️ Continuing without AI opponent...');
+        engine = null;
+        resolve(false);
+      }
+    })();
+  });
+}
+
+// Display system status for debugging
+function displaySystemStatus() {
+  console.log('🎮 =================================');
+  console.log('🎮 TALKING CHESS SYSTEM STATUS');
+  console.log('🎮 =================================');
+  console.log('🎮 Chess Game:', game ? '✅ Available' : '❌ Missing');
+  console.log('🎮 Stockfish Engine:', (engine && engine.isReady) ? '✅ Ready' : '⚠️ Using fallback');
+  console.log('🎮 Canvas:', (canvas && ctx) ? '✅ Ready' : '❌ Not available');
+  console.log('🎮 Player Turn:', isPlayerTurn ? '✅ Yes' : '❌ No');
+  console.log('🎮 Script Load Errors:', window.scriptLoadErrors?.length || 0);
+  
+  if (window.scriptLoadErrors?.length > 0) {
+    console.log('🎮 Failed Scripts:', window.scriptLoadErrors.join(', '));
+  }
+  
+  console.log('🎮 Chat Components:', {
+    ChatWrapper: typeof ChatWrapper !== 'undefined' ? '✅' : '⚠️',
+    ChessMentorIntegration: typeof ChessMentorIntegration !== 'undefined' ? '✅' : '⚠️',
+    GameStateCapture: typeof GameStateCapture !== 'undefined' ? '✅' : '⚠️'
+  });
+  
+  console.log('🎮 =================================');
+  console.log('🎮 STATUS: Game should be playable', (game && canvas && ctx) ? '✅' : '❌');
+  console.log('🎮 =================================');
+}
 
 // Convert canvas coordinates to chess square
 function getSquareFromCoords(x, y) {
@@ -110,9 +170,45 @@ function getSquareCoords(square) {
   return { x, y };
 }
 
+// Validate game state for move processing
+function validateGameState() {
+  // Check if essential components are available
+  if (!game || typeof game.fen !== 'function') {
+    console.error('❌ Game object not available or invalid');
+    return false;
+  }
+  
+  if (!canvas || !ctx) {
+    console.error('❌ Canvas not available or invalid');
+    return false;
+  }
+  
+  // Check if game is in a valid state
+  try {
+    game.fen(); // This will throw if game state is corrupted
+    if (game.game_over()) {
+      console.log('🏁 Game is over - moves not allowed');
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('❌ Game state corrupted:', error.message);
+    return false;
+  }
+}
+
 // Handle board clicks
 function handleBoardClick(event) {
-  if (!isPlayerTurn) return;
+  // Validate game state before processing moves
+  if (!validateGameState()) {
+    console.warn('⚠️ Game state invalid - click ignored');
+    return;
+  }
+  
+  if (!isPlayerTurn) {
+    console.log('🖱️ Not player turn - click ignored');
+    return;
+  }
   
   const square = getSquareFromCoords(event.clientX, event.clientY);
   if (!square) return;
@@ -198,6 +294,13 @@ function makeMove(from, to) {
 // Make computer move
 async function makeComputerMove() {
   try {
+    // Check if engine is available
+    if (!engine || !engine.isReady) {
+      console.warn('🤖 Engine not available - using random move fallback');
+      await makeRandomComputerMove();
+      return;
+    }
+    
     // Get AI difficulty
     const aiElo = parseInt(document.getElementById('ai-elo').value) || 1650;
     
@@ -280,23 +383,40 @@ async function makeComputerMove() {
   } catch (error) {
     console.error('❌ Computer move failed:', error);
     console.log('🔧 Attempting fallback to random move...');
-    
-    // Fallback to random move
+    await makeRandomComputerMove();
+  }
+}
+
+// Make random computer move (fallback when engine unavailable)
+async function makeRandomComputerMove() {
+  try {
     const moves = game.moves();
     if (moves.length > 0) {
       const randomMove = moves[Math.floor(Math.random() * moves.length)];
       const move = game.move(randomMove);
-      console.log('✅ Fallback move successful:', move.san);
+      console.log('🎲 Random move successful:', move.san);
       
       renderBoard();
       updateUI();
       addMoveToHistory(move.san, true);
+      
+      // Check if game is over
+      if (game.game_over()) {
+        handleGameOver();
+        return;
+      }
     } else {
-      console.error('❌ No legal moves available for fallback');
+      console.error('❌ No legal moves available for random fallback');
     }
     
+    // Switch back to player turn
     isPlayerTurn = true;
-    document.getElementById('ai-status').textContent = 'Ready';
+    document.getElementById('ai-status').textContent = 'Ready (Random)';
+    document.getElementById('ai-status').className = 'ai-status';
+  } catch (error) {
+    console.error('❌ Random move failed:', error);
+    isPlayerTurn = true;
+    document.getElementById('ai-status').textContent = 'Error';
     document.getElementById('ai-status').className = 'ai-status';
   }
 }

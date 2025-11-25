@@ -38,41 +38,22 @@ class ChessMentorIntegration {
    */
   async initialize(options = {}) {
     try {
-      console.log('[MENTOR] 🚀 Starting chess mentor initialization...');
-      console.log('[MENTOR] 📝 Input options:', options);
+      console.log('🔬 [TRANSLATOR MODEL] Initializing chess mentor system...');
       
       // Merge configuration
       this.config = { ...this.config, ...options };
-      console.log('[MENTOR] ⚙️ Merged config:', this.config);
 
-      // Initialize Phase 2 modules
-      console.log('[MENTOR] 🎮 Creating GameStateCapture...');
+      // Initialize components for deterministic analysis
       this.gameStateCapture = new GameStateCapture();
-      console.log('[MENTOR] 🎮 GameStateCapture created');
-      
-      console.log('[MENTOR] 🎯 Creating GameTriggers...');
       this.gameTriggers = new GameTriggers();
-      console.log('[MENTOR] 🎯 GameTriggers created');
-      
-      console.log('[MENTOR] 💬 Creating ChatHistory...');
       this.chatHistory = new ChatHistory();
-      console.log('[MENTOR] 💬 ChatHistory created');
-      
-      // Initialize chat components
-      console.log('[MENTOR] 🔗 Creating ChatWrapper...');
       this.chatWrapper = new ChatWrapper();
-      console.log('[MENTOR] 🔗 ChatWrapper created');
-      
-      console.log('[MENTOR] 📦 Creating ChatContainer...');
       this.chatContainer = new ChatContainer();
-      console.log('[MENTOR] 📦 ChatContainer created');
       
-      // Set up chat history limit
-      console.log('[MENTOR] 📊 Setting chat history limit to:', this.config.maxChatHistory);
       this.chatHistory.setMaxMessages(this.config.maxChatHistory);
       
       this.isInitialized = true;
-      console.log('[MENTOR] ✅ Chess mentor integration initialized successfully');
+      console.log('✅ [TRANSLATOR MODEL] System initialized - ready for deterministic analysis');
       return true;
       
     } catch (error) {
@@ -88,65 +69,32 @@ class ChessMentorIntegration {
    * @returns {boolean} Success status
    */
   connect(parentContainerId = 'game-container') {
-    console.log('[MENTOR] 🔌 Starting connection to chess game...');
-    console.log('[MENTOR] 📍 Parent container ID:', parentContainerId);
-    console.log('[MENTOR] 🔍 Is initialized?', this.isInitialized);
+    console.log('🔌 [TRANSLATOR MODEL] Connecting to chess game for deterministic analysis...');
     
     if (!this.isInitialized) {
-      console.error('[MENTOR] ❌ Chess mentor not initialized. Call initialize() first.');
+      console.error('❌ [TRANSLATOR MODEL] System not initialized');
       throw new Error('Chess mentor not initialized. Call initialize() first.');
     }
 
     try {
-      // Check if parent container exists
-      const parentElement = document.getElementById(parentContainerId);
-      console.log('[MENTOR] 📍 Parent element found?', parentElement ? '✅ YES' : '❌ NO');
-      if (parentElement) {
-        console.log('[MENTOR] 📍 Parent element details:', {
-          id: parentElement.id,
-          className: parentElement.className,
-          innerHTML: parentElement.innerHTML.substring(0, 100) + '...'
-        });
-      }
-
       // Create chat UI
-      console.log('[MENTOR] 📦 Creating chat container...');
       const chatContainerId = this.chatContainer.createChatContainer(parentContainerId);
-      console.log('[MENTOR] 📦 Chat container ID returned:', chatContainerId);
-      
       if (!chatContainerId) {
         throw new Error('Failed to create chat container');
       }
 
       // Set up chat components
-      console.log('[MENTOR] 📋 Creating chat header with persona:', this.config.personaName);
       this.chatContainer.createChatHeader(this.config.personaName, false);
-      
-      console.log('[MENTOR] 💬 Creating message stream...');
       this.chatContainer.createMessageStream();
-      
-      console.log('[MENTOR] ⌨️ Creating message input...');
       this.chatContainer.createMessageInput();
-
-      // Connect to chess game events
-      console.log('[MENTOR] 🔗 Setting up move listener...');
       this.chatWrapper.setupMoveListener();
-      
-      // Set up event handlers
-      console.log('[MENTOR] 🎛️ Setting up event handlers...');
       this._setupEventHandlers();
-      
-      // Add initial greeting
-      console.log('[MENTOR] 👋 Adding initial greeting...');
       this._addInitialGreeting();
       
       this.isConnected = true;
-      
-      // Update connection status in UI
-      console.log('[MENTOR] 🟢 Updating connection status to online...');
       this.chatContainer.updateConnectionStatus(true);
       
-      console.log('[MENTOR] ✅ Chess mentor connected to game successfully');
+      console.log('✅ [TRANSLATOR MODEL] Connected - ready to translate chess analysis');
       return true;
       
     } catch (error) {
@@ -327,44 +275,93 @@ class ChessMentorIntegration {
         userMessage: message
       };
 
-      console.log('Sending request to AI backend:', gameContext);
+      console.log('🔬 [TRANSLATOR MODEL] Raw data being sent to reasoning engine:');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('📡 FEN Position:', gameContext.fen);
+      console.log('📡 Legal Moves (for moveReasoning analyzer):', legalMoves.map(m => m.san).join(', '));
+      console.log('📡 Move Count:', legalMoves.length);
+      console.log('📡 User ELO:', gameContext.userElo);
+      console.log('📡 User Message:', gameContext.userMessage);
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('🎯 This data will be processed by deterministic analyzers:');
+      console.log('   • boardRadar.js → BOARD_REALITY facts');
+      console.log('   • safetyCheck.js → SAFETY_ALERT warnings');
+      console.log('   • moveReasoning.js → STRATEGIC_ANALYSIS of legal moves');
+      console.log('🔄 Analyzers will compute chess facts → LLM translates to natural language');
+      console.log('═══════════════════════════════════════════════════════');
       
       // Add loading indicator
       const loadingId = this.chatContainer.addMessage('assistant', `${this.config.personaName} is analyzing...`);
       
-      // Call backend API
-      const response = await fetch('http://localhost:3000/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(gameContext)
-      });
-
-      // Remove loading indicator
-      this.chatContainer.removeMessage(loadingId);
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-
-      const data = await response.json();
+      // Call backend API with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
-      if (data.success && data.message) {
-        // Add AI response to chat
-        this.chatHistory.addMessage('assistant', data.message);
-        this.chatContainer.addMessage('assistant', data.message);
-        this.lastResponseTime = Date.now();
+      try {
+        const response = await fetch('http://localhost:3000/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(gameContext),
+          signal: controller.signal
+        });
         
-        console.log(`${this.config.personaName} responded in ${data.processingTimeMs}ms`);
-      } else {
-        throw new Error('Invalid response from backend');
+        clearTimeout(timeoutId);
+
+        // Remove loading indicator
+        this.chatContainer.removeMessage(loadingId);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`API error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.success && data.message) {
+          // Log what the LLM translated from deterministic analysis
+          console.log('✨ [TRANSLATOR MODEL] LLM Response received:');
+          console.log('   • Processing Time:', data.processingTimeMs + 'ms');
+          console.log('   • Response Length:', data.message.length, 'characters');
+          console.log('   • Response Preview:', data.message.substring(0, 150) + '...');
+          console.log('   • Translation Complete: Deterministic facts → Natural language');
+          
+          // Add AI response to chat
+          this.chatHistory.addMessage('assistant', data.message);
+          this.chatContainer.addMessage('assistant', data.message);
+          this.lastResponseTime = Date.now();
+        } else {
+          throw new Error('Invalid response from backend');
+        }
+        
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        
+        // Remove loading indicator
+        this.chatContainer.removeMessage(loadingId);
+        
+        console.error('Error processing user message:', fetchError);
+        console.error('Game context that failed:', gameContext);
+        
+        let errorMessage = "I'm having trouble understanding right now. Could you rephrase your question?";
+        
+        if (fetchError.name === 'AbortError') {
+          errorMessage = "The request timed out. Please try again.";
+          console.error('Request timeout after 10 seconds');
+        } else if (fetchError.message.includes('Failed to fetch')) {
+          errorMessage = "Can't connect to the chess analysis server. Please check your connection.";
+          console.error('Network error - likely CORS or server down:', fetchError);
+        }
+        
+        // Provide fallback response
+        this.chatHistory.addMessage('assistant', errorMessage);
+        this.chatContainer.addMessage('assistant', errorMessage);
       }
-      
     } catch (error) {
-      console.error('Error processing user message:', error);
+      console.error('Unexpected error in _processUserMessage:', error);
       
-      // Provide fallback response
+      // Provide fallback response for any other errors
       const fallbackMessage = "I'm having trouble understanding right now. Could you rephrase your question?";
       this.chatHistory.addMessage('assistant', fallbackMessage);
       this.chatContainer.addMessage('assistant', fallbackMessage);

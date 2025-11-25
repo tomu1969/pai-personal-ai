@@ -13,24 +13,18 @@ class GameStateCapture {
    * @returns {Object} Complete game state
    */
   captureCurrentState() {
-    console.log('[GAMESTATE] 📊 Capturing current game state...');
+    console.log('🔬 [DETERMINISTIC] Capturing game state for reasoning engine...');
     
     const globalScope = typeof window !== 'undefined' ? window : global;
-    console.log('[GAMESTATE] 🌐 Global scope type:', typeof window !== 'undefined' ? 'window' : 'global');
-    
-    // Check availability of global objects
     const gameAvailable = typeof globalScope.game === 'object' && globalScope.game !== null;
-    console.log('[GAMESTATE] 🎮 Game object available?', gameAvailable ? '✅ YES' : '❌ NO');
     
     if (!gameAvailable) {
-      console.error('[GAMESTATE] ❌ Game object not available');
+      console.error('❌ [DETERMINISTIC] Game object unavailable - cannot provide facts to LLM');
       return null;
     }
 
     try {
       const game = globalScope.game;
-      console.log('[GAMESTATE] 🔄 Extracting state from game object...');
-      
       const state = {
         fen: game.fen(),
         pgn: game.pgn(),
@@ -40,17 +34,16 @@ class GameStateCapture {
         timestamp: new Date().toISOString()
       };
 
-      console.log('[GAMESTATE] ✅ Game state captured successfully:', {
-        hasFen: !!state.fen,
-        turn: state.turn,
-        inCheck: state.inCheck,
-        isGameOver: state.isGameOver
-      });
+      console.log('📡 [DETERMINISTIC] Position facts captured for analysis:');
+      console.log('   • FEN Position:', state.fen);
+      console.log('   • Current Turn:', state.turn === 'w' ? 'White to move' : 'Black to move');
+      console.log('   • In Check:', state.inCheck ? '🚨 YES - Safety alert required' : '✅ No');
+      console.log('   • Game Status:', state.isGameOver ? 'GAME OVER' : 'Active');
+      console.log('   • Move Count:', game.history().length);
 
       return state;
     } catch (error) {
-      console.error('[GAMESTATE] ❌ Error capturing game state:', error);
-      console.error('[GAMESTATE] ❌ Error stack:', error.stack);
+      console.error('❌ [DETERMINISTIC] Failed to capture position facts:', error.message);
       return null;
     }
   }
@@ -60,13 +53,13 @@ class GameStateCapture {
    * @returns {Array} Array of legal moves with from, to, san notation
    */
   getLegalMoves() {
-    console.log('[GAMESTATE] 🎯 Getting legal moves...');
+    console.log('🎯 [DETERMINISTIC] Computing legal moves for reasoning engine...');
     
     const globalScope = typeof window !== 'undefined' ? window : global;
     const gameAvailable = typeof globalScope.game === 'object' && globalScope.game !== null;
     
     if (!gameAvailable) {
-      console.log('[GAMESTATE] ⚠️ Game object not available - returning empty moves array');
+      console.error('❌ [DETERMINISTIC] Cannot compute legal moves - game unavailable');
       return [];
     }
 
@@ -83,10 +76,13 @@ class GameStateCapture {
         promotion: move.promotion || null
       }));
       
-      console.log('[GAMESTATE] 🎯 Legal moves captured:', legalMoves.length, 'moves');
+      console.log('🎯 [DETERMINISTIC] Legal moves computed:', legalMoves.length, 'possible moves');
+      console.log('   • Top moves (SAN):', legalMoves.slice(0, 8).map(m => m.san).join(', '));
+      console.log('   • These will be sent to moveReasoning analyzer for strategic analysis');
+      
       return legalMoves;
     } catch (error) {
-      console.error('[GAMESTATE] ❌ Error getting legal moves:', error);
+      console.error('❌ [DETERMINISTIC] Failed to compute legal moves:', error.message);
       return [];
     }
   }

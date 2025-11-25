@@ -1,7 +1,13 @@
 /**
  * Context Builder Module - Talking Chess Chat Mentor
- * Builds context objects for AI chat interactions
+ * Builds context objects for AI chat interactions with deterministic analysis
  */
+
+// Import deterministic analyzers
+const { Chess } = require('chess.js');
+const { getBoardRadar, getPieceCounts } = require('../analyzers/boardRadar');
+const { getSafetyStatus } = require('../analyzers/safetyCheck');
+const { getStrategicAnalysis, getPositionType } = require('../analyzers/moveReasoning');
 
 /**
  * Parses FEN notation to extract piece positions
@@ -91,7 +97,12 @@ function createPositionDescription(fen, legalMoves = []) {
   const { board, pieces } = parsed;
   const occupiedSquares = Object.keys(board);
   
-  let description = "📋 CURRENT BOARD POSITION:\n";
+  let description = "";
+  
+  // NOTE: Legal moves are now handled separately via LEGAL_MOVES_LIST variable
+  // This function focuses only on board position description
+  
+  description += "📋 CURRENT BOARD POSITION:\n";
   
   // White pieces
   description += "🤍 White pieces: ";
@@ -137,12 +148,6 @@ function createPositionDescription(fen, legalMoves = []) {
     description = description.slice(0, -2); // Remove last comma
   }
 
-  // Legal moves validation
-  if (legalMoves && legalMoves.length > 0) {
-    description += `\n\n✅ LEGAL MOVES AVAILABLE (${legalMoves.length} total):\n`;
-    description += legalMoves.map(m => m.san || m).join(', ');
-  }
-
   return description;
 }
 
@@ -168,6 +173,75 @@ function validateMove(moveNotation, legalMoves = []) {
   }
 
   return { isLegal: true, reason: "Move is legal" };
+}
+
+/**
+ * Validates that the chess position and legal moves are consistent
+ * @param {string} fen - The FEN string
+ * @param {Array} legalMoves - Array of legal moves
+ * @returns {Object} - Validation result with consistency checks
+ */
+function validatePositionConsistency(fen, legalMoves = []) {
+  const issues = [];
+  
+  if (!fen) {
+    issues.push("Missing FEN string");
+    return { isConsistent: false, issues };
+  }
+  
+  if (!legalMoves || legalMoves.length === 0) {
+    issues.push("No legal moves provided - possible stalemate or checkmate");
+  }
+  
+  try {
+    // Basic FEN validation
+    const fenParts = fen.split(' ');
+    if (fenParts.length !== 6) {
+      issues.push(`Invalid FEN format: expected 6 parts, got ${fenParts.length}`);
+    }
+    
+    // Check if position looks like starting position but has advanced moves
+    const isStartPosition = fen.startsWith('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+    if (isStartPosition && legalMoves.some(m => (m.san || m).includes('x'))) {
+      issues.push("Starting position but legal moves include captures - possible desync");
+    }
+    
+    // Check for impossible moves in opening position
+    if (isStartPosition && legalMoves.some(m => {
+      const san = m.san || m;
+      return san.includes('N') && ['Na4', 'Nb5', 'Nd5', 'Ne4', 'Ng4', 'Nh5'].includes(san);
+    })) {
+      issues.push("Starting position but has impossible knight moves - likely position mismatch");
+    }
+    
+    // Check for excessive legal moves (usually indicates wrong position)
+    if (legalMoves.length > 50) {
+      issues.push(`Unusually high number of legal moves: ${legalMoves.length} (possible position error)`);
+    }
+    
+    // Extract move notation for analysis
+    const sanMoves = legalMoves.map(m => m.san || m);
+    
+    // Check for knight moves that don't match common opening patterns
+    const knightMoves = sanMoves.filter(move => move.match(/^N[a-h][1-8]/));
+    if (knightMoves.length > 0) {
+      // In opening, typical knight moves are Nf3, Nc3, Ng1-f3, Nb1-c3
+      const validOpeningKnightMoves = ['Nf3', 'Nc3', 'Ne2', 'Nh3'];
+      const suspiciousKnightMoves = knightMoves.filter(move => !validOpeningKnightMoves.includes(move));
+      if (suspiciousKnightMoves.length > 0 && fenParts[5] === '1') { // Move 1
+        issues.push(`Suspicious knight moves in opening: ${suspiciousKnightMoves.join(', ')}`);
+      }
+    }
+    
+  } catch (error) {
+    issues.push(`FEN parsing error: ${error.message}`);
+  }
+  
+  return {
+    isConsistent: issues.length === 0,
+    issues,
+    warnings: issues.filter(issue => issue.includes('possible') || issue.includes('suspicious'))
+  };
 }
 
 /**
@@ -259,6 +333,7 @@ function formatGameContext(input) {
       score: 0.0,
       bestMove: null
     },
+    legalMoves: input.legalMoves || [],
     chatHistory: input.chatHistory || [],
     userMessage: input.userMessage || ''
   };
@@ -272,11 +347,91 @@ function formatGameContext(input) {
 }
 
 /**
+ * Ranks chess moves by strength and returns top 3 with best move identification
+ * @param {Array} legalMoves - Array of legal moves with san notation
+ * @param {Object} engineEval - Engine evaluation with score and bestMove
+ * @returns {Object} - Object containing top3Moves string and bestMove
+ */
+function extractTop3Moves(legalMoves = [], engineEval = {}) {
+  if (!legalMoves || legalMoves.length === 0) {
+    return {
+      top3Moves: 'No legal moves available',
+      bestMove: null
+    };
+  }
+
+  // Convert moves to consistent format
+  const moves = legalMoves.map(m => m.san || m);
+  
+  // If only 1-3 moves, return all
+  if (moves.length <= 3) {
+    return {
+      top3Moves: moves.join(', '),
+      bestMove: engineEval.bestMove || moves[0]
+    };
+  }
+
+  // Ranking algorithm: prioritize engine best move, then strategic principles
+  const rankedMoves = moves.map(move => {
+    let score = 0;
+    
+    // Primary: Engine best move gets highest priority
+    if (engineEval.bestMove && move === engineEval.bestMove) {
+      score += 1000;
+    }
+    
+    // Secondary: Captures (indicated by 'x' in algebraic notation)
+    if (move.includes('x')) {
+      score += 100;
+    }
+    
+    // Tertiary: Piece development (knights and bishops)
+    if (/^[NB]/.test(move)) {
+      score += 50;
+    }
+    
+    // Quaternary: Central pawn moves (e4, e5, d4, d5)
+    if (/^[ed][45]$/.test(move)) {
+      score += 30;
+    }
+    
+    // Quinary: Castling (0-0, 0-0-0)
+    if (move.includes('0-0')) {
+      score += 25;
+    }
+    
+    // Senary: Check moves (indicated by '+')
+    if (move.includes('+')) {
+      score += 20;
+    }
+    
+    // Septenary: Promotion moves (indicated by '=')
+    if (move.includes('=')) {
+      score += 15;
+    }
+    
+    return { move, score };
+  });
+
+  // Sort by score (highest first) and take top 3
+  const sortedMoves = rankedMoves
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map(item => item.move);
+
+  return {
+    top3Moves: sortedMoves.join(', '),
+    bestMove: engineEval.bestMove || sortedMoves[0]
+  };
+}
+
+/**
  * Builds system prompt context for AI based on user ELO and game state
  * @param {Object} gameContext - Formatted game context
  * @returns {Object} - Prompt context for AI
  */
 function buildPromptContext(gameContext) {
+  const { loadAndFillPrompt } = require('./promptLoader');
   const { userElo = 1500, personaName = 'Irina', engineEval = {}, userMessage = '' } = gameContext;
 
   // Adjust advice complexity based on ELO
@@ -294,63 +449,116 @@ function buildPromptContext(gameContext) {
     createPositionDescription(gameContext.fen, gameContext.legalMoves) : 
     'Position not available';
 
-  const systemPrompt = `You are ${personaName}, a world-class Chess Coach from Russia.
+  // Validate position consistency before processing
+  const validation = validatePositionConsistency(gameContext.fen, gameContext.legalMoves);
+  console.log('🔍 Position validation result:', validation);
+  
+  if (!validation.isConsistent) {
+    console.error('❌ POSITION VALIDATION FAILED:', validation.issues);
+  }
+  
+  if (validation.warnings.length > 0) {
+    console.warn('⚠️ Position warnings:', validation.warnings);
+  }
+
+  // Extract top 3 ranked moves for strategic presentation
+  const { top3Moves, bestMove } = extractTop3Moves(gameContext.legalMoves, engineEval);
+
+  // === DETERMINISTIC ANALYSIS SECTION ===
+  // Create chess instance for computed analysis
+  let boardReality = '[ANALYSIS_ERROR: Could not create chess instance]';
+  let safetyAlert = '[ANALYSIS_ERROR: Could not analyze safety]';
+  let strategicAnalysis = '[ANALYSIS_ERROR: Could not analyze moves]';
+  let positionType = 'Unknown position type';
+  
+  try {
+    console.log('🔬 [DETERMINISTIC] Creating Chess instance from FEN:', gameContext.fen);
+    const chess = new Chess(gameContext.fen);
+    
+    // Generate deterministic facts
+    boardReality = getBoardRadar(gameContext.fen);
+    safetyAlert = getSafetyStatus(chess);
+    positionType = getPositionType(chess);
+    
+    // Analyze top moves with specific reasoning
+    const topMovesArray = top3Moves.split(', ').filter(move => move.trim().length > 0);
+    strategicAnalysis = getStrategicAnalysis(chess, topMovesArray);
+    
+    console.log('✅ [DETERMINISTIC] Analysis completed successfully');
+    console.log('📡 Board Reality:', boardReality);
+    console.log('🛡️ Safety Alert:', safetyAlert);
+    console.log('🎯 Strategic Analysis:', strategicAnalysis);
+    
+  } catch (error) {
+    console.error('❌ [DETERMINISTIC] Analysis failed:', error.message);
+    // Keep error messages in variables so they appear in prompt for debugging
+    boardReality = `[ANALYSIS_ERROR: ${error.message}]`;
+    safetyAlert = `[ANALYSIS_ERROR: ${error.message}]`;
+    strategicAnalysis = `[ANALYSIS_ERROR: ${error.message}]`;
+  }
+
+  // Prepare template variables (preserve existing + add deterministic analysis)
+  const templateVariables = {
+    personaName,
+    userElo,
+    adviceLevel,
+    positionDescription,
+    TOP_3_MOVES: top3Moves,
+    BEST_MOVE: bestMove || 'Unknown',
+    chatHistory: gameContext.chatHistory ? 
+      gameContext.chatHistory.slice(-3).map(msg => `${msg.sender}: ${msg.content}`).join('\n') : 
+      '',
+    engineEvaluation: engineEval.score !== undefined ? 
+      `Engine Evaluation: ${engineEval.score > 0 ? '+' : ''}${engineEval.score}` : 
+      'No engine evaluation available',
+    engineRecommendation: engineEval.bestMove ? 
+      `🎯 Engine Recommends: ${engineEval.bestMove}` : 
+      'No engine recommendation available',
+    lastMove: gameContext.lastMove ? 
+      `📝 Last Move: ${gameContext.lastMove}` : '',
+    fen: gameContext.fen || 'Position not available',
+    
+    // === NEW DETERMINISTIC VARIABLES ===
+    BOARD_REALITY: boardReality,
+    SAFETY_ALERT: safetyAlert,
+    STRATEGIC_ANALYSIS: strategicAnalysis,
+    POSITION_TYPE: positionType,
+    EVAL_SCORE: engineEval.score !== undefined ? 
+      `${engineEval.score > 0 ? '+' : ''}${engineEval.score}` : '0.0'
+  };
+
+  try {
+    // Load and fill the external prompt template
+    const systemPrompt = loadAndFillPrompt('irina-system-prompt', templateVariables);
+    
+    return {
+      systemPrompt,
+      userMessage
+    };
+  } catch (error) {
+    console.error('Failed to load external prompt, falling back to embedded prompt:', error.message);
+    
+    // Fallback to embedded prompt if external loading fails
+    const fallbackPrompt = `You are ${personaName}, a world-class Chess Coach from Russia.
 Your student has an ELO of ${userElo}.
 
-Your Goal: Guide the user to find the best move themselves using the Socratic method.
-Voice: Direct, intelligent, slightly strict but supportive.
-
-🚨 CRITICAL MOVE VALIDATION RULES:
-- ONLY suggest moves from the "LEGAL MOVES AVAILABLE" list below
-- NEVER suggest a move to a BLOCKED SQUARE (marked with 🚫)  
-- If a square is listed as "occupied" or "blocked", NO PIECE CAN MOVE THERE
-- Double-check piece positions against the board description before suggesting moves
-- Example: If e5 is blocked by a Black pawn, you CANNOT suggest "e5" as a move
-
-🚨 MANDATORY RESPONSE FORMAT - FOLLOW EXACTLY:
-- LENGTH LIMIT: Maximum 3-4 sentences. NO EXCEPTIONS.
-- MARKDOWN REQUIRED: Use **bold** for ALL moves and pieces (e.g., **Nf3**, **knight**, **pawn**)
-- STRATEGIC COMPARISONS: Compare 2-3 moves with concrete strategic differences
-- SOCRATIC ENDING: Must end with a strategic choice question
-- FORBIDDEN: Any response longer than 4 sentences will be considered a failure
-
-Rules:
-- By default, ask probing questions that lead to understanding
-- Don't explicitly state the best move unless asked directly
-- When user explicitly asks for a move (e.g., "what move should I make?", "what's the best move?", "tell me what to play?", "what would you do here?"):
-  * ONLY suggest moves from the legal moves list
-  * Compare 2-3 moves with concrete strategic differences
-  * Use **bold** for all moves and pieces
-  * End with a strategic choice question
-- MANDATORY: Before suggesting any move, verify it exists in the legal moves list
-- FORBIDDEN: Suggesting moves to blocked/occupied squares
-- FORBIDDEN: Suggesting moves that are not in the legal moves list
-- FORBIDDEN: Responses longer than 4 sentences
-- ${adviceLevel}
-- Use precise chess terminology appropriate to their skill level
-
-EXAMPLE RESPONSE FORMAT (COPY THIS STYLE EXACTLY):
-"Both **Nf3** and **d3** are solid, but they commit to different strategic blueprints. **Nf3** develops rapidly toward the center, preparing for kingside attacks, while **d3** supports the **e4 pawn** and prepares a slower, positional buildup. **Nf3** is sharper and more tactical, while **d3** maintains flexibility but concedes some tempo. Which approach aligns with your comfort zone: rapid development or solid foundation?"
-
-🚨 CRITICAL: Your response MUST follow this exact format - 4 sentences maximum with strategic comparisons and a final question.
+🚨 DATA CONSTRAINTS (ABSOLUTE MANDATORY BOUNDARY) 🚨
+You MUST ONLY suggest moves found in the following list:
+[LEGAL_MOVES_START] ${top3Moves} [LEGAL_MOVES_END]
 
 ${positionDescription}
 
 📊 Game Information:
-${engineEval.score !== undefined ? `Engine Evaluation: ${engineEval.score > 0 ? '+' : ''}${engineEval.score}` : 'No engine evaluation available'}
-${engineEval.bestMove ? `🎯 Engine Recommends: ${engineEval.bestMove}` : 'No engine recommendation available'}
-${gameContext.lastMove ? `📝 Last Move: ${gameContext.lastMove}` : ''}
-📐 FEN: ${gameContext.fen || 'Position not available'}
+${templateVariables.engineEvaluation}
+${templateVariables.engineRecommendation}
+${templateVariables.lastMove}
+📐 FEN: ${templateVariables.fen}`;
 
-🔍 EXAMPLES OF ILLEGAL MOVES TO AVOID:
-- Suggesting "e5" when e5 is blocked by a pawn
-- Moving to any square listed in "BLOCKED SQUARES"
-- Any move NOT in the legal moves list above`;
-
-  return {
-    systemPrompt,
-    userMessage
-  };
+    return {
+      systemPrompt: fallbackPrompt,
+      userMessage
+    };
+  }
 }
 
 module.exports = {
@@ -359,5 +567,7 @@ module.exports = {
   buildPromptContext,
   parseFEN,
   createPositionDescription,
-  validateMove
+  validateMove,
+  extractTop3Moves,
+  validatePositionConsistency
 };

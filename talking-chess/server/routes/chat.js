@@ -21,6 +21,18 @@ router.post('/', async (req, res) => {
   try {
     console.log(`${new Date().toISOString()} - Chat request received`);
     
+    // Comprehensive debugging of incoming request
+    console.log('🚨 [BACKEND] INCOMING REQUEST ANALYSIS:');
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('📥 Request body keys:', Object.keys(req.body || {}));
+    console.log('📍 FEN received:', req.body?.fen);
+    console.log('📍 User message:', req.body?.userMessage);
+    console.log('📍 User ELO:', req.body?.userElo);
+    console.log('📍 Legal moves received:', req.body?.legalMoves?.length || 0);
+    console.log('📍 Legal moves (first 10):', req.body?.legalMoves?.slice(0, 10));
+    console.log('📍 Engine eval:', req.body?.engineEval);
+    console.log('═══════════════════════════════════════════════════════');
+    
     // Validate request body
     if (!req.body || !req.body.userMessage) {
       return res.status(400).json({
@@ -44,6 +56,21 @@ router.post('/', async (req, res) => {
     const { systemPrompt, userMessage } = buildPromptContext(gameContext);
 
     console.log(`${new Date().toISOString()} - Calling OpenAI with ELO ${gameContext.userElo}`);
+    
+    // Debug what contextBuilder produced
+    console.log('🚨 [BACKEND] CONTEXT BUILDER OUTPUT:');
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('📍 Game context after formatting:', {
+      fen: gameContext.fen,
+      legalMoves: gameContext.legalMoves?.length || 0,
+      userElo: gameContext.userElo,
+      engineEval: gameContext.engineEval
+    });
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('🔍 COMPLETE SYSTEM PROMPT BEING SENT TO AI:');
+    console.log('═══════════════════════════════════════════');
+    console.log(systemPrompt);
+    console.log('═══════════════════════════════════════════');
 
     // Generate AI response
     const aiResponse = await openaiService.generateChatResponse(

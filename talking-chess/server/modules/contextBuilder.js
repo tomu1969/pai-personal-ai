@@ -3,11 +3,11 @@
  * Builds context objects for AI chat interactions with deterministic analysis
  */
 
-// Import deterministic analyzers
+// Import analyzers
 const { Chess } = require('chess.js');
 const { getBoardRadar, getPieceCounts } = require('../analyzers/boardRadar');
 const { getSafetyStatus } = require('../analyzers/safetyCheck');
-const { getStrategicAnalysis, getPositionType } = require('../analyzers/moveReasoning');
+const { getStrategicAnalysis, formatStrategicAnalysis, getPositionType } = require('../analyzers/moveReasoning');
 
 /**
  * Parses FEN notation to extract piece positions
@@ -80,6 +80,66 @@ function parseFEN(fen) {
   }
 
   return { board, pieces };
+}
+
+/**
+ * Creates a human-readable board state description for the LLM
+ * This helps prevent hallucination by giving the LLM ground truth about piece positions
+ * @param {string} fen - The FEN string to parse
+ * @returns {string} - Human-readable board state
+ */
+function createBoardStateDescription(fen) {
+  const parsed = parseFEN(fen);
+  if (!parsed) {
+    return "Position cannot be parsed.";
+  }
+
+  const { pieces } = parsed;
+  let description = "";
+
+  // White pieces
+  description += "White: ";
+  const whiteParts = [];
+  if (pieces.white.pawns.length > 0) {
+    whiteParts.push(`Pawns on ${pieces.white.pawns.join(', ')}`);
+  }
+  // Group other pieces by type
+  const whitePiecesByType = {};
+  pieces.white.pieces.forEach(p => {
+    const capitalizedPiece = p.piece.charAt(0).toUpperCase() + p.piece.slice(1);
+    if (!whitePiecesByType[capitalizedPiece]) {
+      whitePiecesByType[capitalizedPiece] = [];
+    }
+    whitePiecesByType[capitalizedPiece].push(p.square);
+  });
+  for (const [pieceType, squares] of Object.entries(whitePiecesByType)) {
+    whiteParts.push(`${pieceType}${squares.length > 1 ? 's' : ''} on ${squares.join(', ')}`);
+  }
+  description += whiteParts.join('; ') || 'No pieces';
+
+  description += "\n";
+
+  // Black pieces
+  description += "Black: ";
+  const blackParts = [];
+  if (pieces.black.pawns.length > 0) {
+    blackParts.push(`Pawns on ${pieces.black.pawns.join(', ')}`);
+  }
+  // Group other pieces by type
+  const blackPiecesByType = {};
+  pieces.black.pieces.forEach(p => {
+    const capitalizedPiece = p.piece.charAt(0).toUpperCase() + p.piece.slice(1);
+    if (!blackPiecesByType[capitalizedPiece]) {
+      blackPiecesByType[capitalizedPiece] = [];
+    }
+    blackPiecesByType[capitalizedPiece].push(p.square);
+  });
+  for (const [pieceType, squares] of Object.entries(blackPiecesByType)) {
+    blackParts.push(`${pieceType}${squares.length > 1 ? 's' : ''} on ${squares.join(', ')}`);
+  }
+  description += blackParts.join('; ') || 'No pieces';
+
+  return description;
 }
 
 /**
@@ -427,138 +487,155 @@ function extractTop3Moves(legalMoves = [], engineEval = {}) {
 
 /**
  * Builds system prompt context for AI based on user ELO and game state
+ * Now async to support Stockfish engine analysis
  * @param {Object} gameContext - Formatted game context
- * @returns {Object} - Prompt context for AI
+ * @returns {Promise<Object>} - Prompt context for AI
  */
-function buildPromptContext(gameContext) {
+async function buildPromptContext(gameContext) {
   const { loadAndFillPrompt } = require('./promptLoader');
-  const { userElo = 1500, personaName = 'Irina', engineEval = {}, userMessage = '' } = gameContext;
+  const { userElo = 1500, personaName = 'Irina', userMessage = '' } = gameContext;
 
   // Adjust advice complexity based on ELO
   let adviceLevel;
   if (userElo < 1200) {
-    adviceLevel = 'Focus on basic safety like not hanging pieces and simple tactics.';
+    adviceLevel = 'beginner';
   } else if (userElo < 1800) {
-    adviceLevel = 'Focus on positional concepts, piece coordination, and tactical patterns.';
+    adviceLevel = 'intermediate';
   } else {
-    adviceLevel = 'Focus on prophylaxis, long-term planning, and deep strategic concepts.';
+    adviceLevel = 'advanced';
   }
-
-  // Create comprehensive position description with legal moves
-  const positionDescription = gameContext.fen ? 
-    createPositionDescription(gameContext.fen, gameContext.legalMoves) : 
-    'Position not available';
 
   // Validate position consistency before processing
   const validation = validatePositionConsistency(gameContext.fen, gameContext.legalMoves);
-  console.log('🔍 Position validation result:', validation);
-  
-  if (!validation.isConsistent) {
-    console.error('❌ POSITION VALIDATION FAILED:', validation.issues);
-  }
-  
-  if (validation.warnings.length > 0) {
-    console.warn('⚠️ Position warnings:', validation.warnings);
-  }
+  console.log('[CONTEXT] Position validation:', validation.isConsistent ? 'OK' : validation.issues);
 
-  // Extract top 3 ranked moves for strategic presentation
-  const { top3Moves, bestMove } = extractTop3Moves(gameContext.legalMoves, engineEval);
-
-  // === DETERMINISTIC ANALYSIS SECTION ===
-  // Create chess instance for computed analysis
-  let boardReality = '[ANALYSIS_ERROR: Could not create chess instance]';
+  // === ENGINE-BASED ANALYSIS ===
   let safetyAlert = '[ANALYSIS_ERROR: Could not analyze safety]';
   let strategicAnalysis = '[ANALYSIS_ERROR: Could not analyze moves]';
-  let positionType = 'Unknown position type';
-  
+  let positionType = 'Unknown';
+
   try {
-    console.log('🔬 [DETERMINISTIC] Creating Chess instance from FEN:', gameContext.fen);
+    console.log('[CONTEXT] Starting engine analysis for FEN:', gameContext.fen);
     const chess = new Chess(gameContext.fen);
-    
-    // Generate deterministic facts
-    boardReality = getBoardRadar(gameContext.fen);
+
+    // Get safety status (synchronous)
     safetyAlert = getSafetyStatus(chess);
     positionType = getPositionType(chess);
-    
-    // Analyze top moves with specific reasoning
-    const topMovesArray = top3Moves.split(', ').filter(move => move.trim().length > 0);
-    strategicAnalysis = getStrategicAnalysis(chess, topMovesArray);
-    
-    console.log('✅ [DETERMINISTIC] Analysis completed successfully');
-    console.log('📡 Board Reality:', boardReality);
-    console.log('🛡️ Safety Alert:', safetyAlert);
-    console.log('🎯 Strategic Analysis:', strategicAnalysis);
-    
+
+    // Get engine-based strategic analysis (async)
+    const analysisResult = await getStrategicAnalysis(gameContext.fen, {
+      depth: 16,
+      multiPv: 3
+    });
+
+    // Format the analysis for the prompt
+    strategicAnalysis = formatStrategicAnalysis(analysisResult);
+
+    console.log('[CONTEXT] Engine analysis complete');
+    console.log('[CONTEXT] Safety:', safetyAlert);
+    console.log('[CONTEXT] Strategic Analysis:', strategicAnalysis);
+
   } catch (error) {
-    console.error('❌ [DETERMINISTIC] Analysis failed:', error.message);
-    // Keep error messages in variables so they appear in prompt for debugging
-    boardReality = `[ANALYSIS_ERROR: ${error.message}]`;
+    console.error('[CONTEXT] Analysis failed:', error.message);
     safetyAlert = `[ANALYSIS_ERROR: ${error.message}]`;
     strategicAnalysis = `[ANALYSIS_ERROR: ${error.message}]`;
   }
 
-  // Prepare template variables (preserve existing + add deterministic analysis)
+  // Generate board state description to prevent LLM hallucination about piece positions
+  const boardState = createBoardStateDescription(gameContext.fen);
+  console.log('[CONTEXT] Board State:', boardState);
+
+  // Extract prior suggestions to prevent repetition
+  const priorSuggestions = extractPriorSuggestions(gameContext.chatHistory || []);
+  const priorSuggestionsText = priorSuggestions.length > 0
+    ? `You already suggested: ${priorSuggestions.join(', ')}. Suggest something different.`
+    : '';
+  console.log('[CONTEXT] Prior suggestions:', priorSuggestions);
+
+  // Prepare template variables
+  // Note: With tool-based architecture, STRATEGIC_ANALYSIS is optional backup
+  // The AI will call get_position_analysis tool for accurate eval
   const templateVariables = {
     personaName,
     userElo,
     adviceLevel,
-    positionDescription,
-    TOP_3_MOVES: top3Moves,
-    BEST_MOVE: bestMove || 'Unknown',
-    chatHistory: gameContext.chatHistory ? 
-      gameContext.chatHistory.slice(-3).map(msg => `${msg.sender}: ${msg.content}`).join('\n') : 
-      '',
-    engineEvaluation: engineEval.score !== undefined ? 
-      `Engine Evaluation: ${engineEval.score > 0 ? '+' : ''}${engineEval.score}` : 
-      'No engine evaluation available',
-    engineRecommendation: engineEval.bestMove ? 
-      `🎯 Engine Recommends: ${engineEval.bestMove}` : 
-      'No engine recommendation available',
-    lastMove: gameContext.lastMove ? 
-      `📝 Last Move: ${gameContext.lastMove}` : '',
-    fen: gameContext.fen || 'Position not available',
-    
-    // === NEW DETERMINISTIC VARIABLES ===
-    BOARD_REALITY: boardReality,
     SAFETY_ALERT: safetyAlert,
-    STRATEGIC_ANALYSIS: strategicAnalysis,
+    STRATEGIC_ANALYSIS: strategicAnalysis, // Kept for fallback prompt
     POSITION_TYPE: positionType,
-    EVAL_SCORE: engineEval.score !== undefined ? 
-      `${engineEval.score > 0 ? '+' : ''}${engineEval.score}` : '0.0'
+    BOARD_STATE: boardState,
+    PRIOR_SUGGESTIONS: priorSuggestionsText,
+    fen: gameContext.fen || 'Position not available'
   };
 
   try {
     // Load and fill the external prompt template
     const systemPrompt = loadAndFillPrompt('irina-system-prompt', templateVariables);
-    
+
     return {
       systemPrompt,
       userMessage
     };
   } catch (error) {
-    console.error('Failed to load external prompt, falling back to embedded prompt:', error.message);
-    
-    // Fallback to embedded prompt if external loading fails
-    const fallbackPrompt = `You are ${personaName}, a world-class Chess Coach from Russia.
-Your student has an ELO of ${userElo}.
+    console.error('[CONTEXT] Failed to load prompt template:', error.message);
 
-🚨 DATA CONSTRAINTS (ABSOLUTE MANDATORY BOUNDARY) 🚨
-You MUST ONLY suggest moves found in the following list:
-[LEGAL_MOVES_START] ${top3Moves} [LEGAL_MOVES_END]
+    // Fallback to minimal embedded prompt
+    const fallbackPrompt = `You are ${personaName}, a chess coach. Student ELO: ${userElo}.
 
-${positionDescription}
+## MOVE OPTIONS (Engine Analysis)
+These are the ONLY moves you can discuss:
+${strategicAnalysis}
 
-📊 Game Information:
-${templateVariables.engineEvaluation}
-${templateVariables.engineRecommendation}
-${templateVariables.lastMove}
-📐 FEN: ${templateVariables.fen}`;
+## RULES
+1. Only discuss moves listed above
+2. Recommend "best" or "ok" moves only
+3. Max 3-4 sentences
+
+${safetyAlert}`;
 
     return {
       systemPrompt: fallbackPrompt,
       userMessage
     };
   }
+}
+
+/**
+ * Extract move suggestions from chat history
+ * Looks for bold moves (**move**) in assistant messages
+ * @param {Array} chatHistory - Array of {role, content} messages
+ * @returns {Array<string>} - Array of suggested move SANs
+ */
+function extractPriorSuggestions(chatHistory = []) {
+  const suggestions = new Set();
+
+  // Regex to match bold moves like **e5**, **Nf3**, **exd5**
+  const boldMoveRegex = /\*\*([A-Za-z0-9+#=x-]+)\*\*/g;
+
+  // Also match moves mentioned as "play X" or "suggest X" or "try X"
+  const verbMoveRegex = /(?:play|suggest|try|consider|recommend)\s+\*?\*?([NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](?:=[NBRQ])?[+#]?)\*?\*?/gi;
+
+  for (const msg of chatHistory) {
+    if (msg.role === 'assistant' && msg.content) {
+      // Find bold moves
+      let match;
+      while ((match = boldMoveRegex.exec(msg.content)) !== null) {
+        const move = match[1];
+        // Basic validation: looks like a chess move
+        if (/^[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](?:=[NBRQ])?[+#]?$/.test(move) ||
+            /^O-O(?:-O)?$/.test(move)) {
+          suggestions.add(move);
+        }
+      }
+
+      // Find verb-prefixed moves
+      while ((match = verbMoveRegex.exec(msg.content)) !== null) {
+        const move = match[1];
+        suggestions.add(move);
+      }
+    }
+  }
+
+  return Array.from(suggestions);
 }
 
 module.exports = {
@@ -569,5 +646,6 @@ module.exports = {
   createPositionDescription,
   validateMove,
   extractTop3Moves,
-  validatePositionConsistency
+  validatePositionConsistency,
+  extractPriorSuggestions
 };

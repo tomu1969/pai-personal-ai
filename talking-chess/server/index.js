@@ -14,8 +14,22 @@ const app = express();
 
 // Middleware
 app.use(compression());
+
+// CORS configuration - allow multiple origins for local development
+const allowedOrigins = [
+  'http://localhost:3333',
+  'http://127.0.0.1:3333',
+  config.corsOrigin
+];
 app.use(cors({
-  origin: config.corsOrigin,
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 app.use(bodyParser.json({ limit: '10mb' }));

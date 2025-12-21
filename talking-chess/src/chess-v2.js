@@ -351,34 +351,46 @@ async function makeComputerMove() {
     if (bestMove && bestMove !== '(none)') {
       const from = bestMove.substring(0, 2);
       const to = bestMove.substring(2, 4);
-      
+
       console.log(`🤖 Computer move: ${from} -> ${to}`);
-      
+
       const move = game.move({
         from: from,
         to: to,
         promotion: bestMove.length > 4 ? bestMove.substring(4) : 'q'
       });
-      
+
       if (move) {
         console.log('✅ Computer move successful:', move.san);
-        
+
         // Update UI immediately
         renderBoard();
         updateUI();
         addMoveToHistory(move.san, true);
-        
+
         // Check if game is over
         if (game.game_over()) {
           handleGameOver();
           return;
         }
-        
+
         // Switch back to player turn
         isPlayerTurn = true;
         document.getElementById('ai-status').textContent = 'Ready';
         document.getElementById('ai-status').className = 'ai-status';
+      } else {
+        // Engine returned an invalid move - this shouldn't happen but handle it gracefully
+        console.error(`❌ Engine move ${bestMove} (${from}->${to}) was rejected by chess.js`);
+        console.error('Current FEN:', game.fen());
+        console.error('Legal moves:', game.moves().join(', '));
+        console.log('🔧 Attempting fallback to random move...');
+        await makeRandomComputerMove();
       }
+    } else {
+      // Engine returned no move
+      console.error('❌ Engine returned no valid move:', bestMove);
+      console.log('🔧 Attempting fallback to random move...');
+      await makeRandomComputerMove();
     }
   } catch (error) {
     console.error('❌ Computer move failed:', error);

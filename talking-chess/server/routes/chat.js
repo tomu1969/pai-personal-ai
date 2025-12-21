@@ -19,20 +19,8 @@ router.post('/', async (req, res) => {
   const startTime = Date.now();
   
   try {
-    console.log(`${new Date().toISOString()} - Chat request received`);
-    
-    // Comprehensive debugging of incoming request
-    console.log('🚨 [BACKEND] INCOMING REQUEST ANALYSIS:');
-    console.log('═══════════════════════════════════════════════════════');
-    console.log('📥 Request body keys:', Object.keys(req.body || {}));
-    console.log('📍 FEN received:', req.body?.fen);
-    console.log('📍 User message:', req.body?.userMessage);
-    console.log('📍 User ELO:', req.body?.userElo);
-    console.log('📍 Legal moves received:', req.body?.legalMoves?.length || 0);
-    console.log('📍 Legal moves (first 10):', req.body?.legalMoves?.slice(0, 10));
-    console.log('📍 Engine eval:', req.body?.engineEval);
-    console.log('═══════════════════════════════════════════════════════');
-    
+    console.log('[CHAT] Request received - FEN:', req.body?.fen?.substring(0, 30) + '...');
+
     // Validate request body
     if (!req.body || !req.body.userMessage) {
       return res.status(400).json({
@@ -52,31 +40,33 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Build prompt context for AI
-    const { systemPrompt, userMessage } = buildPromptContext(gameContext);
+    // Build prompt context for AI (now async due to engine analysis)
+    console.log('[CHAT] Building prompt context with engine analysis...');
+    const { systemPrompt, userMessage } = await buildPromptContext(gameContext);
 
-    console.log(`${new Date().toISOString()} - Calling OpenAI with ELO ${gameContext.userElo}`);
-    
-    // Debug what contextBuilder produced
-    console.log('🚨 [BACKEND] CONTEXT BUILDER OUTPUT:');
-    console.log('═══════════════════════════════════════════════════════');
-    console.log('📍 Game context after formatting:', {
+    console.log(`[CHAT] Calling OpenAI with ELO ${gameContext.userElo}`);
+    console.log('[CHAT] System prompt length:', systemPrompt.length);
+    console.log('[CHAT] System prompt preview:', systemPrompt.substring(0, 500) + '...');
+
+    // Extract student color from FEN (side to move)
+    // FEN format: position activeColor castling enPassant halfmove fullmove
+    const fenParts = gameContext.fen.split(' ');
+    const studentColor = fenParts[1] || 'w'; // 'w' or 'b'
+
+    // Build gameContext for tool calling
+    const toolGameContext = {
       fen: gameContext.fen,
-      legalMoves: gameContext.legalMoves?.length || 0,
-      userElo: gameContext.userElo,
-      engineEval: gameContext.engineEval
-    });
-    console.log('═══════════════════════════════════════════════════════');
-    console.log('🔍 COMPLETE SYSTEM PROMPT BEING SENT TO AI:');
-    console.log('═══════════════════════════════════════════');
-    console.log(systemPrompt);
-    console.log('═══════════════════════════════════════════');
+      studentColor
+    };
 
-    // Generate AI response
+    console.log('[CHAT] Tool context:', { fen: gameContext.fen.substring(0, 30) + '...', studentColor });
+
+    // Generate AI response with tool calling support
     const aiResponse = await openaiService.generateChatResponse(
       systemPrompt,
       userMessage,
-      gameContext.chatHistory
+      gameContext.chatHistory,
+      toolGameContext
     );
 
     const processingTime = Date.now() - startTime;

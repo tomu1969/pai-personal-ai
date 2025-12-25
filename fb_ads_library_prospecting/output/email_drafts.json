@@ -2,18 +2,20 @@
   {
     "page_name": "10X Evolution",
     "contact_name": "",
-    "contact_position": "",
-    "primary_email": "",
+    "contact_position": "Partnerships",
+    "primary_email": "partnerships@10xevolution.com",
     "emails": [],
-    "hunter_emails": [],
-    "email_verified": "",
+    "hunter_emails": [
+      "partnerships@10xevolution.com"
+    ],
+    "email_verified": "manual",
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Ad on Facebook and Instagram Instantly!",
-    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Facebook and Instagram. It's great to see your efforts in real estate! However, leads from ads can go cold if not answered in seconds. \n\nThat’s where LaHaus AI comes in. Our AI assistant responds instantly, qualifies leads, and books appointments—helping you capture more opportunities.\n\nJoin the 60+ realtors already using LaHaus AI to enhance their ad ROI. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Optimize Your 1 Ad on Facebook and Instagram",
+    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Facebook and Instagram. It's great to see your efforts! However, I know how quickly leads can go cold if they're not responded to in seconds. \n\nLaHaus AI is here to help! Our AI assistant responds instantly, qualifies leads, and even books appointments for you. With over 60 realtors already boosting their ad ROI using our tool, it could be a game changer for your business.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Addressed contact as 'Hi there'",
-      "Mentioned their '1 ad on Facebook and Instagram'"
+      "Addressing them as 'Hi there' due to missing contact name",
+      "Mentioning they are running 1 ad on Facebook and Instagram"
     ]
   },
   {
@@ -29,10 +31,10 @@
     "email_verified": "valid",
     "ad_count": 2,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 2 Facebook and Instagram Ads Responses!",
-    "email_body": "Hi there,\n\nI noticed you're running 2 ads on Facebook and Instagram. Leads from your ads can go cold if not answered in seconds, and that’s where LaHaus AI comes in. Our AI assistant responds instantly, qualifies leads, and books appointments, ensuring you never lose potential clients. \n\nJoin the 60+ realtors already using LaHaus AI to increase their ad ROI. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 2 Facebook & Instagram Ads with Instant Lead Response",
+    "email_body": "Hi there,\n\nI noticed you’re running 2 ads on Facebook and Instagram—great strategy! However, leads from ads can go cold if not answered in seconds. \n\nLaHaus AI is designed to respond instantly, qualify leads, and even book appointments for you, so you never lose potential clients again. With over 60 realtors already using it to enhance their ad ROI, it could be a game-changer for your referral pipeline.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned they are running 2 ads on Facebook and Instagram"
+      "Mentioned their 2 ads on Facebook and Instagram"
     ]
   },
   {
@@ -54,11 +56,11 @@
     "email_verified": "valid",
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Ad on Facebook and Instagram with LaHaus AI!",
-    "email_body": "Hi Evelyn,\n\nI noticed you're running 1 ad on Facebook and Instagram, and I wanted to share a quick tip. Leads from ads can go cold if not answered in seconds, which can really hurt your ROI. \n\nLaHaus AI is here to help! Our AI assistant responds instantly, qualifies leads, and books appointments, ensuring you never lose a potential client. Over 60 realtors are already benefiting from faster responses with LaHaus AI.\n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Facebook & Instagram with LaHaus AI",
+    "email_body": "Hi Evelyn,\n\nI noticed you’re running 1 ad on Facebook and Instagram—great choice! However, leads from ads can go cold if they aren’t answered in seconds. That’s where LaHaus AI comes in. Our AI assistant responds instantly, qualifies leads, and schedules appointments, ensuring you never lose a potential client. With 60+ realtors already using LaHaus AI, you can trust it to enhance your ad ROI.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Contact's first name: Evelyn",
-      "Mention of 1 ad on Facebook and Instagram"
+      "Contact name: Evelyn Carrero",
+      "Noted their 1 ad on Facebook and Instagram"
     ]
   },
   {
@@ -79,11 +81,10 @@
     "email_verified": "valid",
     "ad_count": 1,
     "platforms": "['INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Ad on Instagram and Facebook",
-    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Instagram and Facebook for your outdoor kitchens and pergolas. It's great to see such creativity! However, leads can go cold if not answered in seconds. \n\nThat’s where LaHaus AI comes in. Our AI assistant responds instantly, qualifies leads, and even books appointments, ensuring you never lose a potential client. Over 60 realtors are already enjoying increased ROI with our tool.\n\nAre you free for a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Instagram and Facebook with LaHaus AI",
+    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Instagram and Facebook showcasing your amazing outdoor kitchens and pergolas. The challenge is that leads from ads can go cold if not answered in seconds. \n\nLaHaus AI solves this by responding instantly, qualifying leads, and booking appointments for you. With over 60 realtors already using it, they've seen a boost in their ad ROI.\n\nWould you be open to a quick call or demo this week to see how it can work for you?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned their 1 ad on Instagram and Facebook",
-      "Acknowledged their outdoor kitchens and pergolas services"
+      "Mentioned they are running 1 ad on Instagram and Facebook"
     ]
   },
   {
@@ -100,10 +101,10 @@
     "email_verified": "",
     "ad_count": 1,
     "platforms": "['INSTAGRAM', 'FACEBOOK']",
-    "email_subject": "Boost Your 1 Ad on Instagram and Facebook with LaHaus AI",
-    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Instagram and Facebook for The Beach Club. With leads going cold if not answered in seconds, it’s crucial to respond quickly. LaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and books appointments, helping you never lose a chance to connect.\n\nJoin 60+ realtors already increasing their ad ROI with our tool. How about a quick call or demo this week to see how we can help?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Instagram and Facebook Ad Response Time!",
+    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Instagram and Facebook about The Beach Club. In real estate, leads can go cold if they’re not answered in seconds. That’s where LaHaus AI comes in! Our AI assistant responds instantly, qualifies leads, and books appointments—ensuring you never lose a potential client again. \n\nJoin the 60+ realtors already using LaHaus AI to enhance their ad ROI and keep the conversation going!\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned the prospect's 1 ad on Instagram and Facebook"
+      "1 ad on Instagram and Facebook"
     ]
   },
   {
@@ -116,27 +117,30 @@
     "email_verified": "",
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Facebook and Instagram Ad Response Time!",
-    "email_body": "Hi Brittany,\n\nI noticed you’re running 1 ad on Facebook and Instagram. Did you know that leads from ads can go cold if not answered in seconds? LaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and even books appointments for you. \n\nOver 60 realtors are already using LaHaus AI to enhance their ad ROI. Let’s chat this week for a quick call or demo to see how it can benefit your business.\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Facebook and Instagram with Instant Responses!",
+    "email_body": "Hi Brittany,\n\nI noticed you're running 1 ad on Facebook and Instagram, which is great! However, leads can go cold if not answered in seconds. LaHaus AI can help by instantly responding to inquiries, qualifying leads, and booking appointments for you. \n\nWith over 60 realtors already experiencing increased ROI, it's a game-changer for agents like you. \n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Contact's first name: Brittany",
-      "Mention of 1 ad on Facebook and Instagram"
+      "Contact name: Brittany",
+      "Mentioned 1 ad on Facebook and Instagram"
     ]
   },
   {
     "page_name": "Broward and Miami Dade Real Estate Deals",
-    "contact_name": "",
-    "contact_position": "",
-    "primary_email": "",
+    "contact_name": "Larry Milligan",
+    "contact_position": "Broker / Owner",
+    "primary_email": "larry@bocaagency.com",
     "emails": [],
-    "hunter_emails": [],
-    "email_verified": "",
+    "hunter_emails": [
+      "larry@bocaagency.com"
+    ],
+    "email_verified": "manual",
     "ad_count": 3,
     "platforms": "['INSTAGRAM', 'FACEBOOK']",
-    "email_subject": "Boost Your 3 Instagram & Facebook Ads Response Time!",
-    "email_body": "Hi there,\n\nI noticed you're running 3 ads on Instagram and Facebook, which is fantastic! However, leads from these ads can go cold if not answered in seconds. \n\nThat's where LaHaus AI comes in. Our AI assistant responds instantly, qualifies leads, and schedules appointments, ensuring you never miss an opportunity. Plus, 60+ realtors are already using it to enhance their ad ROI!\n\nI'd love to set up a quick call or demo this week to show you how it can work for your business.\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 3 Instagram & Facebook Ads with Instant Lead Response",
+    "email_body": "Hi Larry,\n\nI noticed you’re running 3 ads on Instagram and Facebook. It’s crucial to respond to leads instantly, or they risk going cold. LaHaus AI can help! Our AI assistant replies in seconds, qualifies leads, and even schedules appointments for you. \n\nJoin 60+ realtors who are already increasing their ad ROI with LaHaus AI. Would you be open to a quick call or demo this week to see how it can benefit your business?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned their 3 ads on Instagram and Facebook"
+      "Addressed by first name Larry",
+      "Mentioned 3 ads on Instagram and Facebook"
     ]
   },
   {
@@ -160,11 +164,11 @@
     "email_verified": "valid",
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Ad on Facebook and Instagram with AI",
-    "email_body": "Hi Eliza,\n\nI noticed you have 1 ad on Facebook and Instagram, which is great! However, leads from ads can go cold if not answered in seconds. That’s where LaHaus AI can help. Our AI assistant responds instantly, qualifies leads, and even books appointments for you.\n\nOver 60 realtors are already using LaHaus AI to enhance their response times and ad ROI. \n\nWould you be open to a quick call or demo this week? I think you’ll find it really valuable!\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Facebook & Instagram Ad Response Time!",
+    "email_body": "Hi Eliza,\n\nI noticed you’re running 1 ad on Facebook and Instagram for Cari & Britt Properties. It’s crucial to respond to leads instantly, as they can go cold in seconds. \n\nLaHaus AI can help by instantly answering inquiries, qualifying leads, and scheduling appointments, ensuring you never lose a potential client. Plus, over 60 realtors are already seeing increased ROI with our tool.\n\nWould you be open to a quick call or demo this week to see how LaHaus AI can enhance your lead response?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Contact's name is Eliza",
-      "Mentioned 1 ad on Facebook and Instagram"
+      "Contact's first name: Eliza",
+      "Mentioned their 1 ad on Facebook and Instagram"
     ]
   },
   {
@@ -179,11 +183,10 @@
     "email_verified": "",
     "ad_count": 3,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 3 Facebook & Instagram Ads with Instant Responses!",
-    "email_body": "Hi there,\n\nI noticed you’re running 3 ads on Facebook and Instagram! In today's fast-paced market, leads from ads can go cold if not answered in seconds. That’s where LaHaus AI comes in — we instantly respond to leads, qualify them, and even book appointments for you. \n\nWith over 60 realtors already benefiting from LaHaus AI, you can enhance your ad ROI and ensure no lead slips through the cracks. \n\nDo you have time for a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 3 Facebook & Instagram Ads with Instant Lead Response",
+    "email_body": "Hi there,\n\nI noticed you’re running 3 ads on Facebook and Instagram—great way to attract attention! However, leads can go cold if they’re not answered in seconds. That’s where LaHaus AI comes in. Our AI assistant responds instantly, qualifies leads, and even books appointments, ensuring you never lose potential clients.\n\nWith 60+ realtors already using LaHaus AI to enhance their ad ROI, it might be just what you need to supercharge your efforts.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Personalized greeting with 'Hi there'",
-      "Mention of '3 ads on Facebook and Instagram'"
+      "Mentioned running 3 ads on Facebook and Instagram"
     ]
   },
   {
@@ -207,11 +210,11 @@
     "email_verified": "valid",
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'AUDIENCE_NETWORK', 'INSTAGRAM', 'MESSENGER', 'THREADS']",
-    "email_subject": "Boost Your 1 Ad on Facebook and Instagram with Instant Responses!",
-    "email_body": "Hi Dean,\n\nI noticed you're running 1 ad on Facebook and Instagram, and I wanted to share something that could really help. Leads from ads can go cold if not answered in seconds, but with LaHaus AI, you can respond instantly, qualify leads, and book appointments—all in one go. \n\nOver 60 realtors are already seeing improved ROI with LaHaus AI. How about a quick call or demo this week to explore how it can work for Century 21 Union Realty?\n\nLooking forward to connecting!\n\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Facebook and Instagram with Instant Responses",
+    "email_body": "Hi Dean,\n\nI noticed you're running 1 ad on Facebook and Instagram for Century 21 Union Realty Co. That's fantastic! However, leads from ads can go cold if not answered in seconds. \n\nLaHaus AI can help by responding instantly to inquiries, qualifying leads, and even scheduling appointments for you. With over 60 realtors already using LaHaus AI to enhance their ad ROI, it's a game changer for busy agents like yourself. \n\nWould you be open to a quick call or demo this week to see how it can work for you?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Contact's name is Dean",
-      "Mentioned their 1 ad on Facebook and Instagram"
+      "Dean's first name",
+      "1 ad on Facebook and Instagram"
     ]
   },
   {
@@ -236,10 +239,10 @@
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
     "email_subject": "Boost Your 1 Ad on Facebook and Instagram with Instant Responses!",
-    "email_body": "Hi Jose,\n\nI noticed you’re running 1 ad on Facebook and Instagram. It’s crucial to respond to leads instantly—otherwise, they go cold fast! \n\nLaHaus AI can help by answering inquiries in seconds, qualifying leads, and scheduling appointments—so you never lose out on potential clients. Over 60 realtors are already using it to enhance their ad ROI. \n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_body": "Hi Jose,\n\nI noticed you're running 1 ad on Facebook and Instagram. Did you know that leads can go cold if not answered in seconds? LaHaus AI responds instantly, qualifies your leads, and even books appointments for you. With over 60 realtors already seeing increased ROI, it’s a game changer for busy agents like you.\n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Contact's first name (Jose)",
-      "1 ad on Facebook and Instagram"
+      "Contact's first name: Jose",
+      "Mention of their 1 ad on Facebook and Instagram"
     ]
   },
   {
@@ -258,9 +261,10 @@
     "email_verified": "",
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Facebook & Instagram Ad Response Time",
-    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Facebook and Instagram. In real estate, leads go cold if not answered in seconds. LaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and even books appointments for you. \n\nJoin 60+ realtors already using LaHaus AI to enhance their ad ROI and never lose another lead to slow response times. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Facebook and Instagram with LaHaus AI",
+    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Facebook and Instagram. As you know, leads can go cold if not answered in seconds. LaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and books appointments, ensuring you never lose potential clients again. With over 60 realtors already experiencing increased ad ROI, it’s a game-changer for busy agents like us.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
+      "Addressed them as 'Hi there' due to unclear contact name",
       "Mentioned they are running 1 ad on Facebook and Instagram"
     ]
   },
@@ -279,27 +283,30 @@
     "email_verified": "valid",
     "ad_count": 1,
     "platforms": "['INSTAGRAM', 'MESSENGER', 'FACEBOOK']",
-    "email_subject": "Boost Your 1 Ad on Instagram and Facebook with LaHaus AI",
-    "email_body": "Hi Connie,\n\nI noticed you're running 1 ad on Instagram and Facebook. As you know, leads can go cold if not answered in seconds. LaHaus AI can help by responding instantly, qualifying leads, and booking appointments for you. \n\nWith over 60 realtors already using our service to enhance their ad ROI, it’s a game changer for agents like you.\n\nWould you be open to a quick call or demo this week to see how it can work for your business?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Instagram and Facebook with LaHaus AI!",
+    "email_body": "Hi Connie,\n\nI noticed you're running 1 ad on Instagram and Facebook! As you know, leads can go cold if not answered in seconds. LaHaus AI can help with that by instantly responding, qualifying, and booking appointments for you. \n\nAlready, 60+ realtors are using LaHaus AI to enhance their ad ROI and keep their leads warm. \n\nHow about a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Addressed by first name: Connie",
-      "Mentioned 1 ad on Instagram and Facebook"
+      "Contact's name: Connie",
+      "Mentioned their 1 ad on Instagram and Facebook"
     ]
   },
   {
     "page_name": "Daniel Gomez Real Estate Consultant",
-    "contact_name": "",
-    "contact_position": "",
-    "primary_email": "",
+    "contact_name": "Daniel Gomez",
+    "contact_position": "Realtor",
+    "primary_email": "daniel.gomez@dilbeck.com",
     "emails": [],
-    "hunter_emails": [],
-    "email_verified": "",
+    "hunter_emails": [
+      "daniel.gomez@dilbeck.com"
+    ],
+    "email_verified": "manual",
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Facebook & Instagram Ad Response Time!",
-    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Facebook and Instagram. It’s crucial to respond to leads quickly; they can go cold in seconds! With LaHaus AI, you can answer inquiries instantly, qualify leads, and even schedule appointments automatically. \n\nJoin 60+ realtors who are already using LaHaus AI to enhance their ad ROI and never lose a potential client again. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Facebook and Instagram with LaHaus AI!",
+    "email_body": "Hi Daniel,\n\nI noticed you’re running 1 ad on Facebook and Instagram. Did you know that leads from ads can go cold if not answered in seconds? With LaHaus AI, you can respond instantly, qualify leads, and even book appointments—all in seconds! \n\nJoin 60+ realtors who are already using LaHaus AI to enhance their ad ROI. \n\nWould you be open to a quick call or demo this week? I’d love to show you how it can work for your business.\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned they are running 1 ad on Facebook and Instagram"
+      "Contact's name: Daniel",
+      "Mention of their 1 ad on Facebook and Instagram"
     ]
   },
   {
@@ -323,10 +330,10 @@
     "email_verified": "valid",
     "ad_count": 1,
     "platforms": "['INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Ad on Instagram and Facebook with Instant Responses!",
-    "email_body": "Hi Michael,\n\nI noticed you're running 1 ad on Instagram and Facebook. With leads going cold if not answered in seconds, it’s crucial to respond quickly. LaHaus AI can help you by instantly responding to inquiries, qualifying leads, and booking appointments. \n\nJoin 60+ realtors who are already increasing their ad ROI with faster responses. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Instagram and Facebook",
+    "email_body": "Hi Michael,\n\nI noticed you’re running 1 ad on Instagram and Facebook. In today’s fast-paced real estate market, leads can go cold if not answered in seconds. LaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and books appointments, ensuring you don’t lose out on potential clients. \n\nWith over 60 realtors already using LaHaus AI, you can increase your ad ROI and never miss a lead again. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Contact's name: Michael",
+      "Contact's first name: Michael",
       "Mention of 1 ad on Instagram and Facebook"
     ]
   },
@@ -344,10 +351,11 @@
     "email_verified": "valid",
     "ad_count": 10,
     "platforms": "['AUDIENCE_NETWORK', 'INSTAGRAM', 'FACEBOOK']",
-    "email_subject": "Boost Your 10 Instagram & Facebook Ads Response Time!",
-    "email_body": "Hi there,\n\nI noticed Edge House Miami is running 10 ads on Instagram and Facebook. That's fantastic! However, leads from ads can go cold if not answered in seconds. \n\nLaHaus AI can help by responding instantly to inquiries, qualifying leads, and scheduling appointments—all in seconds. With 60+ realtors already benefiting from it, you can significantly increase your ad ROI and never miss a lead again.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 10 Instagram & Facebook Ads Response Times",
+    "email_body": "Hi there,\n\nI noticed you're running 10 ads on Instagram and Facebook, but leads can go cold quickly if not answered in seconds. That’s where LaHaus AI comes in! Our AI assistant responds instantly, qualifies leads, and books appointments—ensuring you never lose a potential client again. \n\nWith over 60 realtors already using LaHaus AI to enhance their ad ROI, it’s a game changer for agents like you.\n\nWould you be open to a quick call or demo this week to see how it can work for Edge House Miami?\n\nBest,\n\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned Edge House Miami's 10 ads on Instagram and Facebook"
+      "Contact's company name (Edge House Miami)",
+      "10 ads on Instagram and Facebook"
     ]
   },
   {
@@ -373,10 +381,10 @@
     "email_verified": "valid",
     "ad_count": 2,
     "platforms": "['INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 2 Instagram and Facebook Ads with Instant Responses!",
-    "email_body": "Hi there,\n\nI noticed you’re running 2 ads on Instagram and Facebook to promote your rental services. It’s great to see your efforts! However, leads can quickly go cold if they’re not answered in seconds. That’s where LaHaus AI comes in. Our AI assistant responds instantly, qualifies leads, and schedules appointments, helping you capture every opportunity. With 60+ realtors already benefiting from increased ad ROI, I’d love to show you how it can work for you too. \n\nAre you available for a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 2 Instagram and Facebook Ads with Instant Lead Responses",
+    "email_body": "Hi there,\n\nI noticed you're running 2 ads on Instagram and Facebook to attract leads in Daytona Beach. It's crucial to respond to those leads instantly, or they can go cold quickly. \n\nLaHaus AI can help! Our AI assistant answers inquiries in seconds, qualifies leads, and books appointments—all while you focus on closing deals. Plus, over 60 realtors are already seeing improved ROI using LaHaus AI.\n\nWould you be open to a quick call or demo this week to see how it can work for you?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned their 2 ads on Instagram and Facebook"
+      "Mentioned 2 ads on Instagram and Facebook"
     ]
   },
   {
@@ -389,12 +397,10 @@
     "email_verified": "",
     "ad_count": 3,
     "platforms": "['INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 3 Instagram and Facebook Ads with Instant Responses!",
-    "email_body": "Hi there,\n\nI noticed you’re running 3 ads on Instagram and Facebook to showcase the latest homes in Fort Lauderdale. That’s fantastic! However, leads can go cold if they aren’t answered in seconds. \n\nLaHaus AI can instantly respond to inquiries, qualify leads, and even book appointments, ensuring you never miss out on potential clients. With 60+ realtors already using LaHaus AI to enhance their ad ROI, it’s a game changer for busy agents like you.\n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 3 Ads on Instagram and Facebook with Instant Leads!",
+    "email_body": "Hi there,\n\nI noticed you’re running 3 ads on Instagram and Facebook to attract buyers for Fort Lauderdale homes. The challenge many agents face is that leads can go cold if not answered in seconds.\n\nLaHaus AI is here to help! Our AI assistant responds instantly, qualifies leads, and even schedules appointments, ensuring you never lose a potential client. With over 60 realtors already using LaHaus AI to improve their ad ROI, it’s a game-changer.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned 3 ads on Instagram and Facebook",
-      "Acknowledged their focus on real estate services",
-      "Used a friendly and helpful tone"
+      "3 ads on Instagram and Facebook"
     ]
   },
   {
@@ -408,41 +414,47 @@
     "ad_count": 1,
     "platforms": "['INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
     "email_subject": "Boost Your 1 Ad on Instagram and Facebook with Instant Responses!",
-    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Instagram and Facebook. While it’s a great way to attract leads, they can go cold if not answered in seconds. \n\nLaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and schedules appointments, ensuring you never lose a potential client. Over 60 realtors are already using LaHaus AI to enhance their ad ROI. \n\nWould you be open to a quick call or demo this week to see how it can work for you?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Instagram and Facebook to attract real estate leads. The challenge is that leads can go cold if they aren’t answered in seconds. \n\nLaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and books appointments, so you never lose a potential client. Over 60 realtors are already using LaHaus AI to enhance their ad ROI. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "1 ad on Instagram and Facebook"
+      "Mentioned they are running 1 ad on Instagram and Facebook"
     ]
   },
   {
     "page_name": "Find Wilmington Real Estate Listings",
-    "contact_name": "",
-    "contact_position": "",
-    "primary_email": "",
+    "contact_name": "Bailey Gordon",
+    "contact_position": "Co-Founder / Broker",
+    "primary_email": "BaileyGordon@seacoastrealty.com",
     "emails": [],
-    "hunter_emails": [],
-    "email_verified": "",
+    "hunter_emails": [
+      "BaileyGordon@seacoastrealty.com"
+    ],
+    "email_verified": "manual",
     "ad_count": 1,
     "platforms": "['INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Ad on Instagram and Facebook with Instant Responses",
-    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Instagram and Facebook, which is great! However, leads from ads can go cold if not answered in seconds. LaHaus AI can help you respond instantly, qualify leads, and book appointments seamlessly. \n\nWith over 60 realtors already benefiting from LaHaus AI, you can increase your ad ROI without losing potential clients.\n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Instagram and Facebook with Instant Responses!",
+    "email_body": "Hi Bailey,\n\nI noticed you're running 1 ad on Instagram and Facebook. It’s great to see your efforts in reaching potential clients! However, leads from ads can go cold if they’re not answered in seconds. \n\nLaHaus AI is here to help! Our AI assistant responds instantly, qualifies leads, and even books appointments for you. With 60+ realtors already using it to enhance their ad ROI, it’s a game changer.\n\nWould you be open to a quick call or demo this week?\n\nBest, \nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "1 ad on Instagram and Facebook"
+      "Contact's name: Bailey",
+      "Mentioned 1 ad on Instagram and Facebook"
     ]
   },
   {
     "page_name": "Fischer Homes",
-    "contact_name": "",
-    "contact_position": "",
-    "primary_email": "",
+    "contact_name": "New Homes Team",
+    "contact_position": "Sales / New Homes",
+    "primary_email": "newhomes@fischerhomes.com",
     "emails": [],
-    "hunter_emails": [],
-    "email_verified": "",
+    "hunter_emails": [
+      "newhomes@fischerhomes.com"
+    ],
+    "email_verified": "manual",
     "ad_count": 2,
     "platforms": "['INSTAGRAM', 'MESSENGER', 'FACEBOOK']",
-    "email_subject": "Boost Your 2 Instagram & Facebook Ads Response Time!",
-    "email_body": "Hi there,\n\nI noticed you’re running 2 ads on Instagram and Facebook promoting new homes in the Cincinnati area. It’s crucial to respond to leads instantly, as they can go cold in seconds. \n\nLaHaus AI can help! Our AI assistant responds to leads in seconds, qualifies them, and even schedules appointments, ensuring you don’t lose potential clients. \n\nJoin the 60+ realtors already leveraging LaHaus AI to enhance their ad ROI. \n\nAre you available for a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 2 Instagram and Facebook Ads Response Time!",
+    "email_body": "Hi there,\n\nI noticed you’re running 2 ads on Instagram and Facebook for new homes in the Cincinnati area. That's fantastic! However, leads from ads can go cold if not answered in seconds. \n\nLaHaus AI can help you respond instantly, qualify leads, and schedule appointments, ensuring you don’t lose out on potential buyers. Plus, over 60 realtors are already benefiting from it. \n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "2 ads on Instagram and Facebook"
+      "Mentioned their 2 ads on Instagram and Facebook",
+      "Addressed them with 'Hi there'"
     ]
   },
   {
@@ -455,8 +467,8 @@
     "email_verified": "",
     "ad_count": 3,
     "platforms": "['INSTAGRAM', 'FACEBOOK']",
-    "email_subject": "Boost Your 3 Ads on Instagram and Facebook with Instant Responses!",
-    "email_body": "Hi there,\n\nI noticed you’re running 3 ads on Instagram and Facebook for your new luxury rental residence in Edgewater. It’s great to see your efforts! However, leads can go cold if they’re not answered in seconds. \n\nLaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and schedules appointments, ensuring you never lose potential clients. Over 60 realtors are already using LaHaus AI to increase their ad ROI. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 3 Instagram and Facebook Ads' Response Time",
+    "email_body": "Hi there,\n\nI noticed you’re running 3 ads on Instagram and Facebook for your new luxury rental residence in Edgewater. With leads going cold if not answered in seconds, it’s crucial to respond quickly. \n\nLaHaus AI can help! Our AI assistant answers leads in seconds, qualifies them, and even schedules appointments—perfect for agents like you. Plus, over 60 realtors are already benefiting from increased ad ROI.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
       "3 ads on Instagram and Facebook"
     ]
@@ -475,11 +487,11 @@
     "email_verified": "",
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Facebook & Instagram Ad Response Time!",
-    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Facebook and Instagram, showcasing that stunning oceanfront luxury property. With leads going cold if not answered in seconds, LaHaus AI can help. Our AI assistant responds instantly, qualifies leads, and schedules appointments, ensuring you never lose a potential client again. Over 60 realtors are already seeing improved ad ROI with our tool.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Facebook and Instagram with Instant Responses!",
+    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Facebook and Instagram. As you know, leads from ads can go cold if not answered in seconds. That's where LaHaus AI comes in! Our AI assistant responds instantly, qualifies leads, and books appointments—ensuring you never lose a potential client.\n\nWith 60+ realtors already benefiting from LaHaus AI, it’s a game-changer for agents like you.\n\nHow about a quick call or demo this week to see how it can elevate your business?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mention of their 1 ad on Facebook and Instagram",
-      "Reference to their oceanfront luxury property"
+      "Mentioned their 1 ad on Facebook and Instagram",
+      "Acknowledged their services in oceanfront luxury real estate"
     ]
   },
   {
@@ -494,26 +506,29 @@
     "email_verified": "valid",
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Ad on Facebook and Instagram with LaHaus AI",
-    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Facebook and Instagram to promote luxury properties. One challenge many realtors face is that leads can go cold if not answered in seconds, and you don’t want to lose potential clients. \n\nLaHaus AI responds instantly to inquiries, qualifies leads, and schedules appointments, ensuring you capture every opportunity. Over 60 realtors are already using it to improve their ad ROI!\n\nHow about a quick call or demo this week to see how it can work for you?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Facebook and Instagram with Instant Responses!",
+    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Facebook and Instagram to showcase luxury properties. In real estate, leads can go cold quickly if not answered in seconds, and that’s where LaHaus AI comes in. Our AI assistant responds instantly, qualifies leads, and books appointments, helping you maximize your ad ROI.\n\nOver 60 realtors are already using LaHaus AI to improve their response times and enhance their service. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned running 1 ad on Facebook and Instagram"
+      "1 ad on Facebook and Instagram"
     ]
   },
   {
     "page_name": "Handyman Concierge",
-    "contact_name": "",
-    "contact_position": "",
-    "primary_email": "",
+    "contact_name": "Brian",
+    "contact_position": "Owner",
+    "primary_email": "brian@handymanconcierge.com",
     "emails": [],
-    "hunter_emails": [],
-    "email_verified": "",
+    "hunter_emails": [
+      "brian@handymanconcierge.com"
+    ],
+    "email_verified": "manual",
     "ad_count": 4,
     "platforms": "['INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 4 Instagram and Facebook Ads with Instant Responses",
-    "email_body": "Hi there,\n\nI noticed you're running 4 ads on Instagram and Facebook. It's tough when leads go cold because of slow responses. With LaHaus AI, you can answer real estate leads in seconds, automatically qualify them, and book appointments without lifting a finger. \n\nJoin the 60+ realtors already using LaHaus AI to enhance their ad ROI and ensure no lead slips through the cracks. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 4 Instagram & Facebook Ads with Instant Response!",
+    "email_body": "Hi Brian,\n\nI noticed you’re running 4 ads on Instagram and Facebook. That’s great! However, leads from those ads can go cold if not answered in seconds. \n\nLaHaus AI is here to help! Our AI assistant responds instantly, qualifies leads, and books appointments, ensuring you never lose a potential client again. Over 60 realtors are already using LaHaus AI to increase their ad ROI.\n\nWould you be open to a quick call or demo this week to see how we can support your efforts?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned their 4 ads on Instagram and Facebook"
+      "Contact's name: Brian",
+      "Mention of 4 ads on Instagram and Facebook"
     ]
   },
   {
@@ -526,11 +541,11 @@
     "email_verified": "",
     "ad_count": 2,
     "platforms": "['INSTAGRAM', 'FACEBOOK']",
-    "email_subject": "Boost Your 2 Instagram & Facebook Ads Response Time",
-    "email_body": "Hi there,\n\nI noticed you're running 2 ads on Instagram and Facebook. It's a common challenge that leads from ads can go cold if not answered in seconds. \n\nWith LaHaus AI, you can respond instantly, qualify leads, and even book appointments—all in seconds. Over 60 realtors are already using it to increase their ad ROI and not lose leads to slow response times.\n\nWould you be open to a quick call or demo this week? I'd love to show you how it can work for you!\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 2 Instagram and Facebook Ads Response Time",
+    "email_body": "Hi Jenny,\n\nI noticed you’re running 2 ads on Instagram and Facebook. As you know, leads from ads can go cold if not answered in seconds. LaHaus AI responds instantly, qualifies these leads, and even books appointments for you. With over 60 realtors already using it, they’re seeing great results in boosting their ad ROI. \n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned their 2 ads on Instagram and Facebook",
-      "Addressed them with 'Hi there'"
+      "Contact's name is Jenny",
+      "Mentioned 2 ads on Instagram and Facebook"
     ]
   },
   {
@@ -546,8 +561,8 @@
     "email_verified": "valid",
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Ad on Facebook and Instagram Fast!",
-    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Facebook and Instagram. As you know, leads can go cold if not answered within seconds. That’s where LaHaus AI comes in! Our AI assistant responds instantly, qualifies leads, and schedules appointments, helping you maximize your ad ROI. Over 60 realtors are already benefiting from faster responses with LaHaus AI.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Facebook and Instagram with LaHaus AI",
+    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Facebook and Instagram. As you know, leads can go cold if they're not answered in seconds. LaHaus AI is here to help! Our AI assistant responds instantly, qualifies leads, and books appointments, ensuring you never lose a potential client again.\n\nWith 60+ realtors already using LaHaus AI to enhance their ad ROI, it’s a game changer for busy agents like you.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
       "Mentioned their 1 ad on Facebook and Instagram"
     ]
@@ -571,11 +586,11 @@
     "email_verified": "valid",
     "ad_count": 1,
     "platforms": "['INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Ad on Instagram and Facebook with LaHaus AI",
-    "email_body": "Hi Karina,\n\nI noticed you're running 1 ad on Instagram and Facebook promoting the best pre-construction in Brickell Ave. Miami. With leads going cold if not answered in seconds, it can be tough to keep up. \n\nLaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and books appointments, saving you time and increasing your ROI. Over 60 realtors are already reaping the benefits!\n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Instagram and Facebook Instantly!",
+    "email_body": "Hi Karina,\n\nI noticed you're running 1 ad on Instagram and Facebook featuring that stunning pre-construction on Brickell Ave. That's great! However, leads can go cold if not answered in seconds. \n\nLaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and books appointments, allowing you to capture every opportunity. Join 60+ realtors who are already increasing their ad ROI with our tool.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Contact's first name (Karina)",
-      "Their ad count and platforms (1 ad on Instagram and Facebook)"
+      "Contact's name: Karina",
+      "Mention of 1 ad on Instagram and Facebook"
     ]
   },
   {
@@ -599,27 +614,31 @@
     "email_verified": "valid",
     "ad_count": 1,
     "platforms": "['INSTAGRAM']",
-    "email_subject": "Boost Your 1 Instagram Ad Response Time!",
-    "email_body": "Hi Tim,\n\nI noticed you have 1 ad on Instagram, and I wanted to share a quick tip! Potential leads can go cold if not responded to in seconds, and that’s where LaHaus AI comes in. Our AI assistant answers inquiries instantly, qualifies leads, and schedules appointments, helping you capture those warm leads before they cool off.\n\nOver 60 realtors are already leveraging LaHaus AI to enhance their ad ROI. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Instagram with Instant Responses!",
+    "email_body": "Hi Tim,\n\nI noticed you're running 1 ad on Instagram, which is great! However, leads from ads can go cold if not answered in seconds. LaHaus AI can help by responding instantly, qualifying leads, and booking appointments, ensuring you never lose potential clients again. \n\nWith 60+ realtors already using LaHaus AI to enhance their ad ROI, I believe it could be a game-changer for Kathafuentes Real Estate.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Addressed by first name: Tim",
-      "Mentioned 1 ad on Instagram"
+      "Addressed by first name",
+      "Mentioned 1 ad on Instagram",
+      "Highlighted the problem of leads going cold"
     ]
   },
   {
     "page_name": "Laury Cruz Realtor",
-    "contact_name": "",
-    "contact_position": "",
-    "primary_email": "",
+    "contact_name": "Laury Cruz",
+    "contact_position": "Realtor",
+    "primary_email": "Laurycruzrealtor@gmail.com",
     "emails": [],
-    "hunter_emails": [],
-    "email_verified": "",
+    "hunter_emails": [
+      "Laurycruzrealtor@gmail.com"
+    ],
+    "email_verified": "manual",
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Facebook & Instagram Ad Response Time",
-    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Facebook and Instagram. It’s frustrating when leads go cold because they aren’t answered quickly. With LaHaus AI, you can respond to inquiries in seconds, automatically qualify leads, and even schedule appointments—all while you focus on closing deals. \n\nJoin over 60 realtors who are already using LaHaus AI to boost their ad ROI and never lose a lead again!\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Facebook and Instagram! 🌟",
+    "email_body": "Hi Laury,\n\nI noticed you're running 1 ad on Facebook and Instagram. As a fellow realtor, I understand how frustrating it can be when leads go cold due to slow response times. \n\nLaHaus AI responds to real estate leads in seconds, instantly qualifies them, and schedules appointments for you. With 60+ realtors already benefiting from increased ROI, it’s a game-changer for your business.\n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned they are running 1 ad on Facebook and Instagram"
+      "Contact's first name: Laury",
+      "Mentioned 1 ad on Facebook and Instagram"
     ]
   },
   {
@@ -634,11 +653,10 @@
     "email_verified": "",
     "ad_count": 1,
     "platforms": "['INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Ad on Instagram and Facebook with LaHaus AI!",
-    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Instagram and Facebook to connect with clients in Miami. It’s a great strategy, but leads can go cold if they’re not answered in seconds. \n\nThat’s where LaHaus AI comes in! Our AI assistant responds instantly, qualifies leads, and even books appointments—all while helping over 60 realtors like you increase their ad ROI. \n\nWould you be open to a quick call or demo this week to see how it can work for Local Properties Near You?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Instagram and Facebook!",
+    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Instagram and Facebook. While it’s great to connect with potential clients, leads can go cold if they aren’t answered in seconds. \n\nThat’s where LaHaus AI comes in! Our AI assistant responds instantly, qualifies leads, and even books appointments for you. Over 60 realtors are already enjoying increased ROI with LaHaus AI.\n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned they are running 1 ad on Instagram and Facebook",
-      "Highlighted the need for instant lead response"
+      "Mentioned they are running 1 ad on Instagram and Facebook"
     ]
   },
   {
@@ -651,10 +669,11 @@
     "email_verified": "",
     "ad_count": 1,
     "platforms": "['INSTAGRAM', 'FACEBOOK']",
-    "email_subject": "Boost Your 1 Ad on Instagram and Facebook Instantly!",
-    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Instagram and Facebook promoting your real estate services. It's crucial to respond to leads quickly, as they can go cold in seconds!\n\nLaHaus AI can help. Our AI assistant responds instantly, qualifies leads, and even books appointments for you. With over 60 realtors already using LaHaus AI, they’re seeing a boost in their ad ROI!\n\nWould you be open to a quick call or demo this week to see how it can work for you?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Instagram and Facebook!",
+    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Instagram and Facebook to promote your real estate services. It’s crucial to respond to leads instantly, as they can go cold in seconds. \n\nWith LaHaus AI, you can answer inquiries in seconds, automatically qualify leads, and schedule appointments—no more losing potential clients! Over 60 realtors are already seeing increased ROI with our tool.\n\nWould you be open to a quick call or demo this week to see how it can enhance your lead response time?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "1 ad on Instagram and Facebook"
+      "Mentioned 1 ad on Instagram and Facebook",
+      "Acknowledged their real estate services"
     ]
   },
   {
@@ -669,10 +688,10 @@
     "email_verified": "",
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'AUDIENCE_NETWORK', 'INSTAGRAM', 'MESSENGER', 'THREADS']",
-    "email_subject": "Boost Your 1 Ad on Facebook and Instagram Response Time!",
-    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Facebook and Instagram. It’s crucial to respond to leads in seconds, as they can go cold quickly. LaHaus AI can help by instantly answering inquiries, qualifying leads, and scheduling appointments, ensuring you never lose potential clients to slow response times. \n\nWith over 60 realtors already leveraging LaHaus AI to enhance their ad ROI, it’s a game-changer for busy agents like you. \n\nWould you be interested in a quick call or demo this week to see how it can work for you?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Facebook and Instagram with LaHaus AI",
+    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Facebook and Instagram! As you know, leads from ads can go cold if not answered in seconds. That’s where LaHaus AI comes in – we respond instantly to inquiries, qualify leads, and even book appointments for you. \n\nOver 60 realtors are already using LaHaus AI to increase their ad ROI and ensure they don’t lose leads to slow response times.\n\nLet’s schedule a quick call or demo this week to see how we can help you elevate your real estate game!\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "1 ad on Facebook and Instagram"
+      "Mentioned their 1 ad on Facebook and Instagram"
     ]
   },
   {
@@ -691,10 +710,10 @@
     "email_verified": "",
     "ad_count": 6,
     "platforms": "['FACEBOOK', 'AUDIENCE_NETWORK', 'INSTAGRAM', 'MESSENGER', 'THREADS']",
-    "email_subject": "Boost Your 6 Facebook & Instagram Ads with Instant Responses!",
-    "email_body": "Hi there,\n\nI noticed you're running 6 ads on Facebook and Instagram, but leads can go cold if not answered in seconds. LaHaus AI is here to help! Our AI assistant responds instantly, qualifies leads, and books appointments, ensuring you never lose potential clients again. \n\nWith over 60 realtors already using LaHaus AI to enhance their ROI, it’s a game changer for your business. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 6 Facebook & Instagram Ads with Instant Lead Response!",
+    "email_body": "Hi there,\n\nI noticed you're running 6 ads on Facebook and Instagram. It’s crucial to respond to leads in seconds—otherwise, they go cold. LaHaus AI can help! Our AI assistant answers inquiries instantly, qualifies leads, and books appointments, so you never lose out on potential clients.\n\nWith over 60 realtors already benefiting from LaHaus AI, you can transform your ad ROI. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned their 6 ads on Facebook and Instagram"
+      "6 ads on Facebook and Instagram"
     ]
   },
   {
@@ -712,12 +731,11 @@
     "email_verified": "valid",
     "ad_count": 22,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 22 Facebook & Instagram Ads with Instant Lead Response",
-    "email_body": "Hi Michael,\n\nI noticed you're running 22 ads on Facebook and Instagram for Miami Condos and Homes. Did you know that leads can go cold if not answered in seconds? \n\nLaHaus AI can help you respond instantly, qualify leads, and book appointments, ensuring you don’t lose potential clients. Plus, over 60 realtors are already using it to maximize their ad ROI!\n\nWould you be open to a quick call or demo this week to see how we can help you?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 22 Facebook & Instagram Ads with Instant Lead Responses!",
+    "email_body": "Hi Michael,\n\nI noticed you’re running 22 ads on Facebook and Instagram – that’s fantastic! But as you know, leads can go cold if not answered in seconds. \n\nLaHaus AI can change that. Our AI assistant responds instantly, qualifies leads, and books appointments, helping you maximize your ad ROI. Over 60 realtors are already using it to enhance their business. \n\nWould you be open to a quick call or demo this week? \n\nBest,  \nTomás Uribe  \nCofounder, LaHaus AI",
     "personalization_points": [
-      "Contact name: Michael",
-      "Mention of 22 ads on Facebook and Instagram",
-      "Specific mention of their real estate focus and services"
+      "Addressed them by first name (Michael)",
+      "Mentioned their 22 ads on Facebook and Instagram"
     ]
   },
   {
@@ -730,8 +748,8 @@
     "email_verified": "",
     "ad_count": 1,
     "platforms": "['INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Instagram and Facebook Ad Response Time!",
-    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Instagram and Facebook. It’s crucial to respond to interested leads in seconds, or they may go cold. LaHaus AI instantly replies to these leads, qualifies them, and even schedules appointments—all while you focus on closing sales. \n\nJoin over 60 realtors who are already enhancing their ad ROI with our AI assistant. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Instagram and Facebook with LaHaus AI!",
+    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Instagram and Facebook. That's great! However, leads from ads can go cold if they're not answered in seconds. LaHaus AI can help by responding instantly, qualifying those leads, and booking appointments for you.\n\nJoin the 60+ realtors who are already using LaHaus AI to enhance their ad ROI. \n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
       "1 ad on Instagram and Facebook"
     ]
@@ -739,17 +757,21 @@
   {
     "page_name": "On the Ave Real Estate Group in Delray Beach, FL",
     "contact_name": "",
-    "contact_position": "",
-    "primary_email": "",
+    "contact_position": "Broker / Team",
+    "primary_email": "info@ontheaveshop.com",
     "emails": [],
-    "hunter_emails": [],
-    "email_verified": "",
+    "hunter_emails": [
+      "info@ontheaveshop.com"
+    ],
+    "email_verified": "manual",
     "ad_count": 1,
     "platforms": "['INSTAGRAM']",
-    "email_subject": "Boost Your 1 Instagram Ad Response Time!",
-    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Instagram – that's a great start! But did you know leads can go cold if not answered in seconds? With LaHaus AI, you can respond instantly, qualify leads, and even book appointments automatically.\n\nAlready, 60+ realtors are using LaHaus AI to enhance their ad ROI and never lose leads again. \n\nHow about a quick call or demo this week to see how it can work for On the Ave Real Estate Group?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Instagram with Instant Lead Responses!",
+    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Instagram for On the Ave Real Estate Group. In today’s market, leads from ads can go cold if not answered in seconds. That’s where LaHaus AI comes in! Our AI assistant responds instantly, qualifies leads, and books appointments—helping you make the most of your efforts.\n\nWith 60+ realtors already using LaHaus AI, it’s a game changer for increasing ROI on your ads. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned they are running 1 ad on Instagram"
+      "1 ad on Instagram",
+      "On the Ave Real Estate Group",
+      "South Florida market"
     ]
   },
   {
@@ -771,9 +793,9 @@
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
     "email_subject": "Boost Your 1 Ad on Facebook and Instagram with LaHaus AI",
-    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Facebook and Instagram. As you know, leads can go cold if not answered in seconds. LaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and schedules appointments so you never lose a potential client.\n\nWith over 60 realtors already using LaHaus AI to enhance their ad ROI, it’s a game-changer for busy agents like you.\n\nI'd love to set up a quick call or demo this week to show you how it works.\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Facebook and Instagram, which is a great way to attract new leads! However, leads can go cold if they aren’t answered in seconds. \n\nLaHaus AI can help by responding instantly, qualifying those leads, and scheduling appointments for you. With over 60 realtors already using it, they’re seeing a significant increase in ROI.\n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned 1 ad on Facebook and Instagram"
+      "Mentioned their 1 ad on Facebook and Instagram"
     ]
   },
   {
@@ -792,11 +814,11 @@
     "email_verified": "valid",
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'AUDIENCE_NETWORK', 'INSTAGRAM', 'MESSENGER', 'THREADS']",
-    "email_subject": "Boost Your 1 Ad on Facebook and Instagram!",
-    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Facebook and Instagram—great choice! I wanted to share a quick tip: leads from ads can go cold if not answered in seconds. LaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and books appointments, ensuring you never lose a potential client.\n\nJoin over 60 realtors who are already boosting their ad ROI with LaHaus AI. Are you open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Facebook and Instagram with Instant Responses!",
+    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Facebook and Instagram showcasing your luxury switches. Great work! However, leads from ads can go cold if not answered in seconds. LaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and books appointments, ensuring you never lose potential clients.\n\nJoin 60+ realtors who are already enhancing their ad ROI with LaHaus AI. \n\nWould you be open to a quick call or demo this week to explore how we can help?\n\nBest,\n\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned '1 ad on Facebook and Instagram'",
-      "Personalized greeting with 'Hi there'"
+      "Mentioned their 1 ad on Facebook and Instagram",
+      "Acknowledged their luxury product focus"
     ]
   },
   {
@@ -811,27 +833,29 @@
     "email_verified": "",
     "ad_count": 4,
     "platforms": "['INSTAGRAM', 'MESSENGER', 'FACEBOOK']",
-    "email_subject": "Boost Your 4 Instagram & Facebook Ads with Instant Lead Response",
-    "email_body": "Hi there,\n\nI noticed you’re running 4 ads on Instagram and Facebook. That’s fantastic! However, leads can go cold if they aren’t answered in seconds. \n\nLaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and books appointments, ensuring you won’t lose potential clients. Over 60 realtors are already seeing improved ad ROI with our tool.\n\nWould you be open to a quick call or demo this week to see how it can benefit your business?\n\nBest,\n\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 4 Instagram and Facebook Ads with Instant Responses",
+    "email_body": "Hi there,\n\nI noticed you’re running 4 ads on Instagram and Facebook. It’s crucial to respond to those leads instantly—otherwise, they can go cold in seconds. \n\nLaHaus AI can help! Our AI assistant responds in seconds, qualifies leads, and even schedules appointments for you. With over 60 realtors already using LaHaus AI to enhance their ad ROI, it’s a game-changer for busy agents like you.\n\nWould you be open to a quick call or demo this week to see how it can work for you?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned the prospect is running 4 ads on Instagram and Facebook",
-      "Addressed them as Hi there due to unclear contact name"
+      "Mentioned 4 ads on Instagram and Facebook"
     ]
   },
   {
     "page_name": "Search Port Charlotte Area Real Estate",
-    "contact_name": "",
-    "contact_position": "",
-    "primary_email": "",
+    "contact_name": "Roger D. Eaton",
+    "contact_position": "Clerk of Circuit Court",
+    "primary_email": "Clerkinfo@CharlotteClerk.com",
     "emails": [],
-    "hunter_emails": [],
-    "email_verified": "",
+    "hunter_emails": [
+      "Clerkinfo@CharlotteClerk.com"
+    ],
+    "email_verified": "manual",
     "ad_count": 1,
     "platforms": "['INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Ad on Instagram and Facebook with LaHaus AI!",
-    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Instagram and Facebook, which is great! But I know leads can go cold if they're not answered in seconds. That's where LaHaus AI comes in. Our AI assistant responds instantly, qualifies leads, and schedules appointments, ensuring you never lose a potential client again. \n\nWith over 60 realtors already benefiting from LaHaus AI to increase their ad ROI, it could be a game changer for your business.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Instagram and Facebook Ad Response Time",
+    "email_body": "Hi Roger,\n\nI noticed you're running 1 ad on Instagram and Facebook. With leads going cold if not answered in seconds, it’s crucial to respond quickly. LaHaus AI can help! Our AI assistant answers leads instantly, automatically qualifies them, and schedules appointments—all in seconds. \n\nJoin 60+ realtors who are already increasing their ad ROI with LaHaus AI. \n\nWould you be open to a quick call or demo this week to see how it can work for you?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned they are running 1 ad on Instagram and Facebook"
+      "Contact's first name: Roger",
+      "Mention of 1 ad on Instagram and Facebook"
     ]
   },
   {
@@ -846,10 +870,10 @@
     "email_verified": "",
     "ad_count": 1,
     "platforms": "['INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Ad on Instagram and Facebook",
-    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Instagram and Facebook to promote your real estate services. One challenge many agents face is that leads from ads can go cold if not answered in seconds. LaHaus AI can change that! Our AI assistant responds instantly, qualifies leads, and even books appointments for you. With over 60 realtors already using LaHaus AI to enhance their ad ROI, you won’t want to miss out.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Instagram and Facebook with LaHaus AI!",
+    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Instagram and Facebook, and I wanted to share a quick tip. Leads from ads can go cold if not answered in seconds, which means missed opportunities.\n\nLaHaus AI responds instantly to inquiries, qualifies leads, and even books appointments for you. With over 60 realtors already using it to enhance their ad ROI, it’s a game-changer for busy agents like you.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned they are running 1 ad on Instagram and Facebook."
+      "Mentioned the prospect is running 1 ad on Instagram and Facebook"
     ]
   },
   {
@@ -870,11 +894,11 @@
     "email_verified": "valid",
     "ad_count": 1,
     "platforms": "['INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Ad on Instagram and Facebook with Instant Responses!",
-    "email_body": "Hi Deanna,\n\nI noticed you're running 1 ad on Instagram and Facebook, and I wanted to share how LaHaus AI can help. Leads from ads can go cold if not answered in seconds, and that's where we come in. Our AI assistant responds instantly, qualifies leads, and schedules appointments, ensuring you never lose a potential client again. \n\nWith 60+ realtors already benefiting from LaHaus AI, I’d love to show you how it can enhance your ad ROI too. \n\nAre you open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Instagram and Facebook with LaHaus AI",
+    "email_body": "Hi Deanna,\n\nI noticed you're running 1 ad on Instagram and Facebook. It’s crucial to respond to leads instantly, as they can go cold in seconds. LaHaus AI can help by answering inquiries in seconds, automatically qualifying leads, and scheduling appointments for you.\n\nWith 60+ realtors already benefiting from improved ad ROI, I believe this could be a game changer for See Homes in Southwest Florida.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned Deanna's name",
-      "Referred to their 1 ad on Instagram and Facebook"
+      "Addressed by first name: Deanna",
+      "Mentioned their 1 ad on Instagram and Facebook"
     ]
   },
   {
@@ -889,10 +913,10 @@
     "email_verified": "valid",
     "ad_count": 6,
     "platforms": "['FACEBOOK', 'AUDIENCE_NETWORK', 'INSTAGRAM', 'MESSENGER', 'THREADS']",
-    "email_subject": "Boost Your 6 Facebook & Instagram Ads with Instant Lead Responses",
-    "email_body": "Hi there,\n\nI noticed you’re running 6 ads on Facebook and Instagram. Great work! However, I know how quickly leads can go cold if they aren’t answered in seconds. \n\nThat’s where LaHaus AI comes in. Our AI assistant responds instantly, qualifies leads, and even books appointments for you. With over 60 realtors already experiencing increased ad ROI, you won’t want to miss out.\n\nWould you be open to a quick call or demo this week to see how it can help you?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 6 Facebook and Instagram Ads with Instant Responses",
+    "email_body": "Hi there,\n\nI noticed you're running 6 ads on Facebook and Instagram, which is fantastic! However, leads from those ads can go cold if not answered in seconds. That's where LaHaus AI comes in. Our AI assistant responds instantly, qualifies leads, and books appointments — helping you keep those potential clients engaged.\n\nWith over 60 realtors already using LaHaus AI to increase their ad ROI, it's a game changer! \n\nWould you be open to a quick call or demo this week to see how it can work for you?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned their 6 ads on Facebook and Instagram"
+      "referenced their 6 ads on Facebook and Instagram"
     ]
   },
   {
@@ -909,10 +933,10 @@
     "email_verified": "",
     "ad_count": 2,
     "platforms": "['INSTAGRAM', 'MESSENGER', 'FACEBOOK']",
-    "email_subject": "Boost Your 2 Ads on Instagram and Facebook with LaHaus AI",
-    "email_body": "Hi there,\n\nI noticed you’re running 2 ads on Instagram and Facebook, which is fantastic! However, leads can go cold if not answered in seconds. LaHaus AI responds instantly to inquiries, qualifies leads, and even books appointments for you. Over 60 realtors are already leveraging it to enhance their ad ROI. \n\nWould you be open to a quick call or demo this week to see how it can work for Skygate Growth Strategies?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 2 Instagram and Facebook Ads’ Performance",
+    "email_body": "Hi there,\n\nI noticed you’re running 2 ads on Instagram and Facebook. The demand for luxury properties is high, but leads can go cold if not answered in seconds. \n\nLaHaus AI responds instantly, qualifies leads, and books appointments—all while over 60 realtors have already seen their ad ROI increase with our tool. \n\nHow about a quick call or demo this week to see how LaHaus AI can help you capture those leads?\n\nBest, \nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "2 ads on Instagram and Facebook"
+      "Mentioned they are running 2 ads on Instagram and Facebook"
     ]
   },
   {
@@ -933,10 +957,10 @@
     "email_verified": "valid",
     "ad_count": 1,
     "platforms": "['THREADS', 'INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Ad on Instagram and Facebook",
-    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Instagram and Facebook for your real estate services. It’s crucial to respond to leads quickly, as they can go cold in seconds. With LaHaus AI, you can instantly answer inquiries, qualify leads, and even schedule appointments—all while you focus on closing deals. \n\nJoin over 60 realtors who are already enhancing their ad ROI with LaHaus AI. \n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Instagram and Facebook with LaHaus AI",
+    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Instagram and Facebook. It’s great to see your efforts in reaching potential clients! However, leads from ads can go cold if they’re not answered in seconds. \n\nThat’s where LaHaus AI comes in. Our AI assistant responds instantly, qualifies leads, and books appointments—all while you focus on closing deals. Over 60 realtors are already using LaHaus AI to enhance their ad ROI.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned the prospect's 1 ad on Instagram and Facebook"
+      "Mentioned they are running 1 ad on Instagram and Facebook"
     ]
   },
   {
@@ -953,11 +977,11 @@
     "email_verified": "valid",
     "ad_count": 2,
     "platforms": "['INSTAGRAM', 'FACEBOOK']",
-    "email_subject": "Boost Your 2 Instagram and Facebook Ads with Instant Lead Response!",
-    "email_body": "Hi there,\n\nI noticed you're running 2 ads on Instagram and Facebook to showcase Miami's stunning waterfront properties. The challenge is that leads can go cold if not answered in seconds, right? \n\nLaHaus AI is here to help! Our AI assistant responds instantly, qualifies leads, and schedules appointments, ensuring you never lose a potential client. Plus, over 60 realtors are already using LaHaus AI to enhance their ad ROI.\n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 2 Instagram and Facebook Ads Response Time!",
+    "email_body": "Hi there,\n\nI noticed you’re running 2 ads on Instagram and Facebook to showcase Miami's waterfront lifestyle. That’s fantastic! However, leads from ads can go cold if not answered in seconds. \n\nLaHaus AI can help! We respond instantly, qualify leads, and book appointments—all within seconds. Over 60 realtors are already using LaHaus AI to enhance their ad ROI.\n\nWould you be open to a quick call or demo this week to see how it can work for Sunland Real Estate?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Addressed them as 'Hi there'",
-      "Mentioned '2 ads on Instagram and Facebook'"
+      "Mentioned the prospect's 2 ads on Instagram and Facebook",
+      "Acknowledged their focus on Miami's waterfront lifestyle"
     ]
   },
   {
@@ -987,8 +1011,8 @@
     "email_verified": "valid",
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Ad on Facebook and Instagram with LaHaus AI",
-    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Facebook and Instagram. It’s crucial to respond to leads instantly, as they can go cold in seconds! LaHaus AI can help by answering inquiries immediately, qualifying leads, and even scheduling appointments for you. \n\nJoin the 60+ realtors already enhancing their ad ROI with our tool. How about a quick call or demo this week to see how it can work for you?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Facebook and Instagram with Instant Responses!",
+    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Facebook and Instagram. It's crucial to respond to leads in seconds; otherwise, they go cold before you even get the chance. \n\nLaHaus AI can help! Our AI assistant answers inquiries instantly, qualifies leads, and schedules appointments for you. With over 60 realtors already using LaHaus AI to enhance their ad ROI, it could be a game-changer for your business. \n\nAre you available for a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
       "1 ad on Facebook and Instagram"
     ]
@@ -1017,44 +1041,49 @@
     "email_verified": "valid",
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Facebook Ad Response with LaHaus AI",
-    "email_body": "Hi Heather,\n\nI noticed you’re running 1 ad on Facebook promoting custom home lists under $500k. With leads going cold if not answered in seconds, it’s crucial to respond quickly. LaHaus AI can help! Our AI assistant answers leads in seconds, qualifies them, and schedules appointments—perfect for agents like you.\n\nJoin 60+ realtors already boosting their ad ROI with us. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Facebook Ad Response with LaHaus AI!",
+    "email_body": "Hi Heather,\n\nI noticed you’re running 1 ad on Facebook promoting custom home lists under $500k. It’s a great offer, but leads can go cold if not answered in seconds. That’s where LaHaus AI comes in! Our AI assistant responds instantly, qualifies leads, and books appointments—all in seconds. \n\nWith 60+ realtors already using LaHaus AI to enhance their ad ROI, you could easily turn those leads into clients. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Contacted by first name (Heather)",
-      "Mentioned 1 ad on Facebook",
-      "Ad copy related to homes under $500k"
+      "Contact's first name: Heather",
+      "Mention of running 1 ad on Facebook"
     ]
   },
   {
     "page_name": "The Henry Coral Gables",
-    "contact_name": "",
-    "contact_position": "",
-    "primary_email": "",
+    "contact_name": "Leasing Office",
+    "contact_position": "Property Management",
+    "primary_email": "leasing@thehenrycoralgables.com",
     "emails": [],
-    "hunter_emails": [],
-    "email_verified": "",
+    "hunter_emails": [
+      "leasing@thehenrycoralgables.com"
+    ],
+    "email_verified": "manual",
     "ad_count": 2,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 2 Facebook and Instagram Ads with Instant Responses",
-    "email_body": "Hi there,\n\nI noticed you’re running 2 ads on Facebook and Instagram for luxury apartments in Coral Gables. It’s crucial to respond to leads instantly, as they can go cold in seconds. With LaHaus AI, you can answer inquiries in real time, automatically qualify leads, and schedule appointments—all while 60+ realtors are already seeing improved ROI.\n\nWould you be open to a quick call or demo this week to see how it can work for you?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 2 Facebook and Instagram Ads Response Time!",
+    "email_body": "Hi there,\n\nI noticed that you're running 2 ads on Facebook and Instagram promoting your luxury apartments at The Henry Coral Gables. With leads going cold if not answered in seconds, it’s crucial to respond quickly. \n\nLaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and schedules appointments, ensuring you never lose potential renters. Over 60 realtors are already benefiting from increased ad ROI with our tool.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned they are running 2 ads on Facebook and Instagram"
+      "Mentioned their 2 ads on Facebook and Instagram",
+      "Referred to their luxury apartments"
     ]
   },
   {
     "page_name": "The Law Offices of Patrick L. Cordero PA",
-    "contact_name": "",
-    "contact_position": "",
-    "primary_email": "",
+    "contact_name": "Patrick L. Cordero",
+    "contact_position": "Managing Attorney",
+    "primary_email": "patrick@attorneycordero.com",
     "emails": [],
-    "hunter_emails": [],
-    "email_verified": "",
+    "hunter_emails": [
+      "patrick@attorneycordero.com"
+    ],
+    "email_verified": "manual",
     "ad_count": 3,
     "platforms": "['INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 3 Instagram and Facebook Ads Response Time!",
-    "email_body": "Hi there,\n\nI noticed you’re running 3 ads on Instagram and Facebook, which is great! However, leads can go cold if they aren't answered in seconds. LaHaus AI responds instantly to inquiries, qualifies leads, and books appointments, ensuring you never lose potential clients again.\n\nWith over 60 realtors already benefiting from increased ROI, it’s a tool you won’t want to miss. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 3 Instagram & Facebook Ads with Instant Lead Response",
+    "email_body": "Hi Patrick,\n\nI noticed you're running 3 ads on Instagram and Facebook, which is fantastic! However, leads can go cold if not answered in seconds. LaHaus AI can help by responding instantly, qualifying those leads, and booking appointments for you. \n\nWith over 60 realtors already using LaHaus AI to enhance their ad ROI, you can trust that this tool will keep your leads engaged. \n\nWould you be open to a quick call or demo this week to see how it can work for you?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned they are running 3 ads on Instagram and Facebook"
+      "Contact's first name: Patrick",
+      "Mentioned 3 ads on Instagram and Facebook"
     ]
   },
   {
@@ -1084,10 +1113,10 @@
     "email_verified": "valid",
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Facebook & Instagram Ad's Response Rate",
-    "email_body": "Hi Dylan,\n\nI noticed you’re running 1 ad on Facebook and Instagram. Did you know leads can go cold in seconds if not answered promptly? With LaHaus AI, you can respond instantly, qualify leads, and book appointments without lifting a finger. \n\nOver 60 realtors are already seeing improved results with LaHaus AI, ensuring they don’t lose valuable leads to slow response times. \n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Facebook and Instagram with LaHaus AI",
+    "email_body": "Hi Dylan,  \n\nI noticed you’re running 1 ad on Facebook and Instagram. It’s great to see your efforts in showcasing homes in your area! However, leads from ads can go cold if not answered in seconds. That’s where LaHaus AI comes in. Our AI assistant responds instantly, qualifies leads, and even books appointments for you.  \n\nWith over 60 realtors already benefiting from LaHaus AI, it’s a game changer for managing your leads efficiently.  \n\nWould you be open to a quick call or demo this week?  \n\nBest,  \nTomás Uribe  \nCofounder, LaHaus AI",
     "personalization_points": [
-      "Dylan's name",
+      "Dylan",
       "1 ad on Facebook and Instagram"
     ]
   },
@@ -1105,11 +1134,10 @@
     "email_verified": "accept_all",
     "ad_count": 1,
     "platforms": "['INSTAGRAM', 'FACEBOOK']",
-    "email_subject": "Boost Your 1 Ad on Instagram and Facebook with Instant Responses!",
-    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Instagram and Facebook. It’s great to see your innovative Virtual Sales Gallery showcased! However, leads can go cold if not answered in seconds. \n\nLaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and schedules appointments—all within seconds. Over 60 realtors are already using it to enhance their ad ROI. \n\nWould you be open to a quick call or demo this week to explore how LaHaus AI can elevate your response times?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Instagram and Facebook with Instant Responses",
+    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Instagram and Facebook. As you know, leads from ads can go cold if not answered in seconds. That's where LaHaus AI comes in! Our AI assistant responds instantly, qualifies leads, and schedules appointments, ensuring you never lose a potential client. Over 60 realtors are already using LaHaus AI to enhance their ad ROI.\n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned their 1 ad on Instagram and Facebook",
-      "Referenced their Virtual Sales Gallery and recent event"
+      "Mentioned their 1 ad on Instagram and Facebook"
     ]
   },
   {
@@ -1131,10 +1159,10 @@
     "email_verified": "valid",
     "ad_count": 2,
     "platforms": "['INSTAGRAM', 'FACEBOOK']",
-    "email_subject": "Boost Your 2 Instagram and Facebook Ads Response Time",
-    "email_body": "Hi Juliana,\n\nI noticed you’re running 2 ads on Instagram and Facebook. With leads going cold if not answered in seconds, it’s crucial to respond quickly. LaHaus AI can help by instantly responding to your inquiries, qualifying leads, and scheduling appointments—all in seconds!\n\nJoin 60+ realtors who are already enhancing their ad ROI with our AI assistant. \n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 2 Instagram & Facebook Ads Response Time!",
+    "email_body": "Hi Juliana,\n\nI noticed you’re running 2 ads on Instagram and Facebook. It’s crucial to respond to leads instantly, as they can go cold in seconds! LaHaus AI can help—our AI assistant responds in seconds, qualifies leads, and books appointments automatically. \n\nJoin over 60 realtors already using LaHaus AI to enhance their ad ROI. \n\nAre you available for a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Addressed by first name Juliana",
+      "Addressed by first name (Juliana)",
       "Mentioned 2 ads on Instagram and Facebook"
     ]
   },
@@ -1150,11 +1178,11 @@
     "email_verified": "",
     "ad_count": 3,
     "platforms": "['INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 3 Instagram and Facebook Ads Response Time!",
-    "email_body": "Hi Tracy,\n\nI noticed you’re running 3 ads on Instagram and Facebook. It’s crucial to respond to leads in seconds—otherwise, they go cold. LaHaus AI can help! Our AI assistant answers inquiries instantly, qualifies leads, and schedules appointments, ensuring you never lose potential clients.\n\nWith 60+ realtors already benefiting from LaHaus AI, you can enhance your ad ROI and streamline your process.\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 3 Instagram & Facebook Ads with Instant Lead Response",
+    "email_body": "Hi there,\n\nI noticed you’re running 3 ads on Instagram and Facebook to showcase that stunning unit in the Continuum North tower. With leads going cold in seconds if not answered, it’s crucial to respond quickly.\n\nLaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and books appointments—all while 60+ realtors are already enjoying increased ROI.\n\nWould you be open to a quick call or demo this week to see how it can work for you?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned the prospect's name, Tracy",
-      "Referenced their 3 ads on Instagram and Facebook"
+      "Mentioned 3 ads on Instagram and Facebook",
+      "Referenced the Continuum North tower unit"
     ]
   },
   {
@@ -1175,10 +1203,11 @@
     "email_verified": "accept_all",
     "ad_count": 2,
     "platforms": "['FACEBOOK', 'AUDIENCE_NETWORK', 'INSTAGRAM', 'MESSENGER', 'THREADS']",
-    "email_subject": "Boost Your 2 Facebook & Instagram Ads with Instant Responses!",
-    "email_body": "Hi there,\n\nI noticed you’re running 2 ads on Facebook and Instagram. It’s crucial to respond to leads instantly, as they can go cold in seconds. LaHaus AI can help! Our AI assistant answers inquiries in seconds, qualifies leads, and schedules appointments—all while helping over 60 realtors like you maximize their ad ROI.\n\nLet’s chat this week for a quick call or demo to see how LaHaus AI can elevate your lead response game!\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 2 Facebook & Instagram Ads with LaHaus AI",
+    "email_body": "Hi there,\n\nI noticed you're running 2 ads on Facebook and Instagram for Turnberry One Park Tower. It’s crucial to respond to leads quickly, as they go cold if not answered in seconds. \n\nLaHaus AI can help! Our AI assistant responds instantly, qualifies leads, and even books appointments for you. With over 60 realtors already benefiting from increased ad ROI, it’s a game changer for busy agents like you.\n\nWould you be open to a quick call or demo this week to see how it can work for you?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned running 2 ads on Facebook and Instagram"
+      "Addressed them as 'Hi there'",
+      "Mentioned '2 ads on Facebook and Instagram'"
     ]
   },
   {
@@ -1197,9 +1226,11 @@
     "ad_count": 1,
     "platforms": "['INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
     "email_subject": "Boost Your 1 Ad on Instagram and Facebook Instantly!",
-    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Instagram and Facebook. It's great to see your efforts in showcasing Merritt Island properties! However, leads from ads can go cold if not answered in seconds.\n\nLaHaus AI can respond instantly, qualify leads, and book appointments, ensuring you never lose potential clients again. Join 60+ realtors who are already increasing their ad ROI with our AI assistant.\n\nWould you be open to a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Instagram and Facebook. It’s a great way to attract leads, but we both know how quickly they can go cold without instant responses. \n\nLaHaus AI answers leads in seconds, qualifies them, and even schedules appointments for you. Over 60 realtors are already using it to enhance their ad ROI.\n\nWould you be open to a quick call or demo this week to see how it can work for View Florida Real Estate?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "1 ad on Instagram and Facebook"
+      "Mentioned '1 ad on Instagram and Facebook'",
+      "Acknowledged their current advertising efforts",
+      "Identified the problem of leads going cold without instant response"
     ]
   },
   {
@@ -1216,11 +1247,10 @@
     "email_verified": "",
     "ad_count": 1,
     "platforms": "['FACEBOOK', 'INSTAGRAM', 'MESSENGER', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 1 Facebook and Instagram Ad Response Rate!",
-    "email_body": "Hi there,\n\nI noticed you’re running 1 ad on Facebook and Instagram. It’s great to see your efforts in showcasing homes! However, leads can go cold if not answered in seconds. \n\nLaHaus AI can change that. Our AI assistant responds instantly, qualifies leads, and schedules appointments, ensuring you never lose a potential buyer. Over 60 realtors have already enhanced their ad ROI with LaHaus AI.\n\nLet’s chat or schedule a quick demo this week to see how we can help you capture those leads!\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 1 Ad on Facebook and Instagram with LaHaus AI",
+    "email_body": "Hi there,\n\nI noticed you're running 1 ad on Facebook and Instagram. It's great to see your commitment to connecting with potential home buyers! However, leads can go cold if they aren’t answered in seconds.\n\nThat's where LaHaus AI comes in. We respond instantly, qualify leads, and even schedule appointments for you. With over 60 realtors already boosting their ad ROI using our tool, you won't want to miss out!\n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Contact name: None",
-      "Mentioned 1 ad on Facebook and Instagram"
+      "1 ad on Facebook and Instagram"
     ]
   },
   {
@@ -1236,10 +1266,10 @@
     "email_verified": "",
     "ad_count": 6,
     "platforms": "['INSTAGRAM', 'FACEBOOK', 'AUDIENCE_NETWORK']",
-    "email_subject": "Boost Your 6 Ads on Instagram and Facebook Instantly!",
-    "email_body": "Hi there,\n\nI noticed you’re running 6 ads on Instagram and Facebook. That’s fantastic! But I know how quickly leads can go cold if they aren’t answered in seconds. \n\nLaHaus AI is here to help! Our AI assistant responds instantly, qualifies leads, and schedules appointments, ensuring you never lose a potential client. With 60+ realtors already benefiting from increased ad ROI, it’s a game-changer for agents like you.\n\nAre you available for a quick call or demo this week? \n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
+    "email_subject": "Boost Your 6 Instagram and Facebook Ads with Instant Responses!",
+    "email_body": "Hi there,\n\nI noticed you're running 6 ads on Instagram and Facebook, which is fantastic! However, leads from ads can go cold if not answered in seconds. That’s where LaHaus AI comes in. Our AI assistant responds instantly, qualifies leads, and even books appointments for you.\n\nWith 60+ realtors already enjoying increased ROI, you could streamline your process and never lose a lead again. \n\nWould you be open to a quick call or demo this week?\n\nBest,\nTomás Uribe\nCofounder, LaHaus AI",
     "personalization_points": [
-      "Mentioned running 6 ads on Instagram and Facebook"
+      "Mentioned their 6 ads on Instagram and Facebook"
     ]
   }
 ]

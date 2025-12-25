@@ -132,6 +132,49 @@ def enrich_all(df):
 
     return df
 
+
+def merge_manual_contacts(df):
+    """Merge manually researched contacts from config/manual_contacts.csv."""
+    from pathlib import Path
+
+    manual_path = Path(__file__).parent.parent / "config" / "manual_contacts.csv"
+    if not manual_path.exists():
+        print("No manual contacts file found")
+        return df
+
+    manual_df = pd.read_csv(manual_path)
+    print(f"Loaded {len(manual_df)} manual contacts from {manual_path.name}")
+
+    # Create lookup by page_name
+    manual_lookup = {row['page_name']: row for _, row in manual_df.iterrows()}
+
+    updated = 0
+    for idx, row in df.iterrows():
+        page_name = row['page_name']
+        if page_name in manual_lookup:
+            manual = manual_lookup[page_name]
+
+            # Only update if Hunter didn't find data
+            if pd.isna(row.get('primary_email')) or not row.get('primary_email'):
+                df.at[idx, 'primary_email'] = manual['primary_email']
+                df.at[idx, 'email_verified'] = 'manual'
+
+                # Update hunter_emails list
+                current = str(row.get('hunter_emails', '[]'))
+                if current == '[]' or current == 'nan' or pd.isna(row.get('hunter_emails')):
+                    df.at[idx, 'hunter_emails'] = f"['{manual['primary_email']}']"
+
+                updated += 1
+
+            # Always update contact name if manual has one and current is empty
+            if manual.get('contact_name') and (pd.isna(row.get('contact_name')) or not row.get('contact_name')):
+                df.at[idx, 'contact_name'] = manual['contact_name']
+                df.at[idx, 'contact_position'] = manual.get('contact_position', '')
+
+    print(f"Merged {updated} manual contacts")
+    return df
+
+
 if __name__ == '__main__':
     input_path = 'processed/03_contacts.csv'
     output_path = 'processed/03b_hunter.csv'
@@ -146,6 +189,10 @@ if __name__ == '__main__':
         df = df.head(3)
 
     df = enrich_all(df)
+
+    # Merge manual contacts (from config/manual_contacts.csv)
+    df = merge_manual_contacts(df)
+
     df.to_csv(output_path, index=False)
     print(f"\nSaved: {output_path}")
 

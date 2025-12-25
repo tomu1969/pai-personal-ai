@@ -1,6 +1,6 @@
 # Facebook Ads Library Prospecting Pipeline
 
-Automated pipeline to convert Facebook Ads Library data into qualified prospects with personalized outreach emails for LaHaus AI.
+Automated pipeline to convert Facebook Ads Library data into qualified prospects with verified contact information, ready for HubSpot import.
 
 ## Quick Start
 
@@ -22,31 +22,33 @@ python run_pipeline.py
 ## Pipeline Overview
 
 ```
-Module 1    Module 2    Module 3    Module 3.5   Module 4    Module 5    Module 6
-Loader  →  Enricher →  Scraper  →   Hunter   →  Composer →  Exporter → Validator
-  │           │           │            │            │           │           │
-Excel      Search      Scrape      Hunter.io    OpenAI      CSV/JSON   Quality
-           Websites    Contacts    Emails       GPT-4o                  Report
+Module 1    Module 2    Module 3    Module 3.5   Module 3.6      Module 4    Module 5
+Loader  →  Enricher →  Scraper  →   Hunter   → Agent Enricher → Exporter → Validator
+  │           │           │            │             │              │           │
+Excel      Search      Scrape      Hunter.io    OpenAI Agents   HubSpot     Quality
+           Websites    Contacts    Emails       (fallback)      CSV         Report
 ```
 
 ## Project Structure
 
 ```
 fb_ads_library_prospecting/
-├── run_pipeline.py       # Main orchestrator
+├── run_pipeline.py           # Main orchestrator
 ├── scripts/
-│   ├── loader.py         # Module 1: Load Excel data
-│   ├── enricher.py       # Module 2: Find company websites
-│   ├── scraper.py        # Module 3: Scrape contacts
-│   ├── hunter.py         # Module 3.5: Hunter.io email enrichment
-│   ├── composer.py       # Module 4: Generate personalized emails
-│   ├── exporter.py       # Module 5: Export to CSV/Excel/JSON
-│   ├── validator.py      # Module 6: Quality validation
-│   └── progress.py       # Real-time progress monitor
-├── input/                # Source Excel file
-├── processed/            # Intermediate CSV files
-├── output/               # Final prospect data
-└── config/               # Settings and overrides
+│   ├── loader.py             # Module 1: Load Excel data
+│   ├── enricher.py           # Module 2: Find company websites
+│   ├── scraper.py            # Module 3: Scrape contacts from websites
+│   ├── hunter.py             # Module 3.5: Hunter.io email/phone enrichment
+│   ├── contact_enricher_pipeline.py  # Module 3.6: AI agent fallback enrichment
+│   ├── exporter.py           # Module 4: Export to HubSpot CSV
+│   ├── validator.py          # Module 5: Quality validation
+│   └── legacy/               # Archived scripts
+├── input/                    # Source Excel file
+├── processed/                # Intermediate CSV files
+│   └── legacy/               # Old processed files
+├── output/                   # Final export files
+│   └── legacy/               # Old output files
+└── config/                   # Settings and overrides
 ```
 
 ## Usage
@@ -62,28 +64,41 @@ python scripts/loader.py
 python scripts/enricher.py --all
 python scripts/scraper.py --all
 python scripts/hunter.py --all
-python scripts/composer.py --all
+python scripts/contact_enricher_pipeline.py --all
 python scripts/exporter.py
 python scripts/validator.py
 ```
 
 ### Resume from Specific Module
 ```bash
-python run_pipeline.py --all --from 3.5  # Resume from Hunter
-```
-
-### Monitor Progress (separate terminal)
-```bash
-python scripts/progress.py
+python run_pipeline.py --all --from 3.5   # Resume from Hunter
+python run_pipeline.py --all --from 3.6   # Resume from Agent Enricher
+python run_pipeline.py --all --from 4     # Resume from Exporter
 ```
 
 ## Output Files
 
 | File | Description |
 |------|-------------|
-| `output/prospects_final.csv` | Complete prospect data |
+| `output/hubspot_contacts.csv` | HubSpot-ready import file (contacts with email) |
+| `output/prospects_final.csv` | Complete prospect data (all columns) |
 | `output/prospects_final.xlsx` | Excel version with formatting |
-| `output/email_drafts.json` | Ready-to-send personalized emails |
+
+### HubSpot CSV Columns
+
+| Column | HubSpot Property | Source |
+|--------|------------------|--------|
+| `email` | Email (unique ID) | Hunter.io / Agent Enricher |
+| `firstname` | First Name | Parsed from contact_name |
+| `lastname` | Last Name | Parsed from contact_name |
+| `company` | Company | page_name |
+| `jobtitle` | Job Title | contact_position |
+| `website` | Website | website_url |
+| `phone` | Phone | Scraper / Hunter.io |
+| `fb_ad_count` | Custom: FB Ad Count | Source data |
+| `fb_page_likes` | Custom: FB Page Likes | Source data |
+| `ad_platforms` | Custom: Ad Platforms | Source data |
+| `email_verified` | Custom: Email Verified | Hunter.io verification |
 
 ## Configuration
 
@@ -100,154 +115,68 @@ page_name,website_url
 "Company Name","https://company.com"
 ```
 
-## Current Pipeline Results
+### Manual Contacts (config/manual_contacts.csv)
+Add manually researched contacts:
+```csv
+page_name,primary_email,contact_name,contact_position
+"Company Name","email@company.com","John Doe","Broker"
+```
+
+## Current Pipeline Results (December 2025)
 
 | Metric | Count | % |
 |--------|-------|---|
 | Total Prospects | 59 | 100% |
-| Complete (email + contact) | 28 | 47% |
-| Missing contact only | 13 | 22% |
-| Missing both email & contact | 18 | 31% |
-| Websites found | 52 | 88% |
-| Hunter emails verified | 28 | 47% |
+| Ready for HubSpot (has email) | 48 | 81.4% |
+| Verified emails | 37 | 62.7% |
+| With phone number | 39 | 66.1% |
+| Complete (email + contact + phone) | 23 | 39.0% |
+| Quality score | - | 59.0% |
 
-## Next Steps: Automating Missing Data Completion
+### Enrichment Sources
 
-### 1. Apollo.io Integration (Recommended)
-Add Apollo.io as fallback for prospects where Hunter.io found no emails.
+| Source | Count | Description |
+|--------|-------|-------------|
+| Hunter.io | 46 | Primary email enrichment |
+| Agent v2.1 | 7 | AI agent strict search |
+| Agent v3.1 | 2 | AI agent iterative search |
+| Manual | 10 | Manual overrides |
+| Unfound | 11 | No email found |
 
-**Implementation:**
-```python
-# scripts/apollo.py
-def search_person(name, company_domain):
-    """Find person's email via Apollo.io People API"""
-    # POST https://api.apollo.io/v1/people/match
-    pass
+## Pipeline Data Flow
 
-def search_company(company_name):
-    """Find company contacts via Apollo.io Organization API"""
-    # POST https://api.apollo.io/v1/organizations/search
-    pass
 ```
-
-**Add to pipeline after Hunter:**
-- Input: prospects with no Hunter email
-- Output: updated 03b_hunter.csv with Apollo emails
-
-### 2. LinkedIn Sales Navigator Scraping
-For prospects with no website or email, extract contact info from LinkedIn.
-
-**Implementation options:**
-- **Phantombuster**: LinkedIn profile scraper (paid, reliable)
-- **LinkedIn API**: Official API with limited access
-- **Browser automation**: Selenium/Playwright (requires careful rate limiting)
-
-**Data to extract:**
-- Company LinkedIn URL → Employee list → Decision maker emails
-- Use page_name to search LinkedIn Companies
-
-### 3. Google Maps / Places API
-For local real estate businesses, extract contact info from Google Business profiles.
-
-**Implementation:**
-```python
-# scripts/google_places.py
-def search_business(company_name, location="Miami"):
-    """Find business contact via Google Places API"""
-    # Returns: phone, website, address
-    pass
+01_loaded.csv      → Raw data from Excel (59 advertisers)
+02_enriched.csv    → + website_url, linkedin_url, search_confidence
+03_contacts.csv    → + emails, phones from website scraping
+03b_hunter.csv     → + primary_email, contact_name, email_verified from Hunter
+03c_enriched.csv   → Agent enrichment results (for unfound contacts)
+03d_final.csv      → Merged final data (input for Exporter)
 ```
-
-### 4. Website Contact Form Detection
-For prospects with websites but no email, detect and catalog contact forms.
-
-**Implementation:**
-```python
-# scripts/contact_forms.py
-def detect_contact_form(website_url):
-    """Find contact form URL on website"""
-    # Check /contact, /contact-us, /get-in-touch
-    # Return form URL if found
-    pass
-```
-
-### 5. Manual Research Queue
-Export a prioritized list for manual research with helpful context.
-
-**Implementation:**
-```python
-# scripts/research_queue.py
-def export_research_queue():
-    """Export prospects needing manual research"""
-    # Priority: high ad count + high page likes = higher priority
-    # Include: page_name, ad_count, website_url, ad_text samples
-    # Output: output/manual_research_queue.csv
-```
-
-### 6. Email Finder Aggregator
-Combine multiple email finding services for higher coverage.
-
-**Services to integrate:**
-- Hunter.io (current)
-- Apollo.io
-- Clearbit
-- Snov.io
-- FindThatLead
-- Voila Norbert
-
-**Implementation:**
-```python
-# scripts/email_aggregator.py
-def find_email(name, domain, company):
-    """Try multiple services until email found"""
-    providers = [hunter, apollo, clearbit, snov]
-    for provider in providers:
-        email = provider.find(name, domain)
-        if email:
-            return email, provider.name
-    return None, None
-```
-
-### 7. Automated Follow-up for Unverified Emails
-For emails marked as "accept_all" or unverified, implement email verification.
-
-**Tools:**
-- NeverBounce
-- ZeroBounce
-- EmailListVerify
-
-### Priority Implementation Order
-
-1. **Apollo.io** - Highest ROI, good coverage, reasonable cost
-2. **Manual Research Queue** - Quick win, helps prioritize human effort
-3. **Google Places** - Good for local real estate businesses
-4. **Email Aggregator** - Maximize coverage with multiple sources
-5. **LinkedIn Scraping** - Most comprehensive but complex/risky
 
 ## Troubleshooting
 
 ### No emails found for a prospect
 1. Check if website was found in `02_enriched.csv`
 2. Try adding website manually to `config/website_overrides.csv`
-3. Re-run from Hunter module: `python run_pipeline.py --from 3.5`
+3. Re-run from Hunter module: `python run_pipeline.py --from 3.5 --all`
 
-### "Hi None" in emails
-Fixed in current version. If still occurring, run:
-```bash
-python scripts/composer.py --all
-python scripts/exporter.py
-```
+### Missing phone numbers
+1. Phone numbers are extracted from websites (Scraper) and Hunter.io
+2. Agent Enricher also searches for phone numbers as fallback
+3. Consider adding to `config/manual_contacts.csv`
 
 ### Rate limiting errors
 - Enricher: Uses 2-second delays between requests
 - Hunter: Uses 1-second delays
-- Increase delays in script if needed
+- Agent Enricher: Uses OpenAI API with built-in rate limiting
+- Increase delays in scripts if needed
 
 ## API Requirements
 
 | Service | Purpose | Free Tier |
 |---------|---------|-----------|
-| OpenAI | Email generation | Pay per use |
+| OpenAI | Agent enrichment, website analysis | Pay per use |
 | Hunter.io | Email finding/verification | 25 searches/month |
 | DuckDuckGo | Website search | Unlimited (rate limited) |
 

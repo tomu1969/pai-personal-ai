@@ -24,9 +24,9 @@ def get_domain(url):
     return domain
 
 def search_domain(domain):
-    """Find all emails and contacts for a domain."""
+    """Find all emails, contacts, and phone numbers for a domain."""
     if not domain:
-        return [], None, None, None
+        return [], None, None, [], None
 
     try:
         resp = requests.get(
@@ -41,6 +41,13 @@ def search_domain(domain):
             # Extract all emails
             emails = [e['value'] for e in emails_data]
 
+            # Extract phone numbers from contacts (Hunter includes phone_number field)
+            hunter_phones = []
+            for contact in emails_data:
+                phone = contact.get('phone_number')
+                if phone:
+                    hunter_phones.append(phone)
+
             # Get best contact (highest confidence)
             best_contact = None
             if emails_data:
@@ -51,14 +58,15 @@ def search_domain(domain):
                     'last_name': best.get('last_name', ''),
                     'position': best.get('position', ''),
                     'email': best.get('value', ''),
-                    'confidence': best.get('confidence', 0)
+                    'confidence': best.get('confidence', 0),
+                    'phone': best.get('phone_number', '')  # Include phone from best contact
                 }
 
-            return emails, best_contact, data.get('organization'), None
-        return [], None, None, None
+            return emails, best_contact, data.get('organization'), hunter_phones, None
+        return [], None, None, [], None
     except Exception as e:
         print(f"  Error searching {domain}: {e}")
-        return [], None, None, str(e)
+        return [], None, None, [], str(e)
 
 def verify_email(email):
     """Verify an email address."""
@@ -82,13 +90,14 @@ def enrich_row(row):
     """Enrich a single row with Hunter data."""
     domain = get_domain(row.get('website_url'))
 
-    # Search domain for emails and contacts
-    hunter_emails, best_contact, org, error = search_domain(domain)
+    # Search domain for emails, contacts, and phones
+    hunter_emails, best_contact, org, hunter_phones, error = search_domain(domain)
 
     # Get contact details
     contact_name = ''
     contact_position = ''
     primary_email = ''
+    contact_phone = ''
     confidence = None
 
     if best_contact:
@@ -97,6 +106,7 @@ def enrich_row(row):
         contact_name = f"{first} {last}".strip()
         contact_position = best_contact.get('position', '')
         primary_email = best_contact.get('email', '')
+        contact_phone = best_contact.get('phone', '')
         confidence = best_contact.get('confidence')
 
     # Verify primary email
@@ -106,12 +116,42 @@ def enrich_row(row):
 
     return {
         'hunter_emails': hunter_emails,
+        'hunter_phones': hunter_phones,
         'contact_name': contact_name,
         'contact_position': contact_position,
+        'contact_phone': contact_phone,
         'primary_email': primary_email,
         'email_confidence': confidence,
         'email_verified': verified_status
     }
+
+def merge_phones(existing_phones, hunter_phones, contact_phone):
+    """Merge phone numbers from different sources, avoiding duplicates."""
+    import ast
+
+    # Parse existing phones
+    phones = set()
+    if existing_phones and str(existing_phones) not in ['[]', 'nan', '']:
+        try:
+            if isinstance(existing_phones, str):
+                parsed = ast.literal_eval(existing_phones)
+                phones.update(parsed)
+            elif isinstance(existing_phones, list):
+                phones.update(existing_phones)
+        except (ValueError, SyntaxError):
+            pass
+
+    # Add Hunter phones
+    for phone in hunter_phones:
+        if phone:
+            phones.add(phone)
+
+    # Add contact phone
+    if contact_phone:
+        phones.add(contact_phone)
+
+    return list(phones)
+
 
 def enrich_all(df):
     """Enrich all rows with Hunter data."""
@@ -129,6 +169,17 @@ def enrich_all(df):
     df['primary_email'] = [r['primary_email'] for r in results]
     df['email_confidence'] = [r['email_confidence'] for r in results]
     df['email_verified'] = [r['email_verified'] for r in results]
+
+    # Merge phones: existing (from scraper) + Hunter phones
+    merged_phones = []
+    for idx, row in df.iterrows():
+        existing = row.get('phones', [])
+        hunter_phones = results[idx]['hunter_phones']
+        contact_phone = results[idx]['contact_phone']
+        merged = merge_phones(existing, hunter_phones, contact_phone)
+        merged_phones.append(merged)
+
+    df['phones'] = merged_phones
 
     return df
 

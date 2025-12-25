@@ -20,7 +20,9 @@ if not os.getenv("OPENAI_API_KEY"):
     if parent_env.exists():
         load_dotenv(parent_env)
 
-INPUT_PATH = Path(__file__).parent.parent / "processed" / "03b_hunter.csv"
+# Primary input is from Agent Enricher (Module 3.6), fallback to Hunter output
+INPUT_PATH = Path(__file__).parent.parent / "processed" / "03d_final.csv"
+INPUT_FALLBACK = Path(__file__).parent.parent / "processed" / "03b_hunter.csv"
 OUTPUT_PATH = Path(__file__).parent.parent / "processed" / "04_emails.csv"
 
 MODEL = "gpt-4o-mini"
@@ -188,9 +190,14 @@ if __name__ == "__main__":
     run_all = "--all" in sys.argv
     print(f"=== Email Composer Module {'Full Run' if run_all else 'Test'} ===\n")
 
+    # Try primary input (from Module 3.6), then fallback to Hunter output
     if INPUT_PATH.exists():
         print(f"Loading: {INPUT_PATH}")
         df = pd.read_csv(INPUT_PATH)
+        test_df = df.copy() if run_all else df.head(3).copy()
+    elif INPUT_FALLBACK.exists():
+        print(f"Module 3.6 output not found, using fallback: {INPUT_FALLBACK}")
+        df = pd.read_csv(INPUT_FALLBACK)
         test_df = df.copy() if run_all else df.head(3).copy()
     else:
         print("No input file found. Creating mock data for testing...")

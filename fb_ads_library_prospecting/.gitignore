@@ -3,8 +3,18 @@ __pycache__/
 *.pyc
 .DS_Store
 ~$*
+
+# Input data
 input/*.csv
 input/*.json
+input/*.xlsx
+
+# Processed data (intermediate files)
 processed/*.csv
+processed/legacy/
+
+# Output data (final exports)
 output/*.csv
 output/*.xlsx
+output/*.json
+output/legacy/
